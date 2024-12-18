@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${title}">Retrospective App</title>
+    <script src="https://unpkg.com/htmx.org@1.9.2"></script>
+    <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Dosis:wght@400;500&family=Open+Sans&display=swap"
+        rel="stylesheet">
+    <script th:replace="~{fragments/tailwind-config :: tailwind-config}"></script>
+    <script>
+        document.body.addEventListener('htmx:sseError', function (evt) {
+            console.error('SSE Error:', evt);
+        });
+
+        document.body.addEventListener('htmx:sseOpen', function (evt) {
+            console.log('SSE Connected:', evt);
+        });
+    </script>
+</head>
+
+<body class="flex flex-col min-h-screen bg-gray-100 font-open-sans">
+    <!--/* add the CSRF header to all htmx requests */-->
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+
+        document.body.addEventListener('htmx:configRequest', (event) => {
+            const csrfHeader = /*[[${_csrf.headerName}]]*/ 'X-Sample-CSRF-Header';
+            const csrfToken = /*[[${_csrf.token}]]*/ 'sample-csrf-token';
+
+            event.detail.headers[csrfHeader] = csrfToken;
+        });
+
+        /*]]>*/
+    </script>
+    <header th:replace="~{fragments/header :: header}"></header>
+
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <div th:replace="~{('fragments/' + ${page}) :: content}">
+    </main>
+
+    <footer th:replace=" ~{fragments/footer :: footer}">
+    </footer>
+</body>
+
+</html>

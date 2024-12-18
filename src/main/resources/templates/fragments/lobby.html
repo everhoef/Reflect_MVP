@@ -1,0 +1,44 @@
+<div th:fragment="content" class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md" hx-ext="sse"
+  th:attr="sse-connect=@{/retrospective/{retroId}/events(retroId=${retroId},username=${userName})}" sse-swap="message">
+  <h2 class="text-2xl font-dosis mb-6">Session Lobby</h2>
+
+  <div class="mb-6 p-4 bg-gray-50 rounded-md">
+    <span class="text-gray-600">Session ID:</span>
+    <span th:text="${retroId}" class="font-mono text-ocher-yellow ml-2"></span>
+  </div>
+
+  <div class="participants mb-8">
+    <h3 class="text-xl font-dosis mb-4">Participants</h3>
+    <ul id="participants-list" class="space-y-2"
+      th:attr="hx-get=@{/retrospective/{retroId}/participants(retroId=${retroId})}"
+      hx-trigger="sse:PARTICIPANT_JOINED from:body" hx-swap="innerHTML">
+      <li th:each="participant : ${participants}" class="px-4 py-2 bg-gray-50 rounded-md" th:text="${participant}">
+      </li>
+    </ul>
+  </div>
+
+  <div th:if="${isFacilitator}" class="mt-8">
+    <form th:action="|/retrospective/${retroId}/start|" method="post">
+      <button type="submit"
+        class="w-full bg-ocher-yellow text-white py-3 px-6 rounded-md hover:bg-ocher-yellow-dark transition-colors">
+        Start Retrospective
+      </button>
+    </form>
+  </div>
+
+  <!-- Redirect on session start -->
+  <div th:attr="hx-get=@{/retrospective/{retroId}/session(retroId=${retroId})}" hx-trigger="sse:SESSION_STARTED"
+    hx-swap="none">
+  </div>
+
+  <!-- Connection status indicator -->
+  <div class="mt-4 flex items-center space-x-2">
+    <div class="h-2 w-2 rounded-full bg-yellow-500 animate-pulse"
+      hx-sse-swap-connected="this.classList.replace('bg-yellow-500', 'bg-green-500'); this.classList.remove('animate-pulse')"
+      hx-sse-swap-error="this.classList.replace('bg-yellow-500', 'bg-red-500'); this.classList.remove('animate-pulse')">
+    </div>
+    <span class="text-sm" hx-sse-swap-connected="innerHTML:Connected" hx-sse-swap-error="innerHTML:Connection lost">
+      Connecting...
+    </span>
+  </div>
+</div>

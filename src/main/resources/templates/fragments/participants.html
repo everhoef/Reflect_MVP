@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<body>
+    <div th:fragment="participantsList">
+        <ul id="participants-list">
+            <li th:each="participant : ${participants}" th:text="${participant}"></li>
+        </ul>
+    </div>
+</body>
+
+</html>
