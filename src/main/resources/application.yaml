@@ -1,8 +1,14 @@
+server:
+  servlet:
+    session:
+      timeout=
+
 spring:
   docker:
     compose:
       enabled: true
       file: compose.yaml
+      lifecycle-management: start-only
   application:
     name: facilitator
   datasource:
@@ -17,6 +23,15 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  session:
+    timeout: 2h
+    redis:
+      flush-mode: IMMEDIATE # Sessions flush mode.
+      namespace: spring:session # Namespace for keys used to store sessions.
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
 logging:
   level:

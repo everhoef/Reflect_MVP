@@ -1,16 +1,36 @@
-<div th:fragment="content">
-  <div class="max-w-4xl mx-auto" hx-sse="connect:/retrospective/{retroId}/events">
-    <h2 class="text-2xl font-dosis mb-6">Retrospective Session</h2>
+<div th:fragment="content" class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-md">
+    <!-- Phase and Stage Header -->
+    <div class="border-b pb-6 mb-6">
+        <div class="mb-4">
+            <h2 class="text-2xl font-dosis" th:text="${currentPhase.displayName}">Phase Name</h2>
+            <p class="text-gray-600" th:text="${currentPhase.description}">Phase description</p>
+        </div>
 
-    <div id="currentPage" class="bg-white p-8 rounded-lg shadow-md mb-6" hx-sse="swap:message[type='PAGE_CHANGE']">
-      <!-- Dynamic content will be loaded here -->
+        <div>
+            <h3 class="text-xl font-dosis mb-2" th:text="${currentStage.name}">Stage Name</h3>
+            <div class="space-y-2">
+                <p class="text-gray-600" th:text="${currentStage.why}">Why we're doing this</p>
+                <p th:text="${currentStage.what}">What to do</p>
+            </div>
+        </div>
     </div>
 
-    <div th:if="${isFacilitator}" class="facilitator-controls fixed bottom-8 right-8">
-      <button hx-post="@{/retrospective/{retroId}/next(retroId=${retroId})}"
-        class="bg-ocher-yellow text-white py-3 px-6 rounded-md hover:bg-ocher-yellow-dark transition-colors shadow-lg">
-        Next Page
-      </button>
+    <!-- Dynamic Content based on DisplayStep type -->
+    <div class="mb-8">
+        <div th:replace="${currentStep.templateReference}">
+            <!-- This will automatically use the correct template based on DisplayContentType -->
+        </div>
     </div>
-  </div>
+
+    <!-- Facilitator controls -->
+    <div th:if="${isFacilitator}" class="mt-8 flex justify-between items-center">
+        <span class="text-sm text-gray-500" th:text="|Step ${currentStep.orderIndex + 1} of ${currentStage.steps.size()}|">
+            Step progress
+        </span>
+        <button class="bg-ocher-yellow text-white px-6 py-2 rounded-lg"
+                th:attr="hx-post=@{/retrospective/{retroId}/next(retroId=${retroId})}"
+                hx-swap="none">
+            Next Step →
+        </button>
+    </div>
 </div>

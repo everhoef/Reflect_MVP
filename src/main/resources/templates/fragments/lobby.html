@@ -2,9 +2,17 @@
   th:attr="sse-connect=@{/retrospective/{retroId}/events(retroId=${retroId},username=${userName})}" sse-swap="message">
   <h2 class="text-2xl font-dosis mb-6">Session Lobby</h2>
 
-  <div class="mb-6 p-4 bg-gray-50 rounded-md">
-    <span class="text-gray-600">Session ID:</span>
-    <span th:text="${retroId}" class="font-mono text-ocher-yellow ml-2"></span>
+  <div class="mb-6 p-4 bg-gray-50 rounded-md flex items-center justify-between">
+    <div>
+      <span class="text-gray-600">Session ID:</span>
+      <span id="session-id" th:text="${retroId}" class="font-mono text-ocher-yellow ml-2"></span>
+    </div>
+    <button class="px-3 py-1 text-sm bg-ocher-yellow text-white rounded hover:bg-ocher-yellow-dark transition-colors"
+      hx-get="@{/retrospective/{retroId}/copy(retroId=${retroId})}"
+      hx-trigger="click"
+      hx-swap="none">
+      Copy
+    </button>
   </div>
 
   <div class="participants mb-8">
