@@ -1,20 +1,26 @@
 spring:
-  docker:
-    compose:
-      enabled: false  # Disable Docker Compose for tests
   application:
     name: facilitator
-  datasource:
-    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: create-drop  # Use create-drop for tests
+      ddl-auto: create-drop
     show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+  session:
+    timeout: 15m
+  main:
+    allow-bean-definition-overriding: true
+    web-application-type: reactive
+  security:
+    user:
+      name: test
+      password: test
+  sse:
+    keepalive:
+      interval: 100ms
 
 logging:
   level:
     direct.reflect.facilitator: DEBUG
     org.testcontainers: INFO
+    org.hibernate: INFO
+    org.springframework.test: DEBUG

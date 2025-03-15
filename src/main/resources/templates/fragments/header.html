@@ -1,14 +1,15 @@
 <header th:fragment="header" class="bg-white shadow-md">
     <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
         <a href="/" class="text-2xl font-dosis font-medium text-ocher-yellow">Retro App</a>
-        <div>
-            <a sec:authorize="isAuthenticated()"
-                class="text-aging-grey hover:text-ocher-yellow transition duration-300">
-                <div sec:authentication="name"></div>
-            </a>
+        <div class="flex items-center gap-4">
+            <span sec:authorize="isAuthenticated()" 
+                class="text-aging-grey">
+                <span sec:authentication="name"></span>
+            </span>
             <a sec:authorize="isAnonymous()" th:href="@{/login}"
-                class="text-aging-grey hover:text-ocher-yellow transition duration-300">Login</a></li>
-            <a sec:authorize="isAuthenticated()" th:href="@{/logout}">Logout</a></li>
+                class="text-aging-grey hover:text-ocher-yellow transition duration-300">Login</a>
+            <a sec:authorize="isAuthenticated()" th:href="@{/logout}"
+                class="text-aging-grey hover:text-ocher-yellow transition duration-300">Logout</a>
         </div>
     </nav>
 </header>

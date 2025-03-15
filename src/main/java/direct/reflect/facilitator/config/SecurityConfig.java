@@ -2,80 +2,69 @@ package direct.reflect.facilitator.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
-import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.authentication.logout.RedirectServerLogoutSuccessHandler;
+import org.springframework.security.web.server.context.WebSessionServerSecurityContextRepository;
+import org.springframework.security.web.server.csrf.CookieServerCsrfTokenRepository;
+import org.springframework.security.web.server.csrf.ServerCsrfTokenRequestAttributeHandler;
+import java.net.URI;
+
+import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {
+    
+    @Bean
+    public MapReactiveUserDetailsService userDetailsService() {
+        UserDetails user = User.builder()
+            .username("michel")
+            .password("{noop}t")  // {noop} means no password encoding
+            .roles("USER")
+            .build();
+        return new MapReactiveUserDetailsService(user);
+    }
 
-        @Bean
-        public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-                http.csrf(csrf -> csrf.ignoringRequestMatchers("/retrospective/*/events"))
-                                .authorizeHttpRequests(auth -> auth
-                                                .requestMatchers("/retrospective/*/events")
-                                                .permitAll().anyRequest().authenticated())
-                                .sessionManagement(session -> session
-                                                .sessionCreationPolicy(
-                                                                SessionCreationPolicy.IF_REQUIRED)
-                                                .maximumSessions(1).expiredUrl("/login?expired"))
-                                .anonymous(anonymous -> anonymous.disable());
-
-                return http.build();
-        }
-
-        @Configuration
-        @Profile("dev")
-        public static class DevSecurityConfig {
-
-                @Bean
-                public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-                        http.authorizeHttpRequests((requests) -> requests
-                                        .requestMatchers("/css/**", "/", "/retrospective",
-                                                        "/retrospective/**", "/login")
-                                        .permitAll().anyRequest().permitAll())
-                                        .formLogin(Customizer.withDefaults())
-                                        .logout((logout) -> logout.logoutUrl("/logout")
-                                                        .logoutSuccessUrl("/login?logout")
-                                                        .permitAll())
-                                        .exceptionHandling((exceptions) -> exceptions
-                                                        .accessDeniedPage("/login"));
-
-                        return http.build();
-                }
-
-                @Bean
-                public UserDetailsService userDetailsService() {
-                        UserDetails user = User.withDefaultPasswordEncoder().username("michel")
-                                        .password("t").roles("USER").build();
-
-                        return new InMemoryUserDetailsManager(user);
-                }
-        }
-
-        @Configuration
-        @Profile("prod")
-        public static class ProdSecurityConfig {
-
-                @Bean
-                public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-                        http.authorizeHttpRequests((requests) -> requests
-                                        .requestMatchers("/css/**", "/retrospective/**").permitAll()
-                                        .anyRequest().authenticated())
-                                        .oauth2Login((oauth2) -> oauth2
-                                                        .loginPage("/oauth2/authorization/keycloak")
-                                                        .defaultSuccessUrl("/", true))
-                                        .logout(Customizer.withDefaults());
-
-                        return http.build();
-                }
-        }
+    @Bean
+    public SecurityWebFilterChain filterChain(ServerHttpSecurity http) {
+        return http       
+            // Enable CSRF protection with a cookie-based token repository
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(CookieServerCsrfTokenRepository.withHttpOnlyFalse())
+                .csrfTokenRequestHandler(new ServerCsrfTokenRequestAttributeHandler())
+            )
+            // Store security context in session
+            .securityContextRepository(new WebSessionServerSecurityContextRepository())
+            // Configure authorization rules
+            .authorizeExchange(exchanges -> exchanges
+                // Public resources
+                .pathMatchers("/", "/css/**", "/js/**", "/images/**", "/favicon.ico").permitAll()
+                // Login page is public
+                .pathMatchers("/login", "/register", "/error").permitAll()
+                // API endpoints require authenticated users
+                .pathMatchers("/api/**").authenticated()
+                // Retrospective pages require user role
+                .pathMatchers("/retrospective/**").hasRole("USER")
+                // Everything else requires authentication
+                .anyExchange().authenticated()
+            )
+            // Use default form login
+            .formLogin(withDefaults())
+            // Configure logout
+            .logout(logout -> logout
+                .logoutSuccessHandler(logoutSuccessHandler())
+            )
+            .build();
+    }
+   
+    private RedirectServerLogoutSuccessHandler logoutSuccessHandler() {
+        RedirectServerLogoutSuccessHandler logoutSuccessHandler = new RedirectServerLogoutSuccessHandler();
+        logoutSuccessHandler.setLogoutSuccessUrl(URI.create("/"));
+        return logoutSuccessHandler;
+    }
 }
