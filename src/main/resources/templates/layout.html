@@ -6,23 +6,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title th:text="${title}">Reflect.Direct</title>
-    <script src="https://unpkg.com/htmx.org@1.9.2"></script>
-    <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+    <script type="text/javascript" th:src="@{/webjars/htmx.org/dist/htmx.min.js}"></script>
+    <script type="text/javascript" th:src="@{/webjars/htmx.org/dist/ext/sse.js}"></script>
+    <script type="text/javascript" th:src="@{/webjars/htmx.org/dist/ext/json-enc.js}"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Dosis:wght@400;500&family=Open+Sans&display=swap"
         rel="stylesheet">
     <script th:replace="~{fragments/tailwind-config :: tailwind-config}"></script>
-    <script>
-        document.body.addEventListener('htmx:sseError', function (evt) {
-            console.error('SSE Error:', evt);
-        });
-
-        document.body.addEventListener('htmx:sseOpen', function (evt) {
-            console.log('SSE Connected:', evt);
-        });
-    </script>
 </head>
-
 <body class="flex flex-col min-h-screen bg-gray-100 font-open-sans">
     <!--/* add the CSRF header to all htmx requests */-->
     <script th:inline="javascript">

@@ -1,31 +1,44 @@
 package direct.reflect.facilitator.domain.entity;
 
+import java.time.LocalDateTime;
 import jakarta.persistence.*;
 import lombok.Data;
-import java.time.LocalDateTime;
-
 import direct.reflect.facilitator.domain.enums.ParticipantRole;
 
 @Entity
-@Data
 @Table(name = "participants")
+@Data
 public class Participant {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(nullable = false)
+    
+    /**
+     * Stable identifier (UUIDs) for participants
+     */
+    @Column(name = "participant_id", nullable = false, unique = true)
+    private String participantId;
+    
+    /**
+     * Username for authentication purposes
+     */
+    @Column(name = "username")
     private String username;
     
-    private LocalDateTime lastSeen;
-    private boolean isConnected;
-    private boolean isAuthenticated;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private ParticipantRole role = ParticipantRole.PARTICIPANT;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "retro_session_id")
+    /**
+     * User-selected display name
+     */
+    @Column(name = "display_name", nullable = false)
+    private String displayName;
+    
+    @ManyToOne
+    @JoinColumn(name = "session_id")
     private RetroSession session;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role")
+    private ParticipantRole role = ParticipantRole.PARTICIPANT;
+    
+    @Column(name = "last_seen")
+    private LocalDateTime lastSeen;
 }

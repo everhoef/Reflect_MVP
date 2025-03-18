@@ -1,60 +1,76 @@
 package direct.reflect.facilitator.messaging;
 
-import direct.reflect.facilitator.domain.enums.EventType;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.Getter;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
+/**
+ * Event message for retro-related events
+ */
 public record RetroEvent<T>(
     UUID retroId,
     EventType type,
-    String participantId,
-    T payload,
+    String sourceId,
     Instant timestamp,
-    // Only used for card-related events to track card lifecycle
-    UUID cardId
+    T payload
 ) {
-    // Basic constructor for non-card events
-    public RetroEvent(UUID retroId, EventType type, String participantId) {
-        this(retroId, type, participantId, null, Instant.now(), null);
+    /**
+     * Enum of possible event types
+     */
+    public enum EventType {
+        PARTICIPANT_JOINED,
+        SESSION_STARTED,
+        STEP_ADVANCED,
+        RETRO_CREATED,
+        PHASE_STARTED,
+        NOTE_ADDED,
+        NOTE_UPDATED,
+        NOTE_DELETED,
+        VOTE_ADDED,
+        VOTE_REMOVED,
+        GROUP_CREATED,
+        GROUP_UPDATED,
+        GROUP_DELETED,
+        ACTION_CREATED,
+        ACTION_UPDATED,
+        ACTION_DELETED,
+        TIMER_STARTED,
+        TIMER_PAUSED,
+        TIMER_FINISHED
     }
 
-    // Constructor for card events
-    public RetroEvent(UUID retroId, EventType type, String participantId, T payload, UUID cardId) {
-        this(retroId, type, participantId, payload, Instant.now(), cardId);
+    /**
+     * Create a participant joined event
+     */
+    public static RetroEvent<String> participantJoined(UUID retroId, String displayName) {
+        return new RetroEvent<>(retroId, EventType.PARTICIPANT_JOINED, "system", Instant.now(), displayName);
     }
-
-    // Factory methods for lifecycle events
+    
+    /**
+     * Create a session started event
+     */
+    public static RetroEvent<Void> sessionStarted(UUID retroId) {
+        return new RetroEvent<>(retroId, EventType.SESSION_STARTED, "system", Instant.now(), null);
+    }
+    
+    /**
+     * Create a step advanced event
+     */
+    public static RetroEvent<Void> stepAdvanced(UUID retroId) {
+        return new RetroEvent<>(retroId, EventType.STEP_ADVANCED, "system", Instant.now(), null);
+    }
+    
+    /**
+     * Create a retro created event
+     */
     public static RetroEvent<Void> retroCreated(UUID retroId, String facilitatorId) {
-        return new RetroEvent<>(retroId, EventType.RETRO_CREATED, facilitatorId);
+        return new RetroEvent<>(retroId, EventType.RETRO_CREATED, facilitatorId, Instant.now(), null);
     }
-
-    public static RetroEvent<Void> retroStarted(UUID retroId, String facilitatorId) {
-        return new RetroEvent<>(retroId, EventType.RETRO_STARTED, facilitatorId);
-    }
-
-    // Factory methods for participant events
-    public static RetroEvent<Void> participantJoined(UUID retroId, String participantId) {
-        return new RetroEvent<>(retroId, EventType.PARTICIPANT_JOINED, participantId);
-    }
-
-    // Factory methods for phase events
-    public static RetroEvent<String> phaseStarted(UUID retroId, String facilitatorId, String phase) {
-        return new RetroEvent<>(retroId, EventType.PHASE_STARTED, facilitatorId, phase, null);
-    }
-
-    // Factory methods for card events (with cardId for correlation)
-    public static <T> RetroEvent<T> cardCreated(UUID retroId, String participantId, T cardData, UUID cardId) {
-        return new RetroEvent<>(retroId, EventType.CARD_CREATED, participantId, cardData, cardId);
-    }
-
-    public static <T> RetroEvent<T> cardUpdated(UUID retroId, String participantId, T cardData, UUID cardId) {
-        return new RetroEvent<>(retroId, EventType.CARD_UPDATED, participantId, cardData, cardId);
-    }
-
-    // Modifier for payload
-    public RetroEvent<T> withPayload(T newPayload) {
-        return new RetroEvent<>(retroId, type, participantId, newPayload, timestamp, cardId);
+    
+    /**
+     * Create a phase started event
+     */
+    public static RetroEvent<String> phaseStarted(UUID retroId, String facilitatorId, String phaseName) {
+        return new RetroEvent<>(retroId, EventType.PHASE_STARTED, facilitatorId, Instant.now(), phaseName);
     }
 }

@@ -1,6 +1,8 @@
 package direct.reflect.facilitator.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import direct.reflect.facilitator.messaging.RetroEvent;
 
@@ -51,36 +53,37 @@ public class RedisConfig {
     }
     
     /**
-     * Creates a customized serializer for RetroEvent objects
+     * Creates a reactive Redis template for handling RetroEvent objects.
      */
     @Bean
-    @SuppressWarnings("rawtypes") // Using raw RetroEvent type for serialization
-    public Jackson2JsonRedisSerializer retroEventSerializer(ObjectMapper objectMapper) {
-        // Create a serializer for the raw RetroEvent type
-        Jackson2JsonRedisSerializer<RetroEvent> serializer = 
-            new Jackson2JsonRedisSerializer<>(RetroEvent.class);
-        serializer.setObjectMapper(objectMapper);
-        return serializer;
-    }
-    
-    @Bean
-    @SuppressWarnings({"unchecked", "rawtypes"}) // Necessary for the type casting
-    public ReactiveRedisTemplate<String, RetroEvent<?>> reactiveRedisTemplate(
-            ReactiveRedisConnectionFactory connectionFactory,
-            Jackson2JsonRedisSerializer retroEventSerializer) {
+    public ReactiveRedisTemplate<String, RetroEvent<?>> reactiveRetroEventRedisTemplate(
+            ReactiveRedisConnectionFactory factory, ObjectMapper objectMapper) {
         
-        // Create the RedisSerializationContext with simple serializers
+        // Configure object mapper for serializing RetroEvents
+        ObjectMapper retroEventMapper = objectMapper.copy()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        
+        // Create serializer for RetroEvent objects - use raw type to avoid type inference error
+        @SuppressWarnings("rawtypes")
+        Jackson2JsonRedisSerializer valueSerializer = 
+                new Jackson2JsonRedisSerializer(retroEventMapper, RetroEvent.class);
+        
+        // Create string serializer for keys
         StringRedisSerializer keySerializer = new StringRedisSerializer();
         
-        RedisSerializationContext<String, RetroEvent<?>> context = 
-            RedisSerializationContext.<String, RetroEvent<?>>newSerializationContext()
+        // Configure serialization context
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        RedisSerializationContext<String, RetroEvent<?>> serializationContext =
+                RedisSerializationContext.<String, RetroEvent<?>>newSerializationContext()
                 .key(keySerializer)
-                .value(retroEventSerializer) 
+                .value(valueSerializer)
                 .hashKey(keySerializer)
-                .hashValue(retroEventSerializer)
+                .hashValue(valueSerializer)
                 .build();
         
-        return new ReactiveRedisTemplate<>(connectionFactory, context);
+        // Create the reactive template
+        return new ReactiveRedisTemplate<>(factory, serializationContext);
     }
     
     /**

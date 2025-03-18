@@ -46,10 +46,11 @@ public class SecurityConfig {
                 .pathMatchers("/", "/css/**", "/js/**", "/images/**", "/favicon.ico").permitAll()
                 // Login page is public
                 .pathMatchers("/login", "/register", "/error").permitAll()
-                // API endpoints require authenticated users
-                .pathMatchers("/api/**").authenticated()
+                // API endpoints require authenticated users except creation/joining
+                .pathMatchers("/api/retro/create", "/api/retro/join").permitAll()
+                .pathMatchers("/api/retro/**").authenticated()
                 // Retrospective pages require user role
-                .pathMatchers("/retrospective/**").hasRole("USER")
+                .pathMatchers("/retro/**").permitAll()
                 // Everything else requires authentication
                 .anyExchange().authenticated()
             )

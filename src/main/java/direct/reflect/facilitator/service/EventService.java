@@ -16,6 +16,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.Disposable;
 
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
@@ -24,6 +25,7 @@ import jakarta.annotation.PreDestroy;
 @Slf4j
 public class EventService {
     private final ReactiveRedisTemplate<String, RetroEvent<?>> reactiveRedisTemplate;
+    private final AtomicInteger activeConnections = new AtomicInteger(0);
     private Disposable subscription;
     
     @PostConstruct
@@ -55,17 +57,36 @@ public class EventService {
         return reactiveRedisTemplate.convertAndSend(channel, event);
     }
     
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public Flux<RetroEvent<?>> subscribeToRetro(UUID retroId) {
         String channel = RedisConfig.getChannelForRetro(retroId.toString());
         
-        return reactiveRedisTemplate
-            .listenTo(ChannelTopic.of(channel))
-            .map(message -> (RetroEvent<?>) message.getMessage());
+        int currentConnections = activeConnections.incrementAndGet();
+        log.info("New SSE connection for retro {}, active connections: {}", retroId, currentConnections);
+        
+        // Use cast to ensure compatible types - the <? extends Object> fixes the incompatible types error
+        return (Flux) reactiveRedisTemplate
+            .<RetroEvent<?>>listenTo(ChannelTopic.of(channel))
+            .map(message -> {
+                Object msg = message.getMessage();
+                if (msg instanceof RetroEvent) {
+                    return msg;
+                }
+                log.warn("Received message of unexpected type: {}", msg != null ? msg.getClass() : "null");
+                return null;
+            })
+            .filter(event -> event != null)
+            .doOnCancel(() -> {
+                activeConnections.decrementAndGet();
+                log.info("SSE connection closed for retro {}", retroId);
+            });
     }
     
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public Flux<RetroEvent<?>> subscribeToAllRetros() {
-        return reactiveRedisTemplate
-            .listenTo(PatternTopic.of(RedisConfig.ALL_RETROS_PATTERN))
-            .map(patternMessage -> (RetroEvent<?>) patternMessage.getMessage());
+        // Use cast to ensure compatible types
+        return (Flux) reactiveRedisTemplate
+            .<RetroEvent<?>>listenTo(PatternTopic.of(RedisConfig.ALL_RETROS_PATTERN))
+            .map(patternMessage -> patternMessage.getMessage());
     }
 }

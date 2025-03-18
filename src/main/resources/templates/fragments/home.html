@@ -8,17 +8,17 @@
 
             <div class="create-session">
                 <h2 class="text-xl font-dosis mb-4">Create New Retrospective</h2>
-                <form th:action="@{/api/retro/create}"
-                      hx-post="@{/api/retro/create}"
-                      hx-redirect="true"
+                <form hx-post="/api/retro/create"
+                      hx-headers='{"Content-Type": "application/json"}'
+                      hx-ext="json-enc"
                       class="space-y-3">
-                    <div sec:authorize="!isAuthenticated()" class="space-y-2">
-                        <input type="text" name="username" placeholder="Your name" required
+                    <div th:if="${#authentication == null || #authentication.principal == 'anonymousUser'}" class="space-y-2">
+                        <input type="text" name="displayName" placeholder="Your name" required
                             class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-ocher-yellow">
                     </div>
                     <input type="text" name="sessionName" placeholder="Session name" required
                         class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-ocher-yellow">
-                                        <button type="submit"
+                    <button type="submit"
                         class="w-full bg-ocher-yellow text-white py-2 px-4 rounded-md hover:bg-ocher-yellow-dark transition-colors">
                         Create Session
                     </button>
@@ -31,9 +31,12 @@
 
             <div class="join-session">
                 <h2 class="text-xl font-dosis mb-4">Join Existing Retrospective</h2>
-                <form th:action="@{/retrospective/join}" method="post" class="space-y-3">
-                    <div sec:authorize="!isAuthenticated()" class="space-y-2">
-                        <input type="text" name="username" placeholder="Your name" required
+                <form hx-post="/api/retro/join"
+                      hx-headers='{"Content-Type": "application/json"}'
+                      hx-ext="json-enc"
+                      class="space-y-3">
+                    <div th:if="${#authentication == null || #authentication.principal == 'anonymousUser'}" class="space-y-2">
+                        <input type="text" name="displayName" placeholder="Your name" required
                             class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-ocher-yellow">
                     </div>
                     <input type="text" name="retroId" placeholder="Session ID" required
@@ -43,6 +46,17 @@
                         Join Session
                     </button>
                 </form>
+            </div>
+            
+            <!-- Error message display -->
+            <div th:if="${param.error != null}" 
+                 class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mt-4" 
+                 role="alert">
+                <p th:if="${param.error != null && #arrays.contains(param.error, 'missing_name')}">Please enter a session name</p>
+                <p th:if="${param.error != null && #arrays.contains(param.error, 'missing_username')}">Please enter your name</p>
+                <p th:if="${param.error != null && #arrays.contains(param.error, 'missing_id')}">Please enter a session ID</p>
+                <p th:if="${param.error != null && #arrays.contains(param.error, 'session_not_found')}">Session not found</p>
+                <p th:if="${param.error != null && #arrays.contains(param.error, 'not_participant')}">You are not a participant in this session</p>
             </div>
         </div>
     </div>

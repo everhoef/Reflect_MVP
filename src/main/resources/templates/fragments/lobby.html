@@ -1,32 +1,40 @@
-<div th:fragment="content" class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md" hx-ext="sse"
-  th:attr="sse-connect=@{/retrospective/{retroId}/events(retroId=${retroId},username=${userName})}" sse-swap="message">
+<div th:fragment="content" class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md" 
+     hx-ext="sse"
+     th:attr="sse-connect=@{/api/retro/{retroId}/events(retroId=${retroId})}">
   <h2 class="text-2xl font-dosis mb-6">Session Lobby</h2>
 
+  <!-- Session ID display with copy button -->
   <div class="mb-6 p-4 bg-gray-50 rounded-md flex items-center justify-between">
     <div>
       <span class="text-gray-600">Session ID:</span>
       <span id="session-id" th:text="${retroId}" class="font-mono text-ocher-yellow ml-2"></span>
     </div>
     <button class="px-3 py-1 text-sm bg-ocher-yellow text-white rounded hover:bg-ocher-yellow-dark transition-colors"
-      hx-get="@{/retrospective/{retroId}/copy(retroId=${retroId})}"
-      hx-trigger="click"
-      hx-swap="none">
+      onclick="navigator.clipboard.writeText(document.getElementById('session-id').innerText)">
       Copy
     </button>
   </div>
 
+  <!-- Participants list that auto-updates with new participants -->
   <div class="participants mb-8">
     <h3 class="text-xl font-dosis mb-4">Participants</h3>
     <ul id="participants-list" class="space-y-2"
-      th:attr="hx-get=@{/retrospective/{retroId}/participants(retroId=${retroId})}"
-      hx-trigger="sse:PARTICIPANT_JOINED from:body" hx-swap="innerHTML">
-      <li th:each="participant : ${participants}" class="px-4 py-2 bg-gray-50 rounded-md" th:text="${participant}">
+        th:attr="hx-get=@{retro/{retroId}/participants(retroId=${retroId})}"
+        hx-trigger="sse:participant-joined from:body"
+        hx-swap="innerHTML">
+      <li th:each="participant : ${participants}" class="px-4 py-2 bg-gray-50 rounded-md flex justify-between items-center">
+        <span th:text="${participant.displayName}"></span>
+        <span th:if="${participant.role.name() == 'FACILITATOR'}" 
+              class="ml-2 text-xs bg-ocher-yellow text-white px-2 py-1 rounded">
+          Facilitator
+        </span>
       </li>
     </ul>
   </div>
 
+  <!-- Start button (facilitator only) -->
   <div th:if="${isFacilitator}" class="mt-8">
-    <form th:action="|/retrospective/${retroId}/start|" method="post">
+    <form th:attr="hx-post=@{/api/retro/{retroId}/start(retroId=${retroId})}">
       <button type="submit"
         class="w-full bg-ocher-yellow text-white py-3 px-6 rounded-md hover:bg-ocher-yellow-dark transition-colors">
         Start Retrospective
@@ -34,19 +42,61 @@
     </form>
   </div>
 
-  <!-- Redirect on session start -->
-  <div th:attr="hx-get=@{/retrospective/{retroId}/session(retroId=${retroId})}" hx-trigger="sse:SESSION_STARTED"
-    hx-swap="none">
-  </div>
-
   <!-- Connection status indicator -->
   <div class="mt-4 flex items-center space-x-2">
-    <div class="h-2 w-2 rounded-full bg-yellow-500 animate-pulse"
-      hx-sse-swap-connected="this.classList.replace('bg-yellow-500', 'bg-green-500'); this.classList.remove('animate-pulse')"
-      hx-sse-swap-error="this.classList.replace('bg-yellow-500', 'bg-red-500'); this.classList.remove('animate-pulse')">
+    <div id="connection-status" 
+         class="h-3 w-3 rounded-full bg-yellow-500 animate-pulse">
     </div>
-    <span class="text-sm" hx-sse-swap-connected="innerHTML:Connected" hx-sse-swap-error="innerHTML:Connection lost">
-      Connecting...
-    </span>
+    <span id="connection-text" class="text-sm">Connecting...</span>
   </div>
+  
+  <!-- Simple event log for debugging -->
+  <div class="mt-4 p-2 bg-gray-100 rounded-md text-xs">
+    <details>
+      <summary class="font-semibold cursor-pointer">Debug: Event Log</summary>
+      <div id="event-log" class="mt-2 max-h-32 overflow-y-auto space-y-1 font-mono"></div>
+    </details>
+  </div>
+
+  <!-- Script to handle session start event -->
+  <script th:inline="javascript">
+    document.body.addEventListener('sse:session-started', function(event) {
+      const retroId = /*[[${retroId}]]*/ 'default-retro-id';
+      window.location.href = `/retro/${retroId}`;
+    });
+  </script>
 </div>
+
+<!-- Event handling script -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Handle SSE connection status changes
+    document.body.addEventListener('htmx:sseOpen', function() {
+      console.log('SSE connected');
+      document.getElementById('connection-status').classList.remove('bg-yellow-500', 'animate-pulse', 'bg-red-500');
+      document.getElementById('connection-status').classList.add('bg-green-500');
+      document.getElementById('connection-text').textContent = 'Connected';
+    });
+
+    document.body.addEventListener('htmx:sseError', function() {
+      console.error('SSE connection error');
+      document.getElementById('connection-status').classList.remove('bg-yellow-500', 'animate-pulse', 'bg-green-500');
+      document.getElementById('connection-status').classList.add('bg-red-500');
+      document.getElementById('connection-text').textContent = 'Connection lost';
+    });
+    
+    // Log all received SSE events
+    document.body.addEventListener('htmx:sseMessage', function(event) {
+      console.log('SSE event received:', event.detail);
+      const logEl = document.getElementById('event-log');
+      const timestamp = new Date().toLocaleTimeString();
+      const eventName = event.detail.type || 'message';
+      const logEntry = document.createElement('div');
+      logEntry.innerHTML = `<span class="text-gray-500">[${timestamp}]</span> ${eventName}`;
+      logEl.appendChild(logEntry);
+      
+      // Auto-scroll to bottom
+      logEl.scrollTop = logEl.scrollHeight;
+    });
+  });
+</script>

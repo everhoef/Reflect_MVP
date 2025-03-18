@@ -28,14 +28,14 @@ public class RetroSessionService {
     private final RetroStepRepository stepRepository;
 
     @Transactional
-    public RetroSession createNewSession(String sessionName, Long templateId) {
-        RetroTemplate template = templateRepository.findById(templateId)
-            .orElseThrow(() -> new RetroTemplateNotFoundException(templateId));
+    public RetroSession createNewSession(String sessionName) {
+        // RetroTemplate template = templateRepository.findById(templateId)
+        //     .orElseThrow(() -> new RetroTemplateNotFoundException(templateId));
             
         RetroSession session = new RetroSession();
         session.setName(sessionName);
         session.setCreatedAt(LocalDateTime.now());
-        session.setTemplate(template);
+        // session.setTemplate(template);
         session.setPhase(RetroPhase.LOBBY);
         
         return sessionRepository.save(session);
