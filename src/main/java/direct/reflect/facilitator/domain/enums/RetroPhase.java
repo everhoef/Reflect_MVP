@@ -9,7 +9,8 @@ public enum RetroPhase {
     DECIDE_ACTIONS("Decide What To Do", "Planning concrete improvements"),
     CLOSE_RETRO("Close The Retrospective", "Wrapping up and feedback"),
     PAUSED("Paused", "Temporarily halted"),
-    COMPLETED("Well done!", "Retrospective finished");
+    COMPLETED("Well done!", "Retrospective finished"),
+    ABANDONED("Abandoned", "Retrospective abandoned");
 
     private final String displayName;
     private final String description;

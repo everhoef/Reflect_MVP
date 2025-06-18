@@ -15,7 +15,6 @@ import direct.reflect.facilitator.service.RetroSessionService;
 import direct.reflect.facilitator.service.ParticipantService;
 import direct.reflect.facilitator.domain.entity.RetroSession;
 import direct.reflect.facilitator.domain.entity.RetroStep;
-import direct.reflect.facilitator.domain.entity.Participant;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,7 +47,7 @@ public class RetroViewController {
                     return Mono.just(Rendering.redirectTo("/?error=not_participant").build());
                 }
 
-                RetroSession session = retroService.getSessionByRetroId(retroId);
+                RetroSession session = retroService.getSessionById(retroId);
                 RetroStep currentStep = retroService.getCurrentStep(retroId);
                 
                 // Get current participant

@@ -48,7 +48,7 @@ public class RetroEventController {
                 }
                 
                 // Subscribe to events stream
-                return participantService.updateLastSeen(exchange)
+                return participantService.updateLastSeen(exchange, retroId)
                     .thenReturn(true);
             })
             .flatMapMany(isParticipating -> subscribeToEvents(retroId, exchange));
@@ -74,7 +74,7 @@ public class RetroEventController {
             .mergeWith(Flux.interval(Duration.ofSeconds(30))
                 .flatMap(i -> 
                     // Update last seen on every keepalive
-                    participantService.updateLastSeen(exchange)
+                    participantService.updateLastSeen(exchange, retroId)
                         .thenReturn(ServerSentEvent.<RetroEvent<?>>builder()
                             .comment("keepalive")
                             .build())

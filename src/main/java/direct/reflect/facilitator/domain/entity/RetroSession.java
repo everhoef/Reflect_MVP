@@ -11,8 +11,6 @@ import jakarta.persistence.Table;
 import lombok.Data;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.EnumType;
 
@@ -20,19 +18,16 @@ import jakarta.persistence.EnumType;
 @Data
 @Table(name = "retro_sessions")
 public class RetroSession {
-  @Id
-  @GeneratedValue(strategy = GenerationType.AUTO)
-  private Long id;
 
-  @Column(nullable = false, unique = true)
-  private UUID retroId;
-  @Column(nullable = false)
-  private String facilitator;
+  @Id
+  @GeneratedUuidV7 // Use the custom annotation for UUIDv7 generation
+  @Column(name = "id", nullable = false, unique = true, updatable = false)
+  private UUID id;
+
   @Column
   private String name;
 
   private LocalDateTime createdAt;
-  private int retrospectivePhase;
   private LocalDateTime finishedAt;
 
   @ManyToOne(fetch = FetchType.LAZY)
@@ -47,8 +42,8 @@ public class RetroSession {
     return template.getStageForPhase(getPhase());
   }
 
-  private void setId(Long id) {
-    // Do nothing, just to overwrite Lombok's setter
+  public boolean isFinished() {
+    return getPhase() == RetroPhase.COMPLETED || getPhase() == RetroPhase.ABANDONED;
   }
 
   public void advancePhase() {

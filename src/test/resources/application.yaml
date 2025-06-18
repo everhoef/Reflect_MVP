@@ -14,13 +14,13 @@ spring:
     user:
       name: test
       password: test
-  sse:
-    keepalive:
-      interval: 100ms
+  docker:
+    compose:
+      enabled: false  # Disable Docker Compose for tests, use Testcontainers only
 
-logging:
-  level:
-    direct.reflect.facilitator: DEBUG
-    org.testcontainers: INFO
-    org.hibernate: INFO
-    org.springframework.test: DEBUG
+# logging:
+#   level:
+#     "[direct.reflect.facilitator]": DEBUG
+#     "[org.testcontainers]": INFO
+#     "[org.hibernate]": INFO
+#     "[org.springframework.test]": DEBUG
