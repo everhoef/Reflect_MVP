@@ -1,9 +1,10 @@
 <div th:fragment="content">
     <h1 class="text-3xl font-dosis font-medium mb-6 text-center text-ocher-yellow">Team Retrospective</h1>
+    
     <div class="bg-white p-8 rounded-lg shadow-md max-w-md mx-auto">
         <div class="space-y-4">
             <div sec:authorize="isAuthenticated()" class="text-center mb-4">
-                <p>Welcome, <span sec:authentication="name" class="font-semibold"></span>!</p>
+                <p>Welcome, <span th:text="${userName}" class="font-semibold"></span>!</p>
             </div>
 
             <div class="create-session">
@@ -12,10 +13,7 @@
                       hx-headers='{"Content-Type": "application/json"}'
                       hx-ext="json-enc"
                       class="space-y-3">
-                    <div th:if="${#authentication == null || #authentication.principal == 'anonymousUser'}" class="space-y-2">
-                        <input type="text" name="displayName" placeholder="Your name" required
-                            class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-ocher-yellow">
-                    </div>
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <input type="text" name="sessionName" placeholder="Session name" required
                         class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-ocher-yellow">
                     <button type="submit"
@@ -35,10 +33,7 @@
                       hx-headers='{"Content-Type": "application/json"}'
                       hx-ext="json-enc"
                       class="space-y-3">
-                    <div th:if="${#authentication == null || #authentication.principal == 'anonymousUser'}" class="space-y-2">
-                        <input type="text" name="displayName" placeholder="Your name" required
-                            class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-ocher-yellow">
-                    </div>
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <input type="text" name="retroId" placeholder="Session ID" required
                         class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-ocher-yellow">
                     <button type="submit"
@@ -52,11 +47,14 @@
             <div th:if="${param.error != null}" 
                  class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mt-4" 
                  role="alert">
-                <p th:if="${param.error != null && #arrays.contains(param.error, 'missing_name')}">Please enter a session name</p>
-                <p th:if="${param.error != null && #arrays.contains(param.error, 'missing_username')}">Please enter your name</p>
-                <p th:if="${param.error != null && #arrays.contains(param.error, 'missing_id')}">Please enter a session ID</p>
+                <p th:if="${param.error != null && #arrays.contains(param.error, 'missing_session_name')}">Please enter a session name</p>
+                <p th:if="${param.error != null && #arrays.contains(param.error, 'missing_display_name')}">Please enter your name</p>
+                <p th:if="${param.error != null && #arrays.contains(param.error, 'missing_retro_id')}">Please enter a session ID</p>
                 <p th:if="${param.error != null && #arrays.contains(param.error, 'session_not_found')}">Session not found</p>
-                <p th:if="${param.error != null && #arrays.contains(param.error, 'not_participant')}">You are not a participant in this session</p>
+                <p th:if="${param.error != null && #arrays.contains(param.error, 'active_session_exists')}">You already have an active session</p>
+                <p th:if="${param.error != null && #arrays.contains(param.error, 'creation_failed')}">Failed to create session. Please try again.</p>
+                <p th:if="${param.error != null && #arrays.contains(param.error, 'join_failed')}">Failed to join session. Please try again.</p>
+                <p th:if="${param.error != null && #arrays.contains(param.error, 'template_not_found')}">The selected retrospective template was not found</p>
             </div>
         </div>
     </div>

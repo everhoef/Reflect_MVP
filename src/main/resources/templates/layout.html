@@ -7,7 +7,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title th:text="${title}">Reflect.Direct</title>
     <script type="text/javascript" th:src="@{/webjars/htmx.org/dist/htmx.min.js}"></script>
-    <script type="text/javascript" th:src="@{/webjars/htmx.org/dist/ext/sse.js}"></script>
     <script type="text/javascript" th:src="@{/webjars/htmx.org/dist/ext/json-enc.js}"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Dosis:wght@400;500&family=Open+Sans&display=swap"
@@ -20,10 +19,11 @@
         /*<![CDATA[*/
 
         document.body.addEventListener('htmx:configRequest', (event) => {
-            const csrfHeader = /*[[${_csrf.headerName}]]*/ 'X-Sample-CSRF-Header';
-            const csrfToken = /*[[${_csrf.token}]]*/ 'sample-csrf-token';
-
+            /*[# th:if="${_csrf != null}" ]*/
+            const csrfHeader = /*[[${_csrf.headerName}]]*/ 'X-CSRF-Token';
+            const csrfToken = /*[[${_csrf.token}]]*/ 'csrf-token';
             event.detail.headers[csrfHeader] = csrfToken;
+            /*[/]*/
         });
 
         /*]]>*/
@@ -31,7 +31,25 @@
     <header th:replace="~{fragments/header :: header}"></header>
 
     <main class="flex-grow container mx-auto px-4 py-8">
-        <div th:replace="~{('fragments/' + ${page}) :: content}"></div>
+        <!-- Use th:block with conditionals to prevent fragment preprocessing -->
+        <th:block th:if="${page == 'welcome'}">
+            <div th:replace="~{fragments/welcome :: content}"></div>
+        </th:block>
+        <th:block th:if="${page == 'login'}">
+            <div th:replace="~{fragments/login :: content}"></div>
+        </th:block>
+        <th:block th:if="${page == 'home'}">
+            <div th:replace="~{fragments/home :: content}"></div>
+        </th:block>
+        <th:block th:if="${page == 'lobby'}">
+            <div th:replace="~{fragments/lobby :: content}"></div>
+        </th:block>
+        <th:block th:if="${page == 'retro'}">
+            <div th:replace="~{fragments/retro :: content}"></div>
+        </th:block>
+        <div th:unless="${page == 'welcome' or page == 'login' or page == 'home' or page == 'lobby' or page == 'retro'}">
+            <p>Unknown page: <span th:text="${page}">unknown</span></p>
+        </div>
     </main>
 
     <footer th:replace=" ~{fragments/footer :: footer}">

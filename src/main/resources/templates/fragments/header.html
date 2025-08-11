@@ -5,16 +5,30 @@
             
             <!-- Authentication UI -->
             <div class="flex items-center gap-2">
-                <span sec:authorize="isAuthenticated()" class="text-aging-grey font-semibold">
-                    <span th:text="${#authentication.getName()}"></span>
-                </span>
-                <a sec:authorize="isAuthenticated()" th:href="@{/logout}"
-                   class="text-aging-grey hover:text-ocher-yellow transition duration-300">Logout</a>
+                <!-- Guest user display with upgrade option -->
+                <div sec:authorize="isAuthenticated()" th:if="${#strings.contains(#authentication.authorities, 'ROLE_GUEST')}" class="flex items-center gap-2">
+                    <span class="text-aging-grey font-semibold">
+                        <span th:text="${#authentication.getName()}"></span>
+                        <span class="text-xs text-gray-500">(Guest)</span>
+                    </span>
+                    <a th:href="@{/login}" 
+                       class="px-3 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition duration-300">
+                       Create Account
+                    </a>
+                </div>
                 
-                <!-- When anonymous show login button -->
-                <a th:if="${#authentication == null || #authentication.principal == 'anonymousUser'}" 
-                   th:href="@{/login}"
-                   class="text-aging-grey hover:text-ocher-yellow transition duration-300">Login</a>
+                <!-- Authenticated user display -->
+                <div sec:authorize="isAuthenticated()" th:if="${#strings.contains(#authentication.authorities, 'ROLE_USER')}" class="flex items-center gap-2">
+                    <span class="text-aging-grey font-semibold">
+                        <span th:text="${#authentication.getName()}"></span>
+                    </span>
+                    <form th:action="@{/logout}" method="post" class="inline">
+                        <button type="submit" 
+                                class="text-aging-grey hover:text-ocher-yellow transition duration-300 bg-transparent border-none cursor-pointer">
+                            Logout
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </nav>

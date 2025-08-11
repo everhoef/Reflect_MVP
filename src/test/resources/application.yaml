@@ -9,7 +9,7 @@ spring:
     timeout: 15m
   main:
     allow-bean-definition-overriding: true
-    web-application-type: reactive
+    web-application-type: servlet
   security:
     user:
       name: test
@@ -18,9 +18,9 @@ spring:
     compose:
       enabled: false  # Disable Docker Compose for tests, use Testcontainers only
 
-# logging:
-#   level:
-#     "[direct.reflect.facilitator]": DEBUG
-#     "[org.testcontainers]": INFO
-#     "[org.hibernate]": INFO
-#     "[org.springframework.test]": DEBUG
+logging:
+  level:
+    "[direct.reflect.facilitator]": DEBUG
+    "[org.testcontainers]": INFO
+    "[org.hibernate]": INFO
+    "[org.springframework.test]": DEBUG

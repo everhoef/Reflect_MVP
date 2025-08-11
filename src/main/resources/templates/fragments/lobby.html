@@ -20,7 +20,7 @@
     <h3 class="text-xl font-dosis mb-4">Participants</h3>
     <ul id="participants-list" class="space-y-2"
         th:attr="hx-get=@{retro/{retroId}/participants(retroId=${retroId})}"
-        hx-trigger="sse:participant-joined from:body"
+        hx-trigger="participant-joined from:body, refresh"
         hx-swap="innerHTML">
       <li th:each="participant : ${participants}" class="px-4 py-2 bg-gray-50 rounded-md flex justify-between items-center">
         <span th:text="${participant.displayName}"></span>
@@ -58,45 +58,218 @@
     </details>
   </div>
 
-  <!-- Script to handle session start event -->
-  <script th:inline="javascript">
-    document.body.addEventListener('sse:session-started', function(event) {
-      const retroId = /*[[${retroId}]]*/ 'default-retro-id';
-      window.location.href = `/retro/${retroId}`;
-    });
-  </script>
-</div>
+  <!-- HTMX SSE Event Handlers (No JavaScript!) -->
+  
+  <!-- Handle participant-joined events -->
+  <div sse-swap="participant-joined" 
+       hx-trigger="sse:participant-joined"
+       hx-target="#participants-list"
+       th:attr="hx-get=@{/retro/{retroId}/participants(retroId=${retroId})}"
+       hx-swap="innerHTML"></div>
+  
+  <!-- Handle session-started events -->
+  <div sse-swap="session-started" 
+       hx-trigger="sse:session-started"
+       th:attr="hx-get=@{/retro/{retroId}(retroId=${retroId})}"
+       hx-push-url="true"
+       hx-target="body"
+       hx-swap="outerHTML"></div>
+  
+  <!-- Enhanced debugging with both hyperscript and JavaScript fallback -->
+  <div _="on htmx:sseConnecting from body
+            remove .bg-green-500 from #connection-status
+            remove .bg-red-500 from #connection-status  
+            add .bg-yellow-500 to #connection-status
+            add .animate-pulse to #connection-status
+            put 'Connecting...' into #connection-text
+            call addEventLog('HTMX SSE Connecting...')
+            
+          on htmx:sseOpen from body
+            remove .bg-yellow-500 from #connection-status
+            remove .animate-pulse from #connection-status
+            remove .bg-red-500 from #connection-status
+            add .bg-green-500 to #connection-status
+            put 'Connected' into #connection-text
+            call addEventLog('HTMX SSE Connected')
+            
+          on htmx:sseError from body
+            remove .bg-yellow-500 from #connection-status
+            remove .animate-pulse from #connection-status
+            remove .bg-green-500 from #connection-status
+            add .bg-red-500 to #connection-status
+            put 'Connection Error' into #connection-text
+            call addEventLog('HTMX SSE Error')
+            
+          on htmx:sseClose from body
+            remove .bg-yellow-500 from #connection-status
+            remove .animate-pulse from #connection-status
+            remove .bg-green-500 from #connection-status
+            add .bg-red-500 to #connection-status
+            put 'Disconnected' into #connection-text
+            call addEventLog('HTMX SSE Closed')
+            
+          on sse:participant-joined from body
+            call addEventLog('Event: participant-joined')
+            
+          on sse:session-started from body  
+            call addEventLog('Event: session-started')"></div>
 
-<!-- Event handling script -->
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    // Handle SSE connection status changes
-    document.body.addEventListener('htmx:sseOpen', function() {
-      console.log('SSE connected');
-      document.getElementById('connection-status').classList.remove('bg-yellow-500', 'animate-pulse', 'bg-red-500');
-      document.getElementById('connection-status').classList.add('bg-green-500');
-      document.getElementById('connection-text').textContent = 'Connected';
-    });
-
-    document.body.addEventListener('htmx:sseError', function() {
-      console.error('SSE connection error');
-      document.getElementById('connection-status').classList.remove('bg-yellow-500', 'animate-pulse', 'bg-green-500');
-      document.getElementById('connection-status').classList.add('bg-red-500');
-      document.getElementById('connection-text').textContent = 'Connection lost';
+  <!-- JavaScript debugging fallback -->
+  <script>
+    let eventSource = null;
+    
+    // Enhanced debugging
+    function addEventLog(message) {
+      const logDiv = document.getElementById('event-log');
+      const timestamp = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.textContent = `${timestamp}: ${message}`;
+      entry.className = 'text-xs text-gray-600';
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+    
+    // Pure JavaScript SSE implementation (fallback for HTMX extension issues)
+    function setupJavaScriptSSE() {
+      const sseDiv = document.querySelector('[sse-connect]');
+      const sseUrl = sseDiv ? sseDiv.getAttribute('sse-connect') : null;
+      
+      if (!sseUrl) {
+        addEventLog('ERROR: No SSE URL found');
+        return;
+      }
+      
+      addEventLog('Starting JavaScript SSE connection to: ' + sseUrl);
+      updateConnectionStatus('connecting');
+      
+      eventSource = new EventSource(sseUrl);
+      
+      eventSource.onopen = function() {
+        addEventLog('JavaScript SSE: Connection opened');
+        updateConnectionStatus('connected');
+      };
+      
+      eventSource.onerror = function(event) {
+        addEventLog('JavaScript SSE: Error occurred');
+        updateConnectionStatus('error');
+      };
+      
+      eventSource.onmessage = function(event) {
+        addEventLog('JavaScript SSE: Raw message - ' + event.data);
+      };
+      
+      // Handle custom event types
+      eventSource.addEventListener('participant_joined', function(event) {
+        addEventLog('JavaScript SSE: participant_joined - ' + event.data);
+        try {
+          const data = JSON.parse(event.data);
+          // Trigger HTMX refresh for participants list
+          if (typeof htmx !== 'undefined') {
+            const participantsList = document.getElementById('participants-list');
+            if (participantsList) {
+              htmx.trigger(participantsList, 'refresh');
+            }
+          }
+        } catch (e) {
+          addEventLog('ERROR parsing participant_joined data: ' + e.message);
+        }
+      });
+      
+      eventSource.addEventListener('session_started', function(event) {
+        addEventLog('JavaScript SSE: session_started - ' + event.data);
+        try {
+          const data = JSON.parse(event.data);
+          // Trigger full page refresh for session start
+          if (typeof htmx !== 'undefined') {
+            window.location.reload();
+          }
+        } catch (e) {
+          addEventLog('ERROR parsing session_started data: ' + e.message);
+        }
+      });
+      
+      // Handle keep-alive events (don't log these as they're frequent)
+      eventSource.addEventListener('keep-alive', function(event) {
+        // Silent keep-alive - just maintain connection
+        // addEventLog('JavaScript SSE: keep-alive received'); // Uncomment for debugging
+      });
+    }
+    
+    // Direct SSE debugging - fallback if HTMX events don't fire
+    document.addEventListener('DOMContentLoaded', function() {
+      addEventLog('DOM loaded, checking SSE setup...');
+      
+      // Check if the SSE extension loaded
+      if (typeof htmx !== 'undefined' && htmx.config) {
+        addEventLog('HTMX loaded successfully (version: ' + (htmx.version || 'unknown') + ')');
+      } else {
+        addEventLog('WARNING: HTMX not found');
+      }
+      
+      // Check HTMX extensions
+      const extensions = typeof htmx !== 'undefined' && htmx._extensions ? Object.keys(htmx._extensions) : [];
+      if (extensions.length > 0) {
+        addEventLog('HTMX extensions loaded: ' + extensions.join(', '));
+      } else {
+        addEventLog('No HTMX extensions loaded - using JavaScript SSE fallback');
+        setupJavaScriptSSE();
+      }
+      
+      // Listen for HTMX SSE events (if extension works)
+      document.body.addEventListener('htmx:sseConnecting', function() {
+        addEventLog('HTMX SSE: Connecting...');
+      });
+      
+      document.body.addEventListener('htmx:sseOpen', function() {
+        addEventLog('HTMX SSE: Connected!');
+        updateConnectionStatus('connected');
+      });
+      
+      document.body.addEventListener('htmx:sseError', function(evt) {
+        addEventLog('HTMX SSE: Error - ' + (evt.detail ? evt.detail : 'Unknown'));
+        updateConnectionStatus('error');
+      });
+      
+      document.body.addEventListener('htmx:sseClose', function() {
+        addEventLog('HTMX SSE: Closed');  
+        updateConnectionStatus('disconnected');
+      });
+      
+      // Timeout check - if still connecting after 10 seconds, force JavaScript SSE
+      setTimeout(function() {
+        const statusText = document.getElementById('connection-text').textContent;
+        if (statusText === 'Connecting...') {
+          addEventLog('WARNING: Still connecting after 10 seconds - trying JavaScript SSE fallback');
+          setupJavaScriptSSE();
+        }
+      }, 10000);
     });
     
-    // Log all received SSE events
-    document.body.addEventListener('htmx:sseMessage', function(event) {
-      console.log('SSE event received:', event.detail);
-      const logEl = document.getElementById('event-log');
-      const timestamp = new Date().toLocaleTimeString();
-      const eventName = event.detail.type || 'message';
-      const logEntry = document.createElement('div');
-      logEntry.innerHTML = `<span class="text-gray-500">[${timestamp}]</span> ${eventName}`;
-      logEl.appendChild(logEntry);
+    function updateConnectionStatus(status) {
+      const statusDiv = document.getElementById('connection-status');
+      const textDiv = document.getElementById('connection-text');
       
-      // Auto-scroll to bottom
-      logEl.scrollTop = logEl.scrollHeight;
-    });
-  });
-</script>
+      // Remove all status classes
+      statusDiv.classList.remove('bg-yellow-500', 'bg-green-500', 'bg-red-500', 'animate-pulse');
+      
+      switch(status) {
+        case 'connected':
+          statusDiv.classList.add('bg-green-500');
+          textDiv.textContent = 'Connected';
+          break;
+        case 'error':
+          statusDiv.classList.add('bg-red-500');
+          textDiv.textContent = 'Connection Error';
+          break;
+        case 'disconnected':
+          statusDiv.classList.add('bg-red-500');
+          textDiv.textContent = 'Disconnected';
+          break;
+        default:
+          statusDiv.classList.add('bg-yellow-500', 'animate-pulse');
+          textDiv.textContent = 'Connecting...';
+      }
+    }
+  </script>
+
+</div>

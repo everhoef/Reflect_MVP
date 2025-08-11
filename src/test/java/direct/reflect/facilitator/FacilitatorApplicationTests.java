@@ -3,14 +3,20 @@ package direct.reflect.facilitator;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.redis.testcontainers.RedisContainer;
 
 import lombok.extern.slf4j.Slf4j;
 
 @SpringBootTest
+@Testcontainers
+@TestPropertySource(properties = {
+    "spring.data.redis.repositories.enabled=false"
+})
 @Slf4j
 class FacilitatorApplicationTests {
 

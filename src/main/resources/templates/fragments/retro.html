@@ -1,36 +1,116 @@
 <div th:fragment="content" class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-md">
-    <!-- Phase and Stage Header -->
+    <!-- Phase Header -->
     <div class="border-b pb-6 mb-6">
         <div class="mb-4">
-            <h2 class="text-2xl font-dosis" th:text="${currentPhase.displayName}">Phase Name</h2>
-            <p class="text-gray-600" th:text="${currentPhase.description}">Phase description</p>
+            <h2 class="text-2xl font-dosis" th:text="${currentPhase?.displayName ?: 'Phase Name'}">Phase Name</h2>
+            <p class="text-gray-600" th:text="${currentPhase?.description ?: 'Phase description'}">Phase description</p>
         </div>
 
-        <div>
-            <h3 class="text-xl font-dosis mb-2" th:text="${currentStage.name}">Stage Name</h3>
+        <!-- Stage Header (only for active phases with stages) -->
+        <div th:if="${currentStage != null}">
+            <h3 class="text-xl font-dosis mb-2" th:text="${currentStage?.name ?: 'Stage Name'}">Stage Name</h3>
             <div class="space-y-2">
-                <p class="text-gray-600" th:text="${currentStage.why}">Why we're doing this</p>
-                <p th:text="${currentStage.what}">What to do</p>
+                <p class="text-gray-600" th:text="${currentStage?.why ?: 'Why we are doing this'}">Why we're doing this</p>
+                <p th:text="${currentStage?.what ?: 'What to do'}">What to do</p>
+                <p class="text-sm text-gray-500" th:if="${currentStage?.duration}" th:text="'Duration: ' + ${currentStage.duration} + ' minutes'">Duration info</p>
             </div>
         </div>
     </div>
 
-    <!-- Dynamic Content based on DisplayStep type -->
-    <div class="mb-8">
-        <div th:replace="${currentStep.templateReference}">
-            <!-- This will automatically use the correct template based on DisplayContentType -->
+    <!-- Generic RetroStep Content Area -->
+    <!-- TODO: This is where your generic retroStep view will go -->
+    <!-- For now, showing phase-specific placeholder content -->
+    <div class="min-h-96">
+        <div th:switch="${currentPhase?.name()}">
+            <div th:case="'SET_THE_STAGE'">
+                <div class="text-center py-12">
+                    <h4 class="text-lg font-semibold mb-4">Set the Stage Phase</h4>
+                    <p class="text-gray-600 mb-6">Generic retroStep content will be rendered here based on currentStage configuration</p>
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <p class="text-sm">Stage: <span th:text="${currentStage?.name}">Current Stage</span></p>
+                        <p class="text-sm">Template: <span th:text="${template?.name}">Template Name</span></p>
+                    </div>
+                </div>
+            </div>
+            <div th:case="'GATHER_DATA'">
+                <div class="text-center py-12">
+                    <h4 class="text-lg font-semibold mb-4">Gather Data Phase</h4>
+                    <p class="text-gray-600 mb-6">Generic retroStep content will be rendered here based on currentStage configuration</p>
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <p class="text-sm">Stage: <span th:text="${currentStage?.name}">Current Stage</span></p>
+                        <p class="text-sm">Template: <span th:text="${template?.name}">Template Name</span></p>
+                    </div>
+                </div>
+            </div>
+            <div th:case="'GENERATE_INSIGHTS'">
+                <div class="text-center py-12">
+                    <h4 class="text-lg font-semibold mb-4">Generate Insights Phase</h4>
+                    <p class="text-gray-600 mb-6">Generic retroStep content will be rendered here based on currentStage configuration</p>
+                    <div class="bg-yellow-50 p-4 rounded-lg">
+                        <p class="text-sm">Stage: <span th:text="${currentStage?.name}">Current Stage</span></p>
+                        <p class="text-sm">Template: <span th:text="${template?.name}">Template Name</span></p>
+                    </div>
+                </div>
+            </div>
+            <div th:case="'DECIDE_ACTIONS'">
+                <div class="text-center py-12">
+                    <h4 class="text-lg font-semibold mb-4">Decide Actions Phase</h4>
+                    <p class="text-gray-600 mb-6">Generic retroStep content will be rendered here based on currentStage configuration</p>
+                    <div class="bg-purple-50 p-4 rounded-lg">
+                        <p class="text-sm">Stage: <span th:text="${currentStage?.name}">Current Stage</span></p>
+                        <p class="text-sm">Template: <span th:text="${template?.name}">Template Name</span></p>
+                    </div>
+                </div>
+            </div>
+            <div th:case="'CLOSE_RETRO'">
+                <div class="text-center py-12">
+                    <h4 class="text-lg font-semibold mb-4">Close Retrospective Phase</h4>
+                    <p class="text-gray-600 mb-6">Generic retroStep content will be rendered here based on currentStage configuration</p>
+                    <div class="bg-red-50 p-4 rounded-lg">
+                        <p class="text-sm">Stage: <span th:text="${currentStage?.name}">Current Stage</span></p>
+                        <p class="text-sm">Template: <span th:text="${template?.name}">Template Name</span></p>
+                    </div>
+                </div>
+            </div>
+            <div th:case="'PAUSED'">
+                <div class="text-center py-12">
+                    <h4 class="text-lg font-semibold mb-4">Retrospective Paused</h4>
+                    <p class="text-gray-600">This retrospective has been paused by the facilitator.</p>
+                </div>
+            </div>
+            <div th:case="'COMPLETED'">
+                <div class="text-center py-12">
+                    <h4 class="text-lg font-semibold mb-4">Retrospective Complete</h4>
+                    <p class="text-gray-600">This retrospective has been completed. Thank you for participating!</p>
+                </div>
+            </div>
+            <div th:case="'ABANDONED'">
+                <div class="text-center py-12">
+                    <h4 class="text-lg font-semibold mb-4">Retrospective Abandoned</h4>
+                    <p class="text-gray-600">This retrospective has been abandoned.</p>
+                </div>
+            </div>
+            <div th:case="*">
+                <div class="text-center py-12">
+                    <h4 class="text-lg font-semibold mb-4">Unknown Phase</h4>
+                    <p class="text-gray-600">Phase: <span th:text="${currentPhase?.name()}">Unknown</span></p>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Facilitator controls -->
-    <div th:if="${isFacilitator}" class="mt-8 flex justify-between items-center">
-        <span class="text-sm text-gray-500" th:text="|Step ${currentStep.orderIndex + 1} of ${currentStage.steps.size()}|">
-            Step progress
-        </span>
-        <button class="bg-ocher-yellow text-white px-6 py-2 rounded-lg"
-                th:attr="hx-post=@{/retrospective/{retroId}/next(retroId=${retroId})}"
-                hx-swap="none">
-            Next Step →
-        </button>
+    <!-- Facilitator Controls (only for active phases with stages) -->
+    <div th:if="${(isFacilitator ?: false) and currentStage != null}" class="mt-8 border-t pt-6">
+        <div class="flex justify-between items-center">
+            <span class="text-sm text-gray-500">
+                Current stage: <span th:text="${currentStage?.name ?: 'Unknown'}">Stage Name</span>
+                <span th:if="${currentStage?.duration}" th:text="'(' + ${currentStage.duration} + ' min)'"></span>
+            </span>
+            <button class="bg-ocher-yellow text-white px-6 py-2 rounded-lg hover:bg-ocher-yellow-dark transition-colors"
+                    th:attr="hx-post=@{/api/retro/{retroId}/next(retroId=${retroId})}"
+                    hx-swap="none">
+                Next Stage →
+            </button>
+        </div>
     </div>
 </div>
