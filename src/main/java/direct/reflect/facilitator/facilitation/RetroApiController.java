@@ -8,6 +8,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
@@ -18,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.UUID;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/retro")
@@ -186,7 +188,57 @@ public class RetroApiController {
         }
     }
     
+    @PostMapping("/leave-active-sessions")
+    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    public ResponseEntity<Void> leaveActiveSessions(HttpServletRequest httpRequest) {
+        log.debug("Request to leave all active sessions");
+        
+        try {
+            participantService.leaveAllActiveSessions(httpRequest);
+            log.info("Successfully left all active sessions");
+            return responseService.createRedirectResponse("/home?message=left_sessions");
+        } catch (Exception e) {
+            log.error("Error leaving active sessions: ", e);
+            return responseService.createServerErrorResponse("/home", "leave_sessions_failed");
+        }
+    }
+    
+    @GetMapping("/check-active-sessions")
+    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    public ResponseEntity<ActiveSessionsResponse> checkActiveSessions(HttpServletRequest httpRequest) {
+        try {
+            // Get participant ID from session attributes (much simpler!)
+            HttpSession session = httpRequest.getSession(false);
+            if (session == null) {
+                return ResponseEntity.ok(new ActiveSessionsResponse(List.of()));
+            }
+            
+            UUID participantId = (UUID) session.getAttribute("participantId");
+            if (participantId == null) {
+                return ResponseEntity.ok(new ActiveSessionsResponse(List.of()));
+            }
+            
+            List<Participant> activeSessions = participantService.getActiveSessionsForParticipant(participantId);
+            
+            List<SessionInfo> sessionInfos = activeSessions.stream()
+                .map(p -> new SessionInfo(
+                    p.getSession().getId(),
+                    p.getSession().getName(),
+                    p.getRole().name()
+                ))
+                .toList();
+            
+            return ResponseEntity.ok(new ActiveSessionsResponse(sessionInfos));
+            
+        } catch (Exception e) {
+            log.error("Error checking active sessions: ", e);
+            return ResponseEntity.ok(new ActiveSessionsResponse(List.of()));
+        }
+    }
+
     // Simple records for JSON requests
     public record CreateRetroRequest(String sessionName) {}
     public record JoinRetroRequest(UUID retroId) {}
+    public record SessionInfo(UUID sessionId, String sessionName, String role) {}
+    public record ActiveSessionsResponse(List<SessionInfo> activeSessions) {}
 }

@@ -19,6 +19,7 @@ public record RetroEvent<T>(
      */
     public enum EventType {
         PARTICIPANT_JOINED,
+        PARTICIPANT_LEFT,
         SESSION_STARTED,
         STEP_ADVANCED,
         RETRO_CREATED,
@@ -44,6 +45,13 @@ public record RetroEvent<T>(
      */
     public static RetroEvent<String> participantJoined(UUID retroId, String displayName) {
         return new RetroEvent<>(retroId, EventType.PARTICIPANT_JOINED, "system", Instant.now(), displayName);
+    }
+    
+    /**
+     * Create a participant left event
+     */
+    public static RetroEvent<String> participantLeft(UUID retroId, String displayName) {
+        return new RetroEvent<>(retroId, EventType.PARTICIPANT_LEFT, "system", Instant.now(), displayName);
     }
     
     /**

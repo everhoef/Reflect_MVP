@@ -43,6 +43,19 @@
                 </form>
             </div>
             
+            <!-- Success message display -->
+            <div th:if="${param.message != null && #arrays.contains(param.message, 'left_sessions')}" 
+                 class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mt-4" 
+                 role="alert">
+                <p>Successfully left active sessions. You can now create or join a new session.</p>
+            </div>
+            
+            <div th:if="${param.message != null && #arrays.contains(param.message, 'session_switched')}" 
+                 class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mt-4" 
+                 role="alert">
+                <p>✅ Successfully switched to the new session. Your previous session has been terminated.</p>
+            </div>
+            
             <!-- Error message display -->
             <div th:if="${param.error != null}" 
                  class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mt-4" 
@@ -51,11 +64,118 @@
                 <p th:if="${param.error != null && #arrays.contains(param.error, 'missing_display_name')}">Please enter your name</p>
                 <p th:if="${param.error != null && #arrays.contains(param.error, 'missing_retro_id')}">Please enter a session ID</p>
                 <p th:if="${param.error != null && #arrays.contains(param.error, 'session_not_found')}">Session not found</p>
-                <p th:if="${param.error != null && #arrays.contains(param.error, 'active_session_exists')}">You already have an active session</p>
+                <p th:if="${param.error != null && #arrays.contains(param.error, 'active_session_exists')}">
+                    You already have an active session. Please <a href="#" onclick="showActiveSessionsModal()" class="underline text-red-800 font-semibold">choose what to do</a>.
+                </p>
                 <p th:if="${param.error != null && #arrays.contains(param.error, 'creation_failed')}">Failed to create session. Please try again.</p>
                 <p th:if="${param.error != null && #arrays.contains(param.error, 'join_failed')}">Failed to join session. Please try again.</p>
                 <p th:if="${param.error != null && #arrays.contains(param.error, 'template_not_found')}">The selected retrospective template was not found</p>
+                <p th:if="${param.error != null && #arrays.contains(param.error, 'leave_sessions_failed')}">Failed to leave active sessions. Please try again.</p>
             </div>
         </div>
     </div>
+
+    <!-- Active Sessions Modal -->
+    <div id="activeSessionsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 1000;">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Active Sessions Found</h3>
+                <div id="activeSessionsList" class="mb-4">
+                    <!-- Active sessions will be populated here -->
+                </div>
+                <p class="text-sm text-gray-600 mb-6">
+                    You're currently in one or more active retrospective sessions. 
+                    What would you like to do?
+                </p>
+                <div class="flex flex-col space-y-3">
+                    <button onclick="leaveActiveSessionsAndContinue()" 
+                            class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                        Leave All Active Sessions
+                    </button>
+                    <button onclick="closeActiveSessionsModal()" 
+                            class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let pendingFormSubmit = null;
+
+        function showActiveSessionsModal() {
+            // Fetch active sessions
+            fetch('/api/retro/check-active-sessions')
+                .then(response => response.json())
+                .then(data => {
+                    const sessionsList = document.getElementById('activeSessionsList');
+                    
+                    if (data.activeSessions && data.activeSessions.length > 0) {
+                        sessionsList.innerHTML = '<div class="mb-3"><strong>Active Sessions:</strong></div>' +
+                            data.activeSessions.map(session => 
+                                `<div class="bg-gray-100 p-2 rounded mb-2">
+                                    <div class="font-semibold">${session.sessionName}</div>
+                                    <div class="text-sm text-gray-600">Role: ${session.role}</div>
+                                </div>`
+                            ).join('');
+                    } else {
+                        sessionsList.innerHTML = '<div class="text-gray-500 italic">No active sessions found.</div>';
+                    }
+                    
+                    document.getElementById('activeSessionsModal').classList.remove('hidden');
+                })
+                .catch(error => {
+                    console.error('Error fetching active sessions:', error);
+                    // Show modal anyway with generic message
+                    document.getElementById('activeSessionsList').innerHTML = 
+                        '<div class="text-gray-500 italic">Could not load session details.</div>';
+                    document.getElementById('activeSessionsModal').classList.remove('hidden');
+                });
+        }
+
+        function closeActiveSessionsModal() {
+            document.getElementById('activeSessionsModal').classList.add('hidden');
+            pendingFormSubmit = null;
+        }
+
+        function leaveActiveSessionsAndContinue() {
+            // Leave all active sessions
+            fetch('/api/retro/leave-active-sessions', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('input[name="_csrf"]').value
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    closeActiveSessionsModal();
+                    // Show success message and allow user to continue
+                    window.location.href = '/home?message=left_sessions';
+                } else {
+                    alert('Failed to leave active sessions. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error leaving sessions:', error);
+                alert('Error occurred while leaving sessions. Please try again.');
+            });
+        }
+
+        // Intercept form submissions to check for active sessions first
+        document.addEventListener('DOMContentLoaded', function() {
+            const forms = document.querySelectorAll('form[hx-post*="/api/retro/"]');
+            
+            forms.forEach(form => {
+                form.addEventListener('htmx:configRequest', function(event) {
+                    // Only intercept if we got an active_session_exists error
+                    const urlParams = new URLSearchParams(window.location.search);
+                    if (urlParams.has('error') && urlParams.get('error').includes('active_session_exists')) {
+                        // Show modal automatically if the error is present
+                        setTimeout(() => showActiveSessionsModal(), 100);
+                    }
+                });
+            });
+        });
+    </script>
 </div>

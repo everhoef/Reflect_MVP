@@ -49,7 +49,20 @@ public class ParticipantService {
         // Display name comes from the authentication context
         Participant profile = createParticipantFromAuthentication(auth, null, request);
         validateDisplayName(profile);
-        checkForActiveSession(profile);
+        
+        // For session creation, we automatically terminate old sessions
+        List<Participant> activeSessions = getActiveSessionsForParticipant(profile.getParticipantId());
+        if (!activeSessions.isEmpty()) {
+            log.info("Participant {} creating new session - terminating {} existing session(s)", 
+                profile.getParticipantId(), activeSessions.size());
+                
+            for (Participant activeParticipant : activeSessions) {
+                removeParticipantFromSession(activeParticipant);
+            }
+            
+            log.info("Terminated {} old session(s) for new session creation", activeSessions.size());
+        }
+        
         return createNewSessionWithFacilitator(sessionName, profile, request);
     }
     
@@ -128,7 +141,7 @@ public class ParticipantService {
 
         Participant profile = getCurrentParticipant(request, displayName);
         validateDisplayName(profile);
-        checkForActiveSession(profile);
+        checkForActiveSession(profile, session.getId());
         return createParticipantForSession(session, profile, role, request);
     }
 
@@ -183,7 +196,9 @@ public class ParticipantService {
     }
 
     /**
-     * Extracts participant ID from Spring Security Authentication and cookies.
+     * Extracts participant ID from Spring Security Authentication and session.
+     * For GUEST users: uses the guestId from HTTP session (set by AuthenticationService)
+     * For USER users: generates consistent ID from username
      */
     private UUID extractParticipantId(Authentication auth, HttpServletRequest request) {
         // Check if this is a guest user based on role
@@ -191,24 +206,24 @@ public class ParticipantService {
             .anyMatch(authority -> authority.getAuthority().equals("ROLE_GUEST"));
             
         if (isGuest) {
-            // For guests, get the participant ID from the cookie
-            Cookie[] cookies = request.getCookies();
-            if (cookies != null) {
-                for (Cookie cookie : cookies) {
-                    if (PARTICIPANT_ID_COOKIE.equals(cookie.getName())) {
-                        try {
-                            return UUID.fromString(cookie.getValue());
-                        } catch (IllegalArgumentException e) {
-                            log.warn("Invalid participant ID in cookie: {}", cookie.getValue());
-                            // Fallback to generate new UUID if cookie is corrupted
-                            return UUID.randomUUID();
-                        }
-                    }
+            // For guests, get the guestId from HTTP session (consistent with AuthenticationService)
+            HttpSession session = request.getSession(false);
+            if (session != null) {
+                UUID guestId = (UUID) session.getAttribute("guestId");
+                if (guestId != null) {
+                    log.debug("Using existing guestId from session: {}", guestId);
+                    return guestId;
                 }
             }
             
-            log.warn("No participant ID cookie found for guest user, generating new UUID");
-            return UUID.randomUUID();
+            // Fallback: this should not happen if authentication worked correctly
+            log.warn("No guestId found in session for GUEST user - this indicates an authentication issue");
+            UUID fallbackId = UUID.randomUUID();
+            if (session != null) {
+                session.setAttribute("guestId", fallbackId);
+                log.debug("Created fallback guestId: {}", fallbackId);
+            }
+            return fallbackId;
         } else {
             // For authenticated users, generate consistent ID from username
             return generateUserBasedParticipantId(auth.getName());
@@ -268,28 +283,86 @@ public class ParticipantService {
     }
 
     /**
-     * Checks if a participant has any active sessions.
+     * Checks if a participant has any active sessions and handles session switching.
+     * For same session: allows rejoin
+     * For different session: terminates old session and allows new one
      */
-    private void checkForActiveSession(Participant profile) {
-        log.debug("Checking for active sessions for participant: {} (username: {})", 
-            profile.getParticipantId(), profile.getUsername());
+    private void checkForActiveSession(Participant profile, UUID targetSessionId) {
+        List<Participant> activeSessions = getActiveSessionsForParticipant(profile.getParticipantId());
+        
+        if (!activeSessions.isEmpty()) {
+            // Check if they're trying to join a session they're already in
+            boolean alreadyInTargetSession = activeSessions.stream()
+                .anyMatch(p -> p.getSession().getId().equals(targetSessionId));
+                
+            if (alreadyInTargetSession) {
+                log.info("Participant {} is already in target session {} - allowing rejoin", 
+                    profile.getParticipantId(), targetSessionId);
+                return; // Allow rejoining the same session
+            }
             
-        List<Participant> existing = participantRepository.findByParticipantIdWithSession(profile.getParticipantId());
-        
-        log.debug("Found {} existing participations for participant {}", 
-            existing.size(), profile.getParticipantId());
-        
-        boolean hasActive = existing.stream().anyMatch(p -> {
-            boolean isFinished = p.getSession().isFinished();
-            log.debug("Session {} is finished: {}", p.getSession().getId(), isFinished);
-            return !isFinished;
-        });
-        
-        log.debug("Participant {} has active sessions: {}", profile.getParticipantId(), hasActive);
-        
-        if (hasActive) {
-            throw new IllegalStateException("Participant is already in an active session.");
+            // They're switching to a different session - terminate old sessions
+            log.info("Participant {} switching from {} active session(s) to new session {}", 
+                profile.getParticipantId(), activeSessions.size(), targetSessionId);
+                
+            for (Participant activeParticipant : activeSessions) {
+                removeParticipantFromSession(activeParticipant);
+            }
+            
+            log.info("Successfully terminated {} old session(s) for participant {}", 
+                activeSessions.size(), profile.getParticipantId());
         }
+    }
+    
+    /**
+     * Gets all active sessions for a participant.
+     */
+    public List<Participant> getActiveSessionsForParticipant(UUID participantId) {
+        log.debug("Checking for active sessions for participant: {}", participantId);
+            
+        List<Participant> existing = participantRepository.findByParticipantIdWithSession(participantId);
+        
+        log.debug("Found {} existing participations for participant {}", existing.size(), participantId);
+        
+        List<Participant> activeSessions = existing.stream()
+            .filter(p -> {
+                boolean isFinished = p.getSession().isFinished();
+                log.debug("Session {} is finished: {}", p.getSession().getId(), isFinished);
+                return !isFinished;
+            })
+            .toList();
+        
+        log.debug("Participant {} has {} active sessions", participantId, activeSessions.size());
+        return activeSessions;
+    }
+    
+    /**
+     * Leaves all active sessions for the current user.
+     */
+    @Transactional
+    public void leaveAllActiveSessions(HttpServletRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) {
+            throw new IllegalStateException("No authentication context found");
+        }
+        
+        Participant profile = createParticipantFromAuthentication(auth, null, request);
+        List<Participant> activeSessions = getActiveSessionsForParticipant(profile.getParticipantId());
+        
+        for (Participant activeParticipant : activeSessions) {
+            removeParticipantFromSession(activeParticipant);
+        }
+        
+        // Clear session attributes since we're leaving all sessions
+        if (request.getSession(false) != null) {
+            request.getSession().removeAttribute("retroId");
+            request.getSession().removeAttribute("participantRole");
+            request.getSession().removeAttribute("participantId");
+            log.debug("Cleared session attributes after leaving all active sessions");
+        }
+        
+        log.info("Successfully removed participant {} from {} active sessions", 
+            profile.getParticipantId(), activeSessions.size());
     }
 
     /**
@@ -303,8 +376,38 @@ public class ParticipantService {
 
     /**
      * Creates a participant for an existing session and sets session attributes.
+     * Prevents duplicate participants by checking if this participantId already exists in the session.
      */
     private Participant createParticipantForSession(RetroSession session, Participant profile, ParticipantRole role, HttpServletRequest request) {
+        // Check if this participant already exists in this session
+        ParticipantId pk = new ParticipantId(profile.getParticipantId(), session.getId());
+        var existingParticipant = participantRepository.findById(pk);
+        
+        if (existingParticipant.isPresent()) {
+            log.info("Participant {} already exists in session {}. Updating existing record instead of creating duplicate.", 
+                profile.getParticipantId(), session.getId());
+            
+            // Update existing participant
+            Participant existing = existingParticipant.get();
+            existing.setDisplayName(profile.getDisplayName());
+            existing.setLastSeen(LocalDateTime.now());
+            existing.setRole(role); // Allow role updates
+            
+            Participant updatedParticipant = participantRepository.save(existing);
+            
+            // Update session attributes
+            if (request.getSession(false) != null) {
+                request.getSession().setAttribute("retroId", session.getId());
+                request.getSession().setAttribute("participantRole", role.name());
+                request.getSession().setAttribute("participantId", profile.getParticipantId());
+                log.debug("Updated session attributes: retroId={}, role={}, participantId={}", 
+                    session.getId(), role.name(), profile.getParticipantId());
+            }
+            
+            return updatedParticipant;
+        }
+        
+        // Create new participant
         Participant participant = new Participant();
         participant.setParticipantId(profile.getParticipantId());
         participant.setUsername(profile.getUsername());
@@ -327,6 +430,26 @@ public class ParticipantService {
         return savedParticipant;
     }
     
+    /**
+     * Removes a participant from their session with proper event handling.
+     */
+    @Transactional
+    public void removeParticipantFromSession(Participant participant) {
+        log.info("=== REMOVING PARTICIPANT === {} from session {} ({})", 
+            participant.getParticipantId(), 
+            participant.getSession().getId(), 
+            participant.getSession().getName());
+        
+        // Notify RetroSessionService to handle the event publishing
+        log.info("About to call retroSessionService.onParticipantLeaving for participant: {}", participant.getDisplayName());
+        retroSessionService.onParticipantLeaving(participant);
+        
+        // Remove the participant from the database
+        log.info("About to delete participant {} from database", participant.getDisplayName());
+        participantRepository.delete(participant);
+        log.info("Successfully deleted participant {} from database", participant.getDisplayName());
+    }
+
     /**
      * Creates a cookie with participant ID for guest users.
      */

@@ -8,6 +8,9 @@ import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException
 import direct.reflect.facilitator.common.exception.RetroTemplateNotFoundException;
 import direct.reflect.facilitator.configurator.RetroStepRepository;
 import direct.reflect.facilitator.configurator.RetroTemplateRepository;
+import direct.reflect.facilitator.eventing.EventService;
+import direct.reflect.facilitator.eventing.EventType;
+import direct.reflect.facilitator.eventing.RetroEvent;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,6 +18,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.transaction.Transactional;
+import org.springframework.context.annotation.Lazy;
 
 @Service
 @Slf4j
@@ -23,6 +27,7 @@ public class RetroSessionService {
     private final RetroSessionRepository sessionRepository;
     private final RetroTemplateRepository templateRepository;
     private final RetroStepRepository stepRepository;
+    private final @Lazy EventService eventService;
 
     @Transactional
     public RetroSession createNewSession(String sessionName, RetroTemplate template) {
@@ -32,7 +37,13 @@ public class RetroSessionService {
         session.setTemplate(template);
         session.setPhase(RetroPhase.LOBBY);
         
-        return sessionRepository.save(session);
+        RetroSession savedSession = sessionRepository.save(session);
+        
+        // Publish RETRO_CREATED event to establish SSE connection immediately
+        eventService.publish(RetroEvent.retroCreated(savedSession.getId(), "system"));
+        log.info("Published RETRO_CREATED event for session: {}", savedSession.getName());
+        
+        return savedSession;
     }
 
     @Transactional
@@ -127,5 +138,24 @@ public class RetroSessionService {
     public RetroTemplate getTemplateById(Long templateId) {
         return templateRepository.findById(templateId)
             .orElseThrow(() -> new RetroTemplateNotFoundException(templateId));
+    }
+
+    /**
+     * Called when a participant is leaving a session to publish appropriate events.
+     */
+    public void onParticipantLeaving(Participant participant) {
+        log.debug("Publishing PARTICIPANT_LEFT event for '{}' from session {}", 
+            participant.getDisplayName(), participant.getSession().getId());
+        
+        try {
+            eventService.publish(RetroEvent.participantLeft(
+                participant.getSession().getId(), 
+                participant.getDisplayName()
+            ));
+            log.info("Published PARTICIPANT_LEFT event for '{}'", participant.getDisplayName());
+        } catch (Exception eventError) {
+            log.error("Failed to publish PARTICIPANT_LEFT event: {}", eventError.getMessage());
+            // Continue anyway - event publishing failure shouldn't block user flow
+        }
     }
 }

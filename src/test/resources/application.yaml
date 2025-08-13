@@ -23,4 +23,3 @@ logging:
     "[direct.reflect.facilitator]": DEBUG
     "[org.testcontainers]": INFO
     "[org.hibernate]": INFO
-    "[org.springframework.test]": DEBUG

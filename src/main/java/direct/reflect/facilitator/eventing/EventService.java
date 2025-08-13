@@ -7,8 +7,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.stereotype.Service;
 
-import direct.reflect.facilitator.eventing.RetroEvent;
-import direct.reflect.facilitator.facilitation.ParticipantService;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.UUID;
@@ -31,7 +29,6 @@ import java.util.ArrayList;
 @Slf4j
 public class EventService {
     private final RedisTemplate<String, Object> redisTemplate;
-    private final ParticipantService participantService;
     private final AtomicInteger activeConnections = new AtomicInteger(0);
     
     // Local SSE connections for this pod instance
@@ -39,7 +36,6 @@ public class EventService {
     private final ScheduledExecutorService keepAliveExecutor = Executors.newScheduledThreadPool(2);
     
     private static final String STREAM_KEY_PREFIX = "retro:stream:";
-    private static final String CONSUMER_GROUP = "retro-events";
     private static final long SSE_TIMEOUT = 300000L; // 5 minutes
     
     @PostConstruct
@@ -69,6 +65,9 @@ public class EventService {
      * Publish event to Redis Stream (blocking).
      */
     public String publish(RetroEvent<?> event) {
+        log.info("Publishing {} event for retro {} with payload: {}", 
+            event.type(), event.retroId(), event.payload());
+            
         String streamKey = STREAM_KEY_PREFIX + event.retroId();
         
         // Create stream record
@@ -90,10 +89,25 @@ public class EventService {
     
     /**
      * Create SSE emitter (simple blocking approach).
+     * Ensures only one connection per user per retro.
      */
     public SseEmitter createSseEmitter(UUID retroId, HttpServletRequest request) {
-        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
         String connectionId = retroId + ":" + request.getSession().getId();
+        
+        // Check if connection already exists - close the old one first
+        SseEmitter existingEmitter = localEmitters.get(connectionId);
+        if (existingEmitter != null) {
+            log.info("Closing existing SSE connection for: {}", connectionId);
+            try {
+                existingEmitter.complete();
+            } catch (Exception e) {
+                log.warn("Error closing existing SSE connection: {}", e.getMessage());
+            }
+            localEmitters.remove(connectionId);
+            activeConnections.decrementAndGet();
+        }
+        
+        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
         
         // Store locally
         localEmitters.put(connectionId, emitter);
@@ -119,6 +133,18 @@ public class EventService {
         });
         
         log.info("Created SSE emitter for retro: {} (active connections: {})", retroId, activeConnections.get());
+        
+        // Send immediate connection confirmation event
+        try {
+            emitter.send(SseEmitter.event()
+                .name("connection_established")
+                .data("SSE connection established")
+                .comment("Connection confirmed"));
+            log.debug("Sent connection_established event for retro: {}", retroId);
+        } catch (IOException e) {
+            log.warn("Failed to send connection_established event: {}", e.getMessage());
+        }
+        
         return emitter;
     }
     
@@ -127,10 +153,20 @@ public class EventService {
      */
     private void sendToLocalEmitters(UUID retroId, RetroEvent<?> event) {
         String connectionId = retroId + ":";
+        
+        List<String> matchingConnections = localEmitters.entrySet().stream()
+            .filter(entry -> entry.getKey().startsWith(connectionId))
+            .map(entry -> entry.getKey())
+            .toList();
+            
+        log.info("Sending {} event to {} connections for retro {}", 
+            event.type(), matchingConnections.size(), retroId);
+        
         localEmitters.entrySet().stream()
             .filter(entry -> entry.getKey().startsWith(connectionId))
             .forEach(entry -> {
                 try {
+                    log.debug("Sending {} event to connection: {}", event.type(), entry.getKey());
                     entry.getValue().send(SseEmitter.event()
                         .name(event.type().name().toLowerCase())
                         .data(event));
