@@ -13,7 +13,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import jakarta.servlet.http.HttpServletRequest;
 
-import direct.reflect.facilitator.common.config.SecurityConfig;
 import direct.reflect.facilitator.facilitation.RetroSession;
 import direct.reflect.facilitator.facilitation.Participant;
 import direct.reflect.facilitator.facilitation.ParticipantRole;
@@ -21,6 +20,8 @@ import direct.reflect.facilitator.facilitation.ParticipantService;
 import direct.reflect.facilitator.facilitation.RetroSessionService;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.facilitation.RetroApiController;
+import direct.reflect.facilitator.facilitation.dto.CreateRetroRequest;
+import direct.reflect.facilitator.facilitation.dto.JoinRetroRequest;
 
 import java.util.UUID;
 
@@ -28,12 +29,20 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 
-@WebMvcTest(controllers = RetroApiController.class)
-@Import({SecurityConfig.class, direct.reflect.facilitator.common.exception.ApiExceptionHandler.class})
+@WebMvcTest(controllers = {
+    RetroApiController.class, 
+    direct.reflect.facilitator.auth.AuthController.class
+})
+@Import({
+    direct.reflect.facilitator.common.config.SecurityConfig.class,
+    direct.reflect.facilitator.auth.AuthenticationHelper.class
+})
 @EnableAutoConfiguration(exclude = {
     DataSourceAutoConfiguration.class,
     HibernateJpaAutoConfiguration.class
@@ -52,11 +61,9 @@ public class RetroApiControllerTest {
     @MockitoBean 
     private EventService eventService;
     
-    @MockitoBean
-    private direct.reflect.facilitator.common.RequestValidationService validationService;
     
     @MockitoBean
-    private direct.reflect.facilitator.common.ResponseService responseService;
+    private direct.reflect.facilitator.auth.AuthenticationHelper authHelper;
     
     @Test
     @WithMockUser(roles = "USER")
@@ -72,18 +79,9 @@ public class RetroApiControllerTest {
         mockParticipant.setDisplayName("Test User");
         mockParticipant.setSession(mockSession);
 
-        RetroApiController.CreateRetroRequest request = new RetroApiController.CreateRetroRequest("Test Session");
+        CreateRetroRequest request = new CreateRetroRequest("Test Session");
 
-        // Mock validation service
-        when(validationService.validateSessionName("Test Session"))
-            .thenReturn(direct.reflect.facilitator.common.RequestValidationService.ValidationResult.valid());
-        
-        // Mock response service
-        when(responseService.createRedirectResponse("/retro/" + retroId))
-            .thenReturn(org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.FOUND)
-                .header("HX-Redirect", "/retro/" + retroId).build());
-
-        when(participantService.createAndAssignFacilitatorForSession(eq("Test Session"), eq(null), any(HttpServletRequest.class)))
+        when(participantService.createAndAssignFacilitatorForSession(eq("Test Session"), any(HttpServletRequest.class)))
             .thenReturn(mockParticipant);
         
         // Act & Assert
@@ -100,7 +98,7 @@ public class RetroApiControllerTest {
     void shouldJoinRetrospectiveAndRedirect() throws Exception {
         // Arrange
         UUID retroId = UUID.randomUUID();
-        RetroApiController.JoinRetroRequest request = new RetroApiController.JoinRetroRequest(retroId);
+        JoinRetroRequest request = new JoinRetroRequest(retroId);
 
         RetroSession mockSession = new RetroSession();
         mockSession.setId(retroId);
@@ -111,18 +109,9 @@ public class RetroApiControllerTest {
         mockParticipant.setDisplayName("Guest");
         mockParticipant.setSession(mockSession);
 
-        // Mock validation service
-        when(validationService.validateRetroId(retroId))
-            .thenReturn(direct.reflect.facilitator.common.RequestValidationService.ValidationResult.valid());
-        
-        // Mock response service
-        when(responseService.createRedirectResponse("/retro/" + retroId))
-            .thenReturn(org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.FOUND)
-                .header("HX-Redirect", "/retro/" + retroId).build());
-
         when(retroSessionService.sessionExists(retroId)).thenReturn(true);
         when(retroSessionService.getSessionById(retroId)).thenReturn(mockSession); 
-        when(participantService.addParticipantToSession(any(HttpServletRequest.class), eq(mockSession), eq(null), eq(ParticipantRole.PARTICIPANT)))
+        when(participantService.addParticipantToSession(any(HttpServletRequest.class), eq(mockSession), eq(ParticipantRole.PARTICIPANT)))
             .thenReturn(mockParticipant);
         when(eventService.publish(any())).thenReturn("1234567890-0");
 
@@ -138,7 +127,7 @@ public class RetroApiControllerTest {
     @WithMockUser(roles = "GUEST")
     void shouldAllowGuestUserCreatingSession() throws Exception {
         // Arrange
-        RetroApiController.CreateRetroRequest request = new RetroApiController.CreateRetroRequest("Test Session");
+        CreateRetroRequest request = new CreateRetroRequest("Test Session");
         
         UUID retroId = UUID.randomUUID();
         RetroSession mockSession = new RetroSession();
@@ -150,16 +139,7 @@ public class RetroApiControllerTest {
         mockParticipant.setDisplayName("Test Guest");
         mockParticipant.setSession(mockSession);
 
-        // Mock validation service
-        when(validationService.validateSessionName("Test Session"))
-            .thenReturn(direct.reflect.facilitator.common.RequestValidationService.ValidationResult.valid());
-        
-        // Mock response service
-        when(responseService.createRedirectResponse("/retro/" + retroId))
-            .thenReturn(org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.FOUND)
-                .header("HX-Redirect", "/retro/" + retroId).build());
-
-        when(participantService.createAndAssignFacilitatorForSession(eq("Test Session"), eq(null), any(HttpServletRequest.class)))
+        when(participantService.createAndAssignFacilitatorForSession(eq("Test Session"), any(HttpServletRequest.class)))
             .thenReturn(mockParticipant);
 
         // Act & Assert
@@ -173,21 +153,22 @@ public class RetroApiControllerTest {
     @Test
     void shouldRequireAuthenticationForSessionCreation() throws Exception {
         // Arrange
-        RetroApiController.CreateRetroRequest request = new RetroApiController.CreateRetroRequest("Test Session");
+        CreateRetroRequest request = new CreateRetroRequest("Test Session");
 
         // Act & Assert - Test unauthenticated access
         mockMvc.perform(post("/api/retro/create")
+                .with(anonymous()) // Explicitly ensure no authentication
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"sessionName\":\"Test Session\"}"))
-                .andExpect(status().isForbidden()); // Should return 403 for API endpoints
+                .andExpect(status().isUnauthorized()); // Should return 401 for API endpoints with OAuth
     }
     
     @Test
     @WithMockUser(roles = "USER")
     void shouldRequireCSRFToken() throws Exception {
         // Arrange
-        RetroApiController.CreateRetroRequest request = new RetroApiController.CreateRetroRequest("Test Session");
+        CreateRetroRequest request = new CreateRetroRequest("Test Session");
 
         // Act & Assert - Test without CSRF token (should be rejected)
         mockMvc.perform(post("/api/retro/create")
@@ -195,5 +176,25 @@ public class RetroApiControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"sessionName\":\"Test Session\"}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void guestAuth_ValidDisplayName_ShouldRedirectToHome() throws Exception {
+        // Guest authentication should accept POST with displayName and redirect to home
+        mockMvc.perform(post("/auth/guest")
+                .param("displayName", "Test Guest User")
+                .with(csrf()))
+                .andExpect(status().isFound()) // Guest auth redirects to /
+                .andExpect(redirectedUrl("/"));
+    }
+    
+    @Test
+    void guestAuth_EmptyDisplayName_ShouldRedirectToLoginWithError() throws Exception {
+        // Guest authentication should reject empty display name
+        mockMvc.perform(post("/auth/guest")
+                .param("displayName", "")
+                .with(csrf()))
+                .andExpect(status().isFound()) // Guest auth redirects on error
+                .andExpect(redirectedUrl("/login?error=missing_display_name"));
     }
 }

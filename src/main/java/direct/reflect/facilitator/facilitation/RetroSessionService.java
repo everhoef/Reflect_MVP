@@ -54,7 +54,7 @@ public class RetroSessionService {
         
         // Start first step
         advanceToNextStep(sessionId);
-        // TODO: Notify participants
+        // Note: Participant notification is handled at the API layer via eventService.publish()
     }
 
     public RetroTemplate getDefaultTemplate() {

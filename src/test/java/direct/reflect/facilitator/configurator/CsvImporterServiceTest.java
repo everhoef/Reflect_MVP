@@ -1,18 +1,21 @@
 package direct.reflect.facilitator.configurator;
 
-import direct.reflect.facilitator.configurator.RetroTemplate;
-import direct.reflect.facilitator.configurator.RetroStageRepository;
-import direct.reflect.facilitator.configurator.RetroTemplateRepository;
-import direct.reflect.facilitator.configurator.CsvImporterService;
 import direct.reflect.facilitator.eventing.EventService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
+import direct.reflect.facilitator.common.config.SecurityConfig;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -21,33 +24,33 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-@SpringBootTest(
-    webEnvironment = SpringBootTest.WebEnvironment.NONE,
-    properties = {
-        "spring.data.redis.repositories.enabled=false",
-        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration"
-    }
-)
-@ActiveProfiles("import")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@ActiveProfiles({"import"})
 @Testcontainers
 class CsvImporterServiceTest {
 
     @MockitoBean
     private EventService eventService;
 
+    @Container
+    @ServiceConnection
+    @SuppressWarnings("resource") // Testcontainers manages the lifecycle
+    static GenericContainer<?> redis = new GenericContainer<>("redis:alpine")
+            .withExposedPorts(6379);
+
+    @Container
+    @ServiceConnection
+    @SuppressWarnings("resource") // Testcontainers manages the lifecycle
+    static PostgreSQLContainer<?> postgresContainer = new PostgreSQLContainer<>("postgres:17-alpine")
+            .withDatabaseName("postgres")
+            .withUsername("postgres")
+            .withPassword("postgres");
+
     @Autowired
     private RetroTemplateRepository retroTemplateRepository;
 
     @Autowired
     private RetroStageRepository retroStageRepository;
-
-    @Container
-	@ServiceConnection
-	@SuppressWarnings("resource") // Testcontainers manages the lifecycle
-	static PostgreSQLContainer<?> postgresContainer = new PostgreSQLContainer<>("postgres:17-alpine")
-			.withDatabaseName("postgres")
-			.withUsername("postgres")
-			.withPassword("postgres");
 
     @Test
     @Transactional

@@ -12,8 +12,11 @@ import jakarta.servlet.http.HttpSession;
 
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
-import direct.reflect.facilitator.common.RequestValidationService;
-import direct.reflect.facilitator.common.ResponseService;
+import direct.reflect.facilitator.facilitation.dto.CreateRetroRequest;
+import direct.reflect.facilitator.facilitation.dto.JoinRetroRequest;
+import direct.reflect.facilitator.facilitation.dto.SessionInfo;
+
+import jakarta.validation.Valid;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,13 +32,11 @@ public class RetroApiController {
     private final RetroSessionService retroService;
     private final ParticipantService participantService;
     private final EventService eventService;
-    private final RequestValidationService validationService;
-    private final ResponseService responseService;
 
     @PostMapping(value = "/create", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     public ResponseEntity<Void> createRetrospective(
-            @RequestBody CreateRetroRequest request,
+            @Valid @RequestBody CreateRetroRequest request,
             HttpServletRequest httpRequest,
             Authentication authentication) {
          
@@ -48,36 +49,39 @@ public class RetroApiController {
         log.debug("Creating new retro session with name: {} by user: {}", 
             request.sessionName(), authentication.getName());
         
-        var validation = validationService.validateSessionName(request.sessionName());
-        if (!validation.isValid()) {
-            log.debug("Session name validation failed: {}", validation.getErrorMessage());
-            return responseService.createBadRequestResponse("/home", validation.getErrorCode());
-        }
-        
         try {
             // Display name is derived from the authentication context (no need to pass it)
-            Participant participant = participantService.createAndAssignFacilitatorForSession(request.sessionName(), null, httpRequest);
+            Participant participant = participantService.createAndAssignFacilitatorForSession(request.sessionName(), httpRequest);
             
             // The participant object now holds the session reference
             RetroSession retro = participant.getSession();
             log.info("Created new retro session: {} (id: {}) by facilitator: {}", 
                 retro.getName(), retro.getId(), participant.getDisplayName());
             
-            // Optionally publish an event that a new session was created
-            // eventService.publish(RetroEvent.sessionCreated(retro.getId(), retro.getName()));
-            return responseService.createRedirectResponse("/retro/" + retro.getId());
+            // Publish retro created event
+            try {
+                eventService.publish(RetroEvent.retroCreated(retro.getId(), "system"));
+            } catch (Exception eventError) {
+                log.error("Failed to publish retro created event: {}", eventError.getMessage());
+                // Continue anyway - event publishing failure shouldn't block user flow
+            }
+            
+            return ResponseEntity.status(HttpStatus.FOUND)
+                .header("HX-Redirect", "/retro/" + retro.getId())
+                .build();
             
         } catch (Exception e) {
             log.error("Error creating retro session: ", e);
-            String errorCode = responseService.mapSessionCreationException(e);
-            return responseService.createErrorRedirectResponse("/home", errorCode);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .header("HX-Redirect", "/home?error=creation_failed")
+                .build();
         }
     }
 
     @PostMapping(value = "/join", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     public ResponseEntity<Void> joinRetrospective(
-            @RequestBody JoinRetroRequest request,
+            @Valid @RequestBody JoinRetroRequest request,
             HttpServletRequest httpRequest,
             Authentication authentication) {
         
@@ -86,27 +90,26 @@ public class RetroApiController {
         log.debug("Authentication: {} (type: {})", authentication.getName(), authentication.getClass().getSimpleName());
         log.debug("Request path: {}", httpRequest.getRequestURI());
         
-        var validation = validationService.validateRetroId(request.retroId());
-        if (!validation.isValid()) {
-            log.debug("Retro ID validation failed: {}", validation.getErrorMessage());
-            return responseService.createBadRequestResponse("/home", validation.getErrorCode());
-        }
         
         log.debug("Join request for retro: {} by user: {}", 
             request.retroId(), authentication.getName());
         
         if (!retroService.sessionExists(request.retroId())) {
-            return responseService.createNotFoundResponse("/home", "session_not_found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .header("HX-Redirect", "/home?error=session_not_found")
+                .build();
         }
         
         // Get the session first to pass to addParticipantToSession
         RetroSession sessionToJoin = retroService.getSessionById(request.retroId());
         if (sessionToJoin == null) { // Should not happen if sessionExists passed
-             return responseService.createNotFoundResponse("/home", "session_not_found_critical");
+             return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .header("HX-Redirect", "/home?error=session_not_found")
+                .build();
         }
 
         try {
-            Participant participant = participantService.addParticipantToSession(httpRequest, sessionToJoin, null, ParticipantRole.PARTICIPANT);
+            Participant participant = participantService.addParticipantToSession(httpRequest, sessionToJoin, ParticipantRole.PARTICIPANT);
             
             log.debug("Successfully added participant to session, redirecting to: /retro/{}", request.retroId());
             
@@ -119,12 +122,15 @@ public class RetroApiController {
                 // Continue anyway - event publishing failure shouldn't block user flow
             }
             
-            return responseService.createRedirectResponse("/retro/" + request.retroId());
+            return ResponseEntity.status(HttpStatus.FOUND)
+                .header("HX-Redirect", "/retro/" + request.retroId())
+                .build();
             
         } catch (Exception e) {
             log.error("Error joining retro session {}: ", request.retroId(), e);
-            String errorCode = responseService.mapSessionJoinException(e);
-            return responseService.createErrorRedirectResponse("/home", errorCode);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .header("HX-Redirect", "/home?error=join_failed")
+                .build();
         }
     }
 
@@ -136,7 +142,9 @@ public class RetroApiController {
         
         boolean isFacilitator = participantService.isFacilitator(httpRequest, retroId);
         if (!isFacilitator) {
-            return responseService.createForbiddenResponse("/retro/" + retroId);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .header("HX-Redirect", "/retro/" + retroId)
+                .build();
         }
         
         try {
@@ -150,11 +158,14 @@ public class RetroApiController {
                 // Continue anyway - event publishing failure shouldn't block user flow
             }
             
-            return responseService.createRedirectResponse("/retro/" + retroId);
+            return ResponseEntity.status(HttpStatus.FOUND)
+                .header("HX-Redirect", "/retro/" + retroId)
+                .build();
         } catch (Exception e) {
             log.error("Error starting session", e);
-            String errorCode = responseService.mapSessionOperationException(e, "start");
-            return responseService.createServerErrorResponse("/retro/" + retroId, errorCode);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .header("HX-Redirect", "/retro/" + retroId + "?error=start_failed")
+                .build();
         }
     }
 
@@ -166,7 +177,9 @@ public class RetroApiController {
         
         boolean isFacilitator = participantService.isFacilitator(httpRequest, retroId);
         if (!isFacilitator) {
-            return responseService.createForbiddenResponse("/retro/" + retroId);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .header("HX-Redirect", "/retro/" + retroId)
+                .build();
         }
         
         try {
@@ -180,11 +193,14 @@ public class RetroApiController {
                 // Continue anyway - event publishing failure shouldn't block user flow
             }
             
-            return responseService.createSuccessResponseWithHeader("HX-Trigger", "stepAdvanced");
+            return ResponseEntity.ok()
+                .header("HX-Trigger", "stepAdvanced")
+                .build();
         } catch (Exception e) {
             log.error("Error advancing step", e);
-            String errorCode = responseService.mapSessionOperationException(e, "next_step");
-            return responseService.createServerErrorResponse("/retro/" + retroId, errorCode);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .header("HX-Redirect", "/retro/" + retroId + "?error=next_step_failed")
+                .build();
         }
     }
     
@@ -196,26 +212,30 @@ public class RetroApiController {
         try {
             participantService.leaveAllActiveSessions(httpRequest);
             log.info("Successfully left all active sessions");
-            return responseService.createRedirectResponse("/home?message=left_sessions");
+            return ResponseEntity.status(HttpStatus.FOUND)
+                .header("HX-Redirect", "/home?message=left_sessions")
+                .build();
         } catch (Exception e) {
             log.error("Error leaving active sessions: ", e);
-            return responseService.createServerErrorResponse("/home", "leave_sessions_failed");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .header("HX-Redirect", "/home?error=leave_sessions_failed")
+                .build();
         }
     }
     
     @GetMapping("/check-active-sessions")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<ActiveSessionsResponse> checkActiveSessions(HttpServletRequest httpRequest) {
+    public ResponseEntity<List<SessionInfo>> checkActiveSessions(HttpServletRequest httpRequest) {
         try {
             // Get participant ID from session attributes (much simpler!)
             HttpSession session = httpRequest.getSession(false);
             if (session == null) {
-                return ResponseEntity.ok(new ActiveSessionsResponse(List.of()));
+                return ResponseEntity.ok(List.of());
             }
             
             UUID participantId = (UUID) session.getAttribute("participantId");
             if (participantId == null) {
-                return ResponseEntity.ok(new ActiveSessionsResponse(List.of()));
+                return ResponseEntity.ok(List.of());
             }
             
             List<Participant> activeSessions = participantService.getActiveSessionsForParticipant(participantId);
@@ -228,17 +248,12 @@ public class RetroApiController {
                 ))
                 .toList();
             
-            return ResponseEntity.ok(new ActiveSessionsResponse(sessionInfos));
+            return ResponseEntity.ok(sessionInfos);
             
         } catch (Exception e) {
             log.error("Error checking active sessions: ", e);
-            return ResponseEntity.ok(new ActiveSessionsResponse(List.of()));
+            return ResponseEntity.ok(List.of());
         }
     }
 
-    // Simple records for JSON requests
-    public record CreateRetroRequest(String sessionName) {}
-    public record JoinRetroRequest(UUID retroId) {}
-    public record SessionInfo(UUID sessionId, String sessionName, String role) {}
-    public record ActiveSessionsResponse(List<SessionInfo> activeSessions) {}
 }

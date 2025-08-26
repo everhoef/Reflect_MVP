@@ -2,6 +2,8 @@ package direct.reflect.facilitator.integration;
 
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.LoadState;
+import com.microsoft.playwright.options.RequestOptions;
+import com.microsoft.playwright.options.FormData;
 import org.junit.jupiter.api.*;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -18,13 +20,17 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import direct.reflect.facilitator.auth.TestAuthConfiguration;
+
 /**
  * Integration test for multi-user retrospective sessions using real browser instances.
  * Tests mixed authentication (authenticated user + guest users) and real-time SSE communication.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@org.springframework.test.context.TestPropertySource(properties = "spring.profiles.active=test")
 @Testcontainers
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@org.springframework.context.annotation.Import(TestAuthConfiguration.class)
 class MultiUserRetrospectiveIntegrationTest {
 
     @Container
@@ -94,14 +100,20 @@ class MultiUserRetrospectiveIntegrationTest {
         createBrowserInstance("guest-user-2");
 
         // Step 1: Authenticated user logs in and creates session
-        sessionId = authenticatedUserCreatesSession(0); // Browser index 0
+        authenticateAsUser(pages.get(0));
+        sessionId = createNewSession(pages.get(0), "Integration Test Session");
         assertNotNull(sessionId, "Session ID should not be null");
         assertTrue(sessionId.length() > 30, "Session ID should be a valid UUID");
 
         // Step 2: Guest users join the session sequentially (to avoid Playwright concurrency issues)
-        guestUserJoinsSession(1, "Guest Facilitator", sessionId);
-        guestUserJoinsSession(2, "Guest User 1", sessionId);
-        guestUserJoinsSession(3, "Guest User 2", sessionId);
+        authenticateAsGuest(pages.get(1), "Guest Facilitator");
+        joinExistingSession(pages.get(1), sessionId);
+        
+        authenticateAsGuest(pages.get(2), "Guest User 1");
+        joinExistingSession(pages.get(2), sessionId);
+        
+        authenticateAsGuest(pages.get(3), "Guest User 2");
+        joinExistingSession(pages.get(3), sessionId);
 
         // Step 3: Verify all users see each other in participant list
         verifyParticipantListsInAllBrowsers();
@@ -119,7 +131,9 @@ class MultiUserRetrospectiveIntegrationTest {
         }
 
         // Step 1: Guest User 2 creates a new session (switching from current)
-        String newSessionId = guestUserCreatesNewSession(3, "New Session by Guest");
+        pages.get(3).navigate(baseUrl);
+        pages.get(3).waitForLoadState(LoadState.NETWORKIDLE);
+        String newSessionId = createNewSession(pages.get(3), "New Session by Guest");
         assertNotNull(newSessionId);
         assertNotEquals(sessionId, newSessionId);
 
@@ -127,8 +141,10 @@ class MultiUserRetrospectiveIntegrationTest {
         Thread.sleep(2000); // Allow SSE events to propagate
         verifyParticipantCountInBrowser(0, 3); // Should have 3 participants (lost Guest User 2)
 
-        // Step 3: Guest User 1 switches to the new session  
-        guestUserJoinsSession(2, "Guest User 1", newSessionId);
+        // Step 3: Guest User 1 switches to the new session (keeping same participant ID)
+        pages.get(2).navigate(baseUrl);  // Keep existing authentication, just navigate home
+        pages.get(2).waitForLoadState(LoadState.NETWORKIDLE);
+        joinExistingSession(pages.get(2), newSessionId);
         
         // Step 4: Verify session switching worked correctly
         Thread.sleep(2000);
@@ -184,39 +200,77 @@ class MultiUserRetrospectiveIntegrationTest {
             """.formatted(userType));
     }
 
-    private String authenticatedUserCreatesSession(int browserIndex) throws Exception {
-        Page page = pages.get(browserIndex);
-        
-        // Navigate to login page
+    private void authenticateAsUser(Page page) throws Exception {
+        // First navigate to any page to get a valid session with CSRF token
         page.navigate(baseUrl + "/login");
         page.waitForLoadState(LoadState.NETWORKIDLE);
         
-        // Click User Login tab
-        page.click("#userLoginTab");
-        page.waitForTimeout(500);
+        // Extract CSRF token from the page
+        Object csrfTokenObj = page.evaluate("() => document.querySelector('meta[name=\"_csrf\"]')?.getAttribute('content') || document.querySelector('input[name=\"_csrf\"]')?.value");
+        if (csrfTokenObj == null) {
+            fail("Could not extract CSRF token from login page - no meta tag or input field found");
+        }
+        String csrfToken = csrfTokenObj.toString();
+        if (csrfToken.equals("null")) {
+            fail("CSRF token was null in the page");
+        }
         
-        // Enter credentials
-        page.fill("#username", "michel");
-        page.fill("#password", "t");
+        // Use Playwright to make a POST request directly to TestAuthController with CSRF token
+        APIResponse response = page.request().post(baseUrl + "/test/login-oauth-user", 
+            RequestOptions.create()
+                .setForm(FormData.create()
+                    .set("username", "michel")
+                    .set("displayName", "Michel Test User") 
+                    .set("email", "michel@example.com")
+                    .set("_csrf", csrfToken)));
         
-        // Click login button
-        page.click("#submitButton");
+        if (!response.ok()) {
+            fail("TestAuthController POST request failed with status: " + response.status() + 
+                 ", body: " + response.text());
+        }
+        
+        String responseText = response.text();
+        if (!responseText.contains("OAuth2 authentication set up for: michel")) {
+            fail("TestAuthController didn't respond correctly. Response: " + responseText);
+        }
+        
+        // Now navigate to home page - the session should be authenticated
+        page.navigate(baseUrl + "/");
         page.waitForLoadState(LoadState.NETWORKIDLE);
         
-        // Verify we're on home page and authenticated
-        assertTrue(page.url().contains("/"));
-        String pageContent = page.textContent("body");
-        assertTrue(pageContent.contains("michel") || pageContent.contains("Welcome"));
+        // Wait for home page content to load - look for elements that should be present for authenticated users
+        try {
+            // Wait for either the session creation form or welcome message
+            page.waitForSelector("input[name='sessionName'], :has-text('Welcome')", new Page.WaitForSelectorOptions().setTimeout(8000));
+        } catch (Exception e) {
+            // Debug: Let's see if we were redirected and where
+            String currentUrl = page.url();
+            String pageContent = page.textContent("body");
+            System.out.println("DEBUG: Final URL after timeout: " + currentUrl);
+            System.out.println("DEBUG: Page content after authentication timeout:");
+            System.out.println(pageContent.substring(0, Math.min(pageContent.length(), 1000)));
+            
+            if (currentUrl.contains("/login")) {
+                fail("Authentication failed - page was redirected to login: " + currentUrl);
+            }
+            throw e;
+        }
         
-        // Create session
-        page.fill("input[name='sessionName']", "Integration Test Session");
+        // Additional short wait to ensure template rendering is complete
+        Thread.sleep(500);
+    }
+
+    private String createNewSession(Page page, String sessionName) throws Exception {
+        // Create session - wait for the form to be available
+        page.waitForSelector("input[name='sessionName']", new Page.WaitForSelectorOptions().setTimeout(5000));
+        page.fill("input[name='sessionName']", sessionName);
         page.click("button:has-text('Create Session')");
         page.waitForLoadState(LoadState.NETWORKIDLE);
         
         // Wait for session lobby page
         page.waitForSelector("h2:has-text('Session Lobby')", new Page.WaitForSelectorOptions().setTimeout(10000));
         
-        // Extract session ID from URL or page content
+        // Extract session ID from URL
         String currentUrl = page.url();
         String[] urlParts = currentUrl.split("/");
         String extractedSessionId = urlParts[urlParts.length - 1];
@@ -230,24 +284,21 @@ class MultiUserRetrospectiveIntegrationTest {
         return extractedSessionId;
     }
 
-    private void guestUserJoinsSession(int browserIndex, String guestName, String sessionId) throws Exception {
-        Page page = pages.get(browserIndex);
-        
-        // Navigate to login page
-        page.navigate(baseUrl + "/login");
-        page.waitForLoadState(LoadState.NETWORKIDLE);
-        
-        // Click Guest Access tab
+    private void authenticateAsGuest(Page page, String guestName) throws Exception {
+        // Switch to guest mode using the actual UI
         page.click("#guestLoginTab");
-        page.waitForTimeout(500);
+        page.waitForTimeout(500); // Wait for UI to update
         
-        // Enter guest name
+        // Fill in guest name using the actual form
         page.fill("#displayName", guestName);
         
-        // Click submit button
+        // Submit the form using the actual submit button
         page.click("#submitButton");
-        page.waitForLoadState(LoadState.NETWORKIDLE);
         
+        page.waitForLoadState(LoadState.NETWORKIDLE);
+    }
+
+    private void joinExistingSession(Page page, String sessionId) throws Exception {
         // Should be on home page now - join the session
         page.fill("input[name='retroId']", sessionId);
         page.click("button:has-text('Join Session')");
@@ -260,45 +311,28 @@ class MultiUserRetrospectiveIntegrationTest {
         page.waitForSelector(":has-text('Connected')", new Page.WaitForSelectorOptions().setTimeout(5000));
         
         // Verify we're in the correct session
-        assertTrue(page.url().contains(sessionId));
+        assertTrue(page.url().contains(sessionId), 
+            "User should be in session " + sessionId + " but URL is: " + page.url());
     }
 
-    private String guestUserCreatesNewSession(int browserIndex, String sessionName) throws Exception {
-        Page page = pages.get(browserIndex);
-        
-        // Navigate to home page
-        page.navigate(baseUrl);
-        page.waitForLoadState(LoadState.NETWORKIDLE);
-        
-        // Create new session
-        page.fill("input[name='sessionName']", sessionName);
-        page.click("button:has-text('Create Session')");
-        page.waitForLoadState(LoadState.NETWORKIDLE);
-        
-        // Wait for session lobby page
-        page.waitForSelector("h2:has-text('Session Lobby')", new Page.WaitForSelectorOptions().setTimeout(10000));
-        
-        // Extract session ID from URL
-        String currentUrl = page.url();
-        String[] urlParts = currentUrl.split("/");
-        return urlParts[urlParts.length - 1];
-    }
 
     private void verifyParticipantListsInAllBrowsers() throws Exception {
-        // Expected participants: michel, Guest Facilitator, Guest User 1, Guest User 2
-        String[] expectedParticipants = {"michel", "Guest Facilitator", "Guest User 1", "Guest User 2"};
+        // Expected participants: Michel Test User (OAuth user), Guest Facilitator, Guest User 1, Guest User 2
+        String[] expectedParticipants = {"Michel Test User", "Guest Facilitator", "Guest User 1", "Guest User 2"};
         
         for (int i = 0; i < pages.size(); i++) {
             Page page = pages.get(i);
             
-            // Wait for participant list to update
-            page.waitForSelector("ul li:has-text('michel')", new Page.WaitForSelectorOptions().setTimeout(5000));
+            // Wait for participant list to update - look for Michel Test User instead of michel
+            page.waitForSelector("ul li:has-text('Michel Test User')", new Page.WaitForSelectorOptions().setTimeout(5000));
             
             // Get all participant names from the list
             List<String> participantElements = page.querySelectorAll("ul li").stream()
                 .map(element -> element.textContent().trim())
                 .filter(text -> !text.isEmpty())
                 .toList();
+            
+            System.out.println("DEBUG Browser " + i + " participant list: " + participantElements);
             
             // Verify we have 4 participants
             assertTrue(participantElements.size() >= 4, 

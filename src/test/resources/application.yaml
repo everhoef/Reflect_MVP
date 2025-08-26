@@ -10,13 +10,27 @@ spring:
   main:
     allow-bean-definition-overriding: true
     web-application-type: servlet
-  security:
-    user:
-      name: test
-      password: test
   docker:
     compose:
       enabled: false  # Disable Docker Compose for tests, use Testcontainers only
+  # WORKAROUND: OAuth2 properties must be explicitly specified in test application.yaml
+  # Root Cause: During @SpringBootTest context loading, OAuth2 properties from src/main/resources/application.yaml 
+  # are not loaded in the correct order or are overridden by test-specific property resolution.
+  # This ensures Spring's OAuth2ClientAutoConfiguration creates the required ClientRegistrationRepository bean.
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: test
+            client-secret: test
+            redirect-uri: http://localhost:8080/login/oauth2/code/github
+        provider:
+          github:
+            authorization-uri: https://github.com/login/oauth/authorize
+            token-uri: https://github.com/login/oauth/access_token
+            user-info-uri: https://api.github.com/user
+            user-name-attribute: login
 
 logging:
   level:

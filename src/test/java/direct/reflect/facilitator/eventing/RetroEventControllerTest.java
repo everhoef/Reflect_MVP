@@ -34,6 +34,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Tests for RetroEventController SSE endpoint functionality.
  */
 @WebMvcTest(RetroEventController.class)
+@org.springframework.boot.autoconfigure.EnableAutoConfiguration(exclude = {
+    org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration.class,
+    org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration.class
+})
 class RetroEventControllerTest {
 
     @Autowired
@@ -165,7 +169,7 @@ class RetroEventControllerTest {
         // When & Then - No @WithMockUser annotation means no authentication
         mockMvc.perform(get("/api/retro/{retroId}/events", retroId)
                 .accept(MediaType.TEXT_EVENT_STREAM_VALUE))
-                .andExpect(status().isFound()); // Spring Security redirects unauthenticated requests (302)
+                .andExpect(status().is3xxRedirection()); // WebMvcTest redirects to login for unauthenticated requests
                 
         // Verify no service methods were called due to authentication failure
         verify(participantService, org.mockito.Mockito.never()).getParticipantForSession(any(HttpServletRequest.class), any(UUID.class));

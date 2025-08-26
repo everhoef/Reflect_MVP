@@ -15,7 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import direct.reflect.facilitator.facilitation.RetroSessionService;
 import direct.reflect.facilitator.facilitation.ParticipantService;
-import direct.reflect.facilitator.facilitation.AuthenticationService;
+import direct.reflect.facilitator.auth.AuthenticationHelper;
 import direct.reflect.facilitator.facilitation.RetroSession;
 import direct.reflect.facilitator.facilitation.Participant;
 import direct.reflect.facilitator.configurator.RetroStage;
@@ -31,7 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 public class RetroViewController {
     private final RetroSessionService retroService;
     private final ParticipantService participantService;
-    private final AuthenticationService authenticationService;
+    private final AuthenticationHelper authenticationHelper;
 
     @GetMapping("/")
     public String home(Model model, HttpServletRequest request) {
@@ -48,11 +48,11 @@ public class RetroViewController {
             throw new IllegalStateException("No authentication context found");
         }
         
-        String displayName = authenticationService.extractDisplayName(auth);
+        String displayName = authenticationHelper.getDisplayName(request);
         
         model.addAttribute("page", "home");
         model.addAttribute("title", "Team Retrospective - Home");
-        model.addAttribute("user", displayName);
+        model.addAttribute("userName", displayName);
         
         List<RetroTemplate> templates = retroService.getAvailableTemplates();
         model.addAttribute("templates", templates);
@@ -164,42 +164,4 @@ public class RetroViewController {
         model.addAttribute("participants", participantService.getSessionParticipants(retroId));
         return "fragments/lobby :: ul.space-y-2";  // Direct fragment reference
     }
-    
-    @PostMapping("/logout")
-    public String logout(HttpServletRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null) {
-            log.info("Logging out user: {} (type: {})", 
-                auth.getName(), auth.getClass().getSimpleName());
-        }
-        
-        authenticationService.clearAuthenticationCookies(request);
-        
-        return "redirect:/login";
-    }
-    
-    /**
-     * Unified login endpoint - delegates to AuthenticationService for business logic.
-     */
-    @PostMapping("/login")
-    public String unifiedLogin(HttpServletRequest request, 
-                              String loginType, 
-                              String username, 
-                              String password, 
-                              String displayName) {
-        
-        log.info("=== UNIFIED LOGIN DEBUG ===");
-        log.info("Method: {}", request.getMethod());
-        log.info("Path: {}", request.getRequestURI());
-        log.info("Query parameters: {}", request.getQueryString());
-        
-        log.info("Form data - loginType: {}, username: {}, displayName: {}", 
-                loginType, username, displayName);
-        
-        String result = authenticationService.processLogin(loginType, username, password, displayName, request);
-        log.info("Login result: {}", result);
-        
-        return result;
-    }
-    
 }

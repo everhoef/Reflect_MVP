@@ -98,13 +98,7 @@ public class EventService {
         SseEmitter existingEmitter = localEmitters.get(connectionId);
         if (existingEmitter != null) {
             log.info("Closing existing SSE connection for: {}", connectionId);
-            try {
-                existingEmitter.complete();
-            } catch (Exception e) {
-                log.warn("Error closing existing SSE connection: {}", e.getMessage());
-            }
-            localEmitters.remove(connectionId);
-            activeConnections.decrementAndGet();
+            cleanupConnection(connectionId, existingEmitter);
         }
         
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
@@ -113,22 +107,19 @@ public class EventService {
         localEmitters.put(connectionId, emitter);
         activeConnections.incrementAndGet();
         
-        // Cleanup on close/error/timeout
+        // Cleanup on close/error/timeout - use a single cleanup method to avoid race conditions
         emitter.onCompletion(() -> {
-            localEmitters.remove(connectionId);
-            activeConnections.decrementAndGet();
+            cleanupConnection(connectionId, emitter);
             log.info("SSE connection completed for retro: {}", retroId);
         });
         
         emitter.onTimeout(() -> {
-            localEmitters.remove(connectionId);
-            activeConnections.decrementAndGet();
+            cleanupConnection(connectionId, emitter);
             log.warn("SSE connection timed out for retro: {}", retroId);
         });
         
         emitter.onError((error) -> {
-            localEmitters.remove(connectionId);
-            activeConnections.decrementAndGet();
+            cleanupConnection(connectionId, emitter);
             log.error("SSE connection error for retro: {}: {}", retroId, error.getMessage());
         });
         
@@ -143,9 +134,28 @@ public class EventService {
             log.debug("Sent connection_established event for retro: {}", retroId);
         } catch (IOException e) {
             log.warn("Failed to send connection_established event: {}", e.getMessage());
+            // Don't cleanup here - the error handler will be called
         }
         
         return emitter;
+    }
+    
+    /**
+     * Thread-safe cleanup method to avoid double-decrements.
+     */
+    private void cleanupConnection(String connectionId, SseEmitter emitter) {
+        // Only cleanup if the emitter in the map matches the one we're cleaning up
+        // This prevents race conditions where multiple cleanup calls happen for the same connection
+        if (localEmitters.remove(connectionId, emitter)) {
+            activeConnections.decrementAndGet();
+            log.debug("Cleaned up SSE connection: {} (active: {})", connectionId, activeConnections.get());
+            try {
+                emitter.complete();
+            } catch (Exception e) {
+                // Ignore completion errors during cleanup
+                log.debug("Error completing emitter during cleanup: {}", e.getMessage());
+            }
+        }
     }
     
     /**
@@ -162,21 +172,23 @@ public class EventService {
         log.info("Sending {} event to {} connections for retro {}", 
             event.type(), matchingConnections.size(), retroId);
         
-        localEmitters.entrySet().stream()
+        // Take a snapshot of matching emitters to avoid concurrent modification
+        List<Map.Entry<String, SseEmitter>> matchingEmitters = localEmitters.entrySet().stream()
             .filter(entry -> entry.getKey().startsWith(connectionId))
-            .forEach(entry -> {
-                try {
-                    log.debug("Sending {} event to connection: {}", event.type(), entry.getKey());
-                    entry.getValue().send(SseEmitter.event()
-                        .name(event.type().name().toLowerCase())
-                        .data(event));
-                } catch (IOException e) {
-                    String removedKey = entry.getKey();
-                    localEmitters.remove(removedKey);
-                    activeConnections.decrementAndGet();
-                    log.warn("Removed broken SSE connection: {}", removedKey);
-                }
-            });
+            .toList();
+            
+        matchingEmitters.forEach(entry -> {
+            try {
+                log.debug("Sending {} event to connection: {}", event.type(), entry.getKey());
+                entry.getValue().send(SseEmitter.event()
+                    .name(event.type().name().toLowerCase())
+                    .data(event));
+            } catch (IOException e) {
+                log.warn("Failed to send event to connection: {} - {}", entry.getKey(), e.getMessage());
+                // Don't manually cleanup here - let the emitter's error handler deal with it
+                // This prevents double-cleanup and negative connection counts
+            }
+        });
     }
     
     /**
@@ -187,29 +199,21 @@ public class EventService {
             return;
         }
         
-        List<String> brokenConnections = new ArrayList<>();
-        localEmitters.forEach((connectionId, emitter) -> {
+        // Take a snapshot to avoid concurrent modification
+        List<Map.Entry<String, SseEmitter>> currentEmitters = new ArrayList<>(localEmitters.entrySet());
+        
+        currentEmitters.forEach(entry -> {
             try {
-                emitter.send(SseEmitter.event()
+                entry.getValue().send(SseEmitter.event()
                     .name("keep-alive")
                     .data("heartbeat")
                     .comment("Keep connection alive"));
             } catch (IOException e) {
-                brokenConnections.add(connectionId);
-                log.warn("Keep-alive failed for connection: {}", connectionId);
+                log.warn("Keep-alive failed for connection: {} - {}", entry.getKey(), e.getMessage());
+                // Don't manually cleanup here - let the emitter's error handler deal with it
+                // This prevents double-cleanup and negative connection counts
             }
         });
-        
-        // Remove broken connections
-        brokenConnections.forEach(connectionId -> {
-            localEmitters.remove(connectionId);
-            activeConnections.decrementAndGet();
-        });
-        
-        if (!brokenConnections.isEmpty()) {
-            log.info("Removed {} broken connections during keep-alive. Active connections: {}", 
-                brokenConnections.size(), activeConnections.get());
-        }
     }
     
 }

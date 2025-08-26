@@ -8,25 +8,19 @@ import direct.reflect.facilitator.facilitation.ParticipantRepository;
 import direct.reflect.facilitator.facilitation.ParticipantService;
 import direct.reflect.facilitator.facilitation.RetroSessionService;
 import direct.reflect.facilitator.facilitation.RetroPhase;
+import direct.reflect.facilitator.auth.AuthenticationHelper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextImpl;
 
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpSession;
 
 import java.util.Collections;
 import java.util.List;
@@ -44,24 +38,20 @@ class ParticipantServiceTest {
 
     @Mock
     private RetroSessionService retroSessionService;
+    
+    @Mock
+    private AuthenticationHelper authHelper;
 
     @InjectMocks
     private ParticipantService participantService;
 
-    private HttpServletRequest mockRequest;
-    private MockedStatic<SecurityContextHolder> securityContextMock;
+    private MockHttpServletRequest mockRequest;
 
     @BeforeEach
     void setUp() {
         mockRequest = new MockHttpServletRequest();
-        securityContextMock = Mockito.mockStatic(SecurityContextHolder.class);
-    }
-
-    @AfterEach
-    void tearDown() {
-        if (securityContextMock != null) {
-            securityContextMock.close();
-        }
+        // Create session for the mock request
+        mockRequest.getSession(true);
     }
 
     @Test
@@ -69,6 +59,7 @@ class ParticipantServiceTest {
         // Arrange
         String sessionName = "Test Session";
         String displayName = "John Doe";
+        UUID guestParticipantId = UUID.randomUUID();
         
         RetroTemplate template = new RetroTemplate();
         template.setId(1L);
@@ -76,27 +67,25 @@ class ParticipantServiceTest {
         session.setId(UUID.randomUUID());
         session.setName(sessionName);
         
-        // Create standard Spring Security authentication token with GUEST role
-        Authentication guestAuth = new UsernamePasswordAuthenticationToken(
-            displayName, null, List.of(new SimpleGrantedAuthority("ROLE_GUEST"))
-        );
-        SecurityContext securityContext = new SecurityContextImpl(guestAuth);
+        // Mock AuthenticationHelper for guest user
+        when(authHelper.getParticipantId(mockRequest)).thenReturn(guestParticipantId);
+        when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
+        when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guests don't have usernames
         
         when(retroSessionService.getDefaultTemplate()).thenReturn(template);
         when(retroSessionService.createNewSession(sessionName, template)).thenReturn(session);
         when(participantRepository.findByParticipantIdWithSession(any(UUID.class))).thenReturn(Collections.emptyList());
         when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        securityContextMock.when(SecurityContextHolder::getContext).thenReturn(securityContext);
 
         // Act
-        Participant result = participantService.createAndAssignFacilitatorForSession(sessionName, null, mockRequest);
+        Participant result = participantService.createAndAssignFacilitatorForSession(sessionName, mockRequest);
         
         // Assert
         assertEquals(displayName, result.getDisplayName());
         assertNull(result.getUsername());
         assertEquals(ParticipantRole.FACILITATOR, result.getRole());
         assertEquals(session, result.getSession());
-        assertNotNull(result.getParticipantId());
+        assertEquals(guestParticipantId, result.getParticipantId());
     }
 
     @Test
@@ -104,6 +93,8 @@ class ParticipantServiceTest {
         // Arrange
         String sessionName = "Test Session";
         String username = "testuser";
+        String displayName = "Test User"; // OIDC users have display names from claims
+        UUID userParticipantId = UUID.nameUUIDFromBytes(("6ba7b810-9dad-11d1-80b4-00c04fd430c8" + username).getBytes());
         
         RetroTemplate template = new RetroTemplate();
         template.setId(1L);
@@ -111,39 +102,39 @@ class ParticipantServiceTest {
         session.setId(UUID.randomUUID());
         session.setName(sessionName);
         
-        SecurityContext securityContext = new SecurityContextImpl(
-            new UsernamePasswordAuthenticationToken(username, null, Collections.emptyList())
-        );
+        // Mock AuthenticationHelper for OIDC user
+        when(authHelper.getParticipantId(mockRequest)).thenReturn(userParticipantId);
+        when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
+        when(authHelper.getUsername(mockRequest)).thenReturn(username);
         
         when(retroSessionService.getDefaultTemplate()).thenReturn(template);
         when(retroSessionService.createNewSession(sessionName, template)).thenReturn(session);
         when(participantRepository.findByParticipantIdWithSession(any(UUID.class))).thenReturn(Collections.emptyList());
         when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        securityContextMock.when(SecurityContextHolder::getContext).thenReturn(securityContext);
 
         // Act
-        Participant result = participantService.createAndAssignFacilitatorForSession(sessionName, null, mockRequest);
+        Participant result = participantService.createAndAssignFacilitatorForSession(sessionName, mockRequest);
         
         // Assert
-        assertEquals(username, result.getDisplayName()); // Falls back to username
+        assertEquals(displayName, result.getDisplayName());
         assertEquals(username, result.getUsername());
         assertEquals(ParticipantRole.FACILITATOR, result.getRole());
+        assertEquals(userParticipantId, result.getParticipantId());
     }
 
     @Test
     void createSession_AnonymousUserWithoutDisplayName_Fails() {
         // Arrange
         String sessionName = "Test Session";
+        UUID guestParticipantId = UUID.randomUUID();
         
-        // Create unauthenticated guest token - this would typically result in authentication failure
-        Authentication guestAuth = new UsernamePasswordAuthenticationToken(null, null);
-        SecurityContext securityContext = new SecurityContextImpl(guestAuth);
-        
-        securityContextMock.when(SecurityContextHolder::getContext).thenReturn(securityContext);
+        // Mock AuthenticationHelper to throw exception when display name is missing
+        when(authHelper.getParticipantId(mockRequest)).thenReturn(guestParticipantId);
+        when(authHelper.getDisplayName(mockRequest)).thenThrow(new IllegalStateException("Guest session missing guestDisplayName - call initializeGuestSession first"));
 
         // Act & Assert
-        assertThrows(IllegalArgumentException.class, 
-            () -> participantService.createAndAssignFacilitatorForSession(sessionName, null, mockRequest));
+        assertThrows(IllegalStateException.class, 
+            () -> participantService.createAndAssignFacilitatorForSession(sessionName, mockRequest));
     }
 
     @Test
@@ -170,24 +161,19 @@ class ParticipantServiceTest {
         existingParticipant.setDisplayName(displayName);
         existingParticipant.setRole(ParticipantRole.FACILITATOR);
         
-        // Mock guest authentication with session containing guestId
-        MockHttpServletRequest mockRequestWithSession = new MockHttpServletRequest();
-        mockRequestWithSession.getSession().setAttribute("guestId", participantId);
-        
-        Authentication guestAuth = new UsernamePasswordAuthenticationToken(
-            displayName, null, List.of(new SimpleGrantedAuthority("ROLE_GUEST"))
-        );
-        SecurityContext securityContext = new SecurityContextImpl(guestAuth);
+        // Mock AuthenticationHelper for guest user
+        when(authHelper.getParticipantId(mockRequest)).thenReturn(participantId);
+        when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
+        when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guest user
         
         when(retroSessionService.getDefaultTemplate()).thenReturn(template);
         when(retroSessionService.createNewSession(sessionName, template)).thenReturn(newSession);
         when(participantRepository.findByParticipantIdWithSession(participantId))
             .thenReturn(List.of(existingParticipant));
         when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        securityContextMock.when(SecurityContextHolder::getContext).thenReturn(securityContext);
 
         // Act
-        Participant result = participantService.createAndAssignFacilitatorForSession(sessionName, null, mockRequestWithSession);
+        Participant result = participantService.createAndAssignFacilitatorForSession(sessionName, mockRequest);
         
         // Assert
         assertNotNull(result);
@@ -205,85 +191,30 @@ class ParticipantServiceTest {
     void addParticipantToSession_Success() {
         // Arrange
         String displayName = "Jane Doe";
+        UUID participantId = UUID.randomUUID();
         RetroSession session = new RetroSession();
         session.setId(UUID.randomUUID());
         
-        Authentication guestAuth = new UsernamePasswordAuthenticationToken(
-            displayName, null, List.of(new SimpleGrantedAuthority("ROLE_GUEST"))
-        );
-        SecurityContext securityContext = new SecurityContextImpl(guestAuth);
+        // Mock AuthenticationHelper for guest user
+        when(authHelper.getParticipantId(mockRequest)).thenReturn(participantId);
+        when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
+        when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guest user
         
         when(participantRepository.findByParticipantIdWithSession(any(UUID.class))).thenReturn(Collections.emptyList());
         when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        securityContextMock.when(SecurityContextHolder::getContext).thenReturn(securityContext);
 
         // Act
-        Participant result = participantService.addParticipantToSession(mockRequest, session, null, ParticipantRole.PARTICIPANT);
+        Participant result = participantService.addParticipantToSession(mockRequest, session, ParticipantRole.PARTICIPANT);
         
         // Assert
         assertEquals(displayName, result.getDisplayName());
         assertEquals(ParticipantRole.PARTICIPANT, result.getRole());
         assertEquals(session, result.getSession());
+        assertEquals(participantId, result.getParticipantId());
     }
 
-    @Test
-    void getCurrentParticipant_AnonymousUser_Success() {
-        // Arrange
-        String displayName = "Anonymous User";
-        
-        Authentication guestAuth = new UsernamePasswordAuthenticationToken(
-            displayName, null, List.of(new SimpleGrantedAuthority("ROLE_GUEST"))
-        );
-        SecurityContext securityContext = new SecurityContextImpl(guestAuth);
-        
-        securityContextMock.when(SecurityContextHolder::getContext).thenReturn(securityContext);
 
-        // Act
-        Participant result = participantService.getCurrentParticipant(mockRequest, null);
-        
-        // Assert
-        assertEquals(displayName, result.getDisplayName());
-        assertNull(result.getUsername());
-        assertNotNull(result.getParticipantId());
-    }
 
-    @Test
-    void getCurrentParticipant_AuthenticatedUser_Success() {
-        // Arrange
-        String username = "testuser";
-        
-        SecurityContext securityContext = new SecurityContextImpl(
-            new UsernamePasswordAuthenticationToken(username, null, Collections.emptyList())
-        );
-        securityContextMock.when(SecurityContextHolder::getContext).thenReturn(securityContext);
-
-        // Act
-        Participant result = participantService.getCurrentParticipant(mockRequest, null);
-        
-        // Assert
-        assertEquals(username, result.getDisplayName()); // For users, display name = username
-        assertEquals(username, result.getUsername());
-        assertNotNull(result.getParticipantId());
-    }
-
-    @Test
-    void getCurrentParticipant_AuthenticatedUserWithoutDisplayName_FallsBackToUsername() {
-        // Arrange
-        String username = "testuser";
-        
-        SecurityContext securityContext = new SecurityContextImpl(
-            new UsernamePasswordAuthenticationToken(username, null, Collections.emptyList())
-        );
-        securityContextMock.when(SecurityContextHolder::getContext).thenReturn(securityContext);
-
-        // Act
-        Participant result = participantService.getCurrentParticipant(mockRequest, null);
-        
-        // Assert
-        assertEquals(username, result.getDisplayName()); // Falls back to username
-        assertEquals(username, result.getUsername());
-        assertNotNull(result.getParticipantId());
-    }
 
     @Test
     void addParticipantToSession_SameSessionRejoin_AllowsRejoin() {
@@ -302,21 +233,17 @@ class ParticipantServiceTest {
         existingParticipant.setDisplayName(displayName);
         existingParticipant.setRole(ParticipantRole.PARTICIPANT);
         
-        MockHttpServletRequest mockRequestWithSession = new MockHttpServletRequest();
-        mockRequestWithSession.getSession().setAttribute("guestId", participantId);
-        
-        Authentication guestAuth = new UsernamePasswordAuthenticationToken(
-            displayName, null, List.of(new SimpleGrantedAuthority("ROLE_GUEST"))
-        );
-        SecurityContext securityContext = new SecurityContextImpl(guestAuth);
+        // Mock AuthenticationHelper for guest user
+        when(authHelper.getParticipantId(mockRequest)).thenReturn(participantId);
+        when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
+        when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guest user
         
         when(participantRepository.findByParticipantIdWithSession(participantId))
             .thenReturn(List.of(existingParticipant));
         when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        securityContextMock.when(SecurityContextHolder::getContext).thenReturn(securityContext);
 
         // Act
-        Participant result = participantService.addParticipantToSession(mockRequestWithSession, session, null, ParticipantRole.PARTICIPANT);
+        Participant result = participantService.addParticipantToSession(mockRequest, session, ParticipantRole.PARTICIPANT);
         
         // Assert
         assertNotNull(result);
@@ -353,21 +280,17 @@ class ParticipantServiceTest {
         existingParticipant.setDisplayName(displayName);
         existingParticipant.setRole(ParticipantRole.PARTICIPANT);
         
-        MockHttpServletRequest mockRequestWithSession = new MockHttpServletRequest();
-        mockRequestWithSession.getSession().setAttribute("guestId", participantId);
-        
-        Authentication guestAuth = new UsernamePasswordAuthenticationToken(
-            displayName, null, List.of(new SimpleGrantedAuthority("ROLE_GUEST"))
-        );
-        SecurityContext securityContext = new SecurityContextImpl(guestAuth);
+        // Mock AuthenticationHelper for guest user
+        when(authHelper.getParticipantId(mockRequest)).thenReturn(participantId);
+        when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
+        when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guest user
         
         when(participantRepository.findByParticipantIdWithSession(participantId))
             .thenReturn(List.of(existingParticipant));
         when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        securityContextMock.when(SecurityContextHolder::getContext).thenReturn(securityContext);
 
         // Act
-        Participant result = participantService.addParticipantToSession(mockRequestWithSession, newSession, null, ParticipantRole.PARTICIPANT);
+        Participant result = participantService.addParticipantToSession(mockRequest, newSession, ParticipantRole.PARTICIPANT);
         
         // Assert
         assertNotNull(result);
@@ -407,32 +330,29 @@ class ParticipantServiceTest {
         participant2.setSession(session2);
         participant2.setDisplayName(displayName);
         
-        MockHttpServletRequest mockRequestWithSession = new MockHttpServletRequest();
-        mockRequestWithSession.getSession().setAttribute("guestId", participantId);
-        mockRequestWithSession.getSession().setAttribute("retroId", session1.getId());
-        mockRequestWithSession.getSession().setAttribute("participantRole", "PARTICIPANT");
-        mockRequestWithSession.getSession().setAttribute("participantId", participantId);
+        // Set up session attributes in mock request
+        HttpSession session = mockRequest.getSession();
+        session.setAttribute("retroId", session1.getId());
+        session.setAttribute("participantRole", "PARTICIPANT");
+        session.setAttribute("participantId", participantId);
         
-        Authentication guestAuth = new UsernamePasswordAuthenticationToken(
-            displayName, null, List.of(new SimpleGrantedAuthority("ROLE_GUEST"))
-        );
-        SecurityContext securityContext = new SecurityContextImpl(guestAuth);
+        // Mock AuthenticationHelper for guest user
+        when(authHelper.getParticipantId(mockRequest)).thenReturn(participantId);
         
         when(participantRepository.findByParticipantIdWithSession(participantId))
             .thenReturn(List.of(participant1, participant2));
-        securityContextMock.when(SecurityContextHolder::getContext).thenReturn(securityContext);
 
         // Act
-        participantService.leaveAllActiveSessions(mockRequestWithSession);
+        participantService.leaveAllActiveSessions(mockRequest);
         
         // Assert
         verify(participantRepository).delete(participant1);
         verify(participantRepository).delete(participant2);
         
         // Verify session attributes were cleared
-        assertNull(mockRequestWithSession.getSession().getAttribute("retroId"));
-        assertNull(mockRequestWithSession.getSession().getAttribute("participantRole"));
-        assertNull(mockRequestWithSession.getSession().getAttribute("participantId"));
+        assertNull(mockRequest.getSession().getAttribute("retroId"));
+        assertNull(mockRequest.getSession().getAttribute("participantRole"));
+        assertNull(mockRequest.getSession().getAttribute("participantId"));
     }
 
     @Test
@@ -468,50 +388,5 @@ class ParticipantServiceTest {
         assertFalse(result.get(0).getSession().isFinished());
     }
 
-    @Test
-    void guestParticipantId_ConsistentAcrossRequests() {
-        // Arrange
-        String displayName = "Guest User";
-        UUID guestId = UUID.randomUUID();
-        
-        MockHttpServletRequest mockRequestWithSession = new MockHttpServletRequest();
-        mockRequestWithSession.getSession().setAttribute("guestId", guestId);
-        
-        Authentication guestAuth = new UsernamePasswordAuthenticationToken(
-            displayName, null, List.of(new SimpleGrantedAuthority("ROLE_GUEST"))
-        );
-        SecurityContext securityContext = new SecurityContextImpl(guestAuth);
-        securityContextMock.when(SecurityContextHolder::getContext).thenReturn(securityContext);
 
-        // Act - call twice to verify consistency
-        Participant result1 = participantService.getCurrentParticipant(mockRequestWithSession, null);
-        Participant result2 = participantService.getCurrentParticipant(mockRequestWithSession, null);
-        
-        // Assert
-        assertEquals(guestId, result1.getParticipantId());
-        assertEquals(guestId, result2.getParticipantId());
-        assertEquals(result1.getParticipantId(), result2.getParticipantId());
-    }
-
-    @Test
-    void userParticipantId_ConsistentAcrossRequests() {
-        // Arrange
-        String username = "testuser";
-        
-        SecurityContext securityContext = new SecurityContextImpl(
-            new UsernamePasswordAuthenticationToken(username, null, Collections.emptyList())
-        );
-        securityContextMock.when(SecurityContextHolder::getContext).thenReturn(securityContext);
-
-        // Act - call twice to verify consistency
-        Participant result1 = participantService.getCurrentParticipant(mockRequest, null);
-        Participant result2 = participantService.getCurrentParticipant(mockRequest, null);
-        
-        // Assert
-        assertNotNull(result1.getParticipantId());
-        assertNotNull(result2.getParticipantId());
-        assertEquals(result1.getParticipantId(), result2.getParticipantId());
-        assertEquals(username, result1.getUsername());
-        assertEquals(username, result2.getUsername());
-    }
 }
