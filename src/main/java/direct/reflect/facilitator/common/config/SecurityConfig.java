@@ -7,7 +7,12 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.logout.SimpleUrlLogoutSuccessHandler;
@@ -19,6 +24,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Hybrid Security Configuration: OIDC + Anonymous Guests
@@ -150,6 +157,26 @@ public class SecurityConfig {
                 // Clear any guest session data
                 session.removeAttribute("guestDisplayName");
                 session.removeAttribute("guestId");
+                
+                // Create new authentication token with ROLE_USER
+                OAuth2User userPrincipal = oauth2Token.getPrincipal();
+                
+                Set<GrantedAuthority> authorities = new HashSet<>(userPrincipal.getAuthorities());
+                authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+                
+                OAuth2User userWithRole = new DefaultOAuth2User(
+                    authorities,
+                    userPrincipal.getAttributes(),
+                    oauth2Token.getPrincipal().getAttribute("login") != null ? "login" : "sub"
+                );
+                
+                OAuth2AuthenticationToken newAuth = new OAuth2AuthenticationToken(
+                    userWithRole,
+                    authorities,
+                    oauth2Token.getAuthorizedClientRegistrationId()
+                );
+                
+                SecurityContextHolder.getContext().setAuthentication(newAuth);
             }
             
             response.sendRedirect("/");
