@@ -25,11 +25,13 @@ public class CsvImporterService {
 
     private final RetroTemplateRepository retroTemplateRepository;
     private final RetroStageRepository retroStageRepository;
+    private final RetroStepRepository retroStepRepository;
 
     @PostConstruct
     @Profile("import")
     public void importData() {
         importRetroStages();
+        importRetroSteps();
         importRetroTemplates();
     }
 
@@ -135,6 +137,80 @@ public class CsvImporterService {
             }
         } catch (Exception e) {
             log.error("Failed to import retro templates from CSV", e);
+        }
+    }
+
+    private void importRetroSteps() {
+        try {
+            log.info("Starting import of retro steps...");
+            ClassPathResource resource = new ClassPathResource("retrospective_steps.csv");
+            if (!resource.exists()) {
+                log.info("retrospective_steps.csv not found, skipping step import");
+                return;
+            }
+            
+            Reader reader = new InputStreamReader(resource.getInputStream());
+            CSVFormat csvFormat = CSVFormat.Builder.create(CSVFormat.DEFAULT)
+                    .setHeader("stageID", "orderIndex", "stepType", "dataPattern", "title", "durationSeconds", "configuration")
+                    .setSkipHeaderRecord(true)
+                    .setTrim(true)
+                    .setAllowMissingColumnNames(true)
+                    .build();
+            
+            try (CSVParser csvParser = new CSVParser(reader, csvFormat)) {
+                int count = 0;
+                for (CSVRecord record : csvParser) {
+                    String stageIdStr = record.get("stageID");
+                    if (stageIdStr == null || stageIdStr.trim().isEmpty()) {
+                        log.warn("Skipping record with empty stageID.");
+                        continue;
+                    }
+
+                    Integer stageId = Integer.parseInt(stageIdStr.trim());
+                    RetroStage stage = retroStageRepository.findByMastersheetID(stageId).orElse(null);
+                    
+                    if (stage == null) {
+                        log.warn("Skipping step - stage with mastersheetID {} not found", stageId);
+                        continue;
+                    }
+
+                    RetroStep step = new RetroStep();
+                    step.setRetroStage(stage);
+                    
+                    String orderIndexStr = record.get("orderIndex");
+                    step.setOrderIndex(orderIndexStr != null && !orderIndexStr.trim().isEmpty() 
+                        ? Integer.parseInt(orderIndexStr.trim()) : 1);
+                    
+                    String stepTypeStr = record.get("stepType");
+                    if (stepTypeStr != null && !stepTypeStr.trim().isEmpty()) {
+                        step.setStepType(StepType.valueOf(stepTypeStr.trim()));
+                    } else {
+                        step.setStepType(StepType.INSTRUCTION);
+                    }
+                    
+                    String dataPatternStr = record.get("dataPattern");
+                    if (dataPatternStr != null && !dataPatternStr.trim().isEmpty()) {
+                        step.setDataPattern(DataPattern.valueOf(dataPatternStr.trim()));
+                    }
+                    
+                    String title = record.get("title");
+                    step.setTitle(title != null ? title.trim() : "");
+                    
+                    String durationStr = record.get("durationSeconds");
+                    step.setDurationSeconds(durationStr != null && !durationStr.trim().isEmpty()
+                        ? Integer.parseInt(durationStr.trim()) : 0);
+                    
+                    String configuration = record.get("configuration");
+                    step.setConfiguration(configuration != null ? configuration.trim() : "{}");
+
+                    retroStepRepository.save(step);
+                    count++;
+                    log.debug("Imported step: {} for stage: {}", step.getTitle(), stage.getName());
+                }
+                log.info("Successfully imported {} retro steps.", count);
+            }
+        } catch (Exception e) {
+            log.error("Failed to import retro steps from CSV", e);
         }
     }
 

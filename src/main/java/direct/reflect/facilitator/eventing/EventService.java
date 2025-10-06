@@ -36,7 +36,7 @@ public class EventService {
     private final ScheduledExecutorService keepAliveExecutor = Executors.newScheduledThreadPool(2);
     
     private static final String STREAM_KEY_PREFIX = "retro:stream:";
-    private static final long SSE_TIMEOUT = 300000L; // 5 minutes
+    private static final long SSE_TIMEOUT = 3600000L; // 1 hour
     
     @PostConstruct
     public void init() {
@@ -91,14 +91,15 @@ public class EventService {
      * Create SSE emitter (simple blocking approach).
      * Ensures only one connection per user per retro.
      */
-    public SseEmitter createSseEmitter(UUID retroId, HttpServletRequest request) {
+    public SseEmitter createSseEmitter(UUID retroId, HttpServletRequest request, String participantName, UUID participantId) {
         String connectionId = retroId + ":" + request.getSession().getId();
+        String participantInfo = participantName + " (" + participantId + ")";
         
         // Check if connection already exists - close the old one first
         SseEmitter existingEmitter = localEmitters.get(connectionId);
         if (existingEmitter != null) {
-            log.info("Closing existing SSE connection for: {}", connectionId);
-            cleanupConnection(connectionId, existingEmitter);
+            log.info("Closing existing SSE connection for participant {} in retro {}", participantInfo, retroId);
+            cleanupConnection(connectionId, existingEmitter, participantInfo, retroId);
         }
         
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
@@ -109,33 +110,35 @@ public class EventService {
         
         // Cleanup on close/error/timeout - use a single cleanup method to avoid race conditions
         emitter.onCompletion(() -> {
-            cleanupConnection(connectionId, emitter);
-            log.info("SSE connection completed for retro: {}", retroId);
+            cleanupConnection(connectionId, emitter, participantInfo, retroId);
+            log.debug("SSE connection completed for participant {} in retro {}", participantInfo, retroId);
         });
         
         emitter.onTimeout(() -> {
-            cleanupConnection(connectionId, emitter);
-            log.warn("SSE connection timed out for retro: {}", retroId);
+            cleanupConnection(connectionId, emitter, participantInfo, retroId);
+            log.warn("SSE connection timed out for participant {} in retro {}", participantInfo, retroId);
         });
         
         emitter.onError((error) -> {
-            cleanupConnection(connectionId, emitter);
-            log.error("SSE connection error for retro: {}: {}", retroId, error.getMessage());
+            // Check if this is a normal client disconnection (user navigating away)
+            boolean isClientDisconnection = error instanceof org.springframework.web.context.request.async.AsyncRequestNotUsableException ||
+                error.getMessage().contains("Broken pipe") ||
+                error.getMessage().contains("Connection reset") ||
+                error.getMessage().contains("disconnected client");
+            
+            if (isClientDisconnection) {
+                log.debug("SSE connection closed by client navigation for participant {} in retro {}", participantInfo, retroId);
+            } else {
+                log.warn("SSE connection error for participant {} in retro {}: {}", participantInfo, retroId, error.getMessage());
+            }
+            
+            cleanupConnection(connectionId, emitter, participantInfo, retroId);
         });
         
-        log.info("Created SSE emitter for retro: {} (active connections: {})", retroId, activeConnections.get());
+        log.info("Created SSE emitter for participant {} in retro {} (active connections: {})", participantInfo, retroId, activeConnections.get());
         
-        // Send immediate connection confirmation event
-        try {
-            emitter.send(SseEmitter.event()
-                .name("connection_established")
-                .data("SSE connection established")
-                .comment("Connection confirmed"));
-            log.debug("Sent connection_established event for retro: {}", retroId);
-        } catch (IOException e) {
-            log.warn("Failed to send connection_established event: {}", e.getMessage());
-            // Don't cleanup here - the error handler will be called
-        }
+        // Don't send immediate event - let the connection establish naturally
+        log.debug("SSE emitter created successfully for participant {} in retro {}", participantInfo, retroId);
         
         return emitter;
     }
@@ -143,17 +146,17 @@ public class EventService {
     /**
      * Thread-safe cleanup method to avoid double-decrements.
      */
-    private void cleanupConnection(String connectionId, SseEmitter emitter) {
+    private void cleanupConnection(String connectionId, SseEmitter emitter, String participantInfo, UUID retroId) {
         // Only cleanup if the emitter in the map matches the one we're cleaning up
         // This prevents race conditions where multiple cleanup calls happen for the same connection
         if (localEmitters.remove(connectionId, emitter)) {
             activeConnections.decrementAndGet();
-            log.debug("Cleaned up SSE connection: {} (active: {})", connectionId, activeConnections.get());
+            log.trace("Cleaned up SSE connection for participant {} in retro {} (active: {})", participantInfo, retroId, activeConnections.get());
             try {
                 emitter.complete();
             } catch (Exception e) {
-                // Ignore completion errors during cleanup
-                log.debug("Error completing emitter during cleanup: {}", e.getMessage());
+                // Silently ignore completion errors during cleanup - these are expected when client disconnects
+                log.trace("Error completing emitter during cleanup for participant {} in retro {} (expected): {}", participantInfo, retroId, e.getMessage());
             }
         }
     }
@@ -180,9 +183,15 @@ public class EventService {
         matchingEmitters.forEach(entry -> {
             try {
                 log.debug("Sending {} event to connection: {}", event.type(), entry.getKey());
+                
+                // Send properly formatted SSE event using SseEmitter.event() builder
+                // Use the event type as the SSE event name, and pass the actual payload as data
+                String eventData = event.payload() != null ? event.payload().toString() : "refresh";
                 entry.getValue().send(SseEmitter.event()
                     .name(event.type().name().toLowerCase())
-                    .data(event));
+                    .data(eventData));
+                
+                log.debug("Successfully sent {} event to connection: {}", event.type(), entry.getKey());
             } catch (IOException e) {
                 log.warn("Failed to send event to connection: {} - {}", entry.getKey(), e.getMessage());
                 // Don't manually cleanup here - let the emitter's error handler deal with it

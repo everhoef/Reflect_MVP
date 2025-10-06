@@ -1,7 +1,7 @@
 package direct.reflect.facilitator.facilitation.dto;
 
 import jakarta.validation.constraints.NotNull;
-import java.util.UUID;
+import jakarta.validation.constraints.Pattern;
 
 /**
  * Request DTO for joining an existing retrospective session.
@@ -9,5 +9,7 @@ import java.util.UUID;
  */
 public record JoinRetroRequest(
     @NotNull(message = "Retro ID is required")
-    UUID retroId
+    @Pattern(regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", 
+             message = "Retro ID must be a valid UUID")
+    String retroId
 ) {}

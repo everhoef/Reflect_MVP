@@ -84,7 +84,12 @@ public class ParticipantService {
         authHelper.getDisplayName(request); // Validate display name is set
         
         checkForActiveSession(participantId, session.getId());
-        return createParticipantForSession(session, role, request);
+        Participant participant = createParticipantForSession(session, role, request);
+        
+        // Notify RetroSessionService to handle the event publishing
+        retroSessionService.onParticipantJoining(participant);
+        
+        return participant;
     }
 
     /**
@@ -230,13 +235,16 @@ public class ParticipantService {
         String username = authHelper.getUsername(request); // null for guests
         String displayName = authHelper.getDisplayName(request);
         
+        log.debug("createParticipantForSession called with role: {} for participant: {} in session: {}", 
+            role, participantId, session.getId());
+        
         // Check if this participant already exists in this session
         ParticipantId pk = new ParticipantId(participantId, session.getId());
         var existingParticipant = participantRepository.findById(pk);
         
         if (existingParticipant.isPresent()) {
-            log.info("Participant {} already exists in session {}. Updating existing record instead of creating duplicate.", 
-                participantId, session.getId());
+            log.debug("Participant {} already exists in session {}. Current role: {}, requested role: {}", 
+                participantId, session.getId(), existingParticipant.get().getRole(), role);
             
             // Update existing participant
             Participant existing = existingParticipant.get();
@@ -244,7 +252,9 @@ public class ParticipantService {
             existing.setLastSeen(LocalDateTime.now());
             existing.setRole(role); // Allow role updates
             
+            log.debug("About to save updated participant with role: {}", existing.getRole());
             Participant updatedParticipant = participantRepository.save(existing);
+            log.debug("Saved updated participant. Role after save: {}", updatedParticipant.getRole());
             
             // Update session attributes
             if (request.getSession(false) != null) {
@@ -258,6 +268,9 @@ public class ParticipantService {
             return updatedParticipant;
         }
         
+        log.debug("Creating new participant with role: {} for participant: {} in session: {}", 
+            role, participantId, session.getId());
+        
         // Create new participant
         Participant participant = new Participant();
         participant.setParticipantId(participantId);
@@ -267,7 +280,9 @@ public class ParticipantService {
         participant.setRole(role);
         participant.setLastSeen(LocalDateTime.now());
         
+        log.debug("About to save new participant with role: {}", participant.getRole());
         Participant savedParticipant = participantRepository.save(participant);
+        log.debug("Saved new participant. Role after save: {}", savedParticipant.getRole());
         
         // Set session attributes for participant tracking
         if (request.getSession(false) != null) {

@@ -6,6 +6,7 @@ import java.util.UUID;
 import direct.reflect.facilitator.facilitation.RetroPhase;
 import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.configurator.RetroStage;
+import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.common.entity.GeneratedUuidV7;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

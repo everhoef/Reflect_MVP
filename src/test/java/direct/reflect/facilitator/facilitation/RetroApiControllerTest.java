@@ -40,13 +40,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
     direct.reflect.facilitator.auth.AuthController.class
 })
 @Import({
-    direct.reflect.facilitator.common.config.SecurityConfig.class,
+    direct.reflect.facilitator.config.TestSecurityOverride.class,
     direct.reflect.facilitator.auth.AuthenticationHelper.class
 })
 @EnableAutoConfiguration(exclude = {
     DataSourceAutoConfiguration.class,
     HibernateJpaAutoConfiguration.class
 })
+@org.springframework.test.context.ActiveProfiles("test")
 public class RetroApiControllerTest {
 
     @Autowired
@@ -61,6 +62,8 @@ public class RetroApiControllerTest {
     @MockitoBean 
     private EventService eventService;
     
+    @MockitoBean
+    private direct.reflect.facilitator.configurator.ParticipantResponseService participantResponseService;
     
     @MockitoBean
     private direct.reflect.facilitator.auth.AuthenticationHelper authHelper;
@@ -98,7 +101,7 @@ public class RetroApiControllerTest {
     void shouldJoinRetrospectiveAndRedirect() throws Exception {
         // Arrange
         UUID retroId = UUID.randomUUID();
-        JoinRetroRequest request = new JoinRetroRequest(retroId);
+        JoinRetroRequest request = new JoinRetroRequest(retroId.toString());
 
         RetroSession mockSession = new RetroSession();
         mockSession.setId(retroId);

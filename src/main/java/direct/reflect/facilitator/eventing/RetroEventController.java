@@ -39,8 +39,11 @@ public class RetroEventController {
         
         log.info("SSE connection requested for retro {}", retroId);
         
-        // Set content type explicitly for tests
+        // Set proper SSE headers
         response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        response.setHeader("Cache-Control", "no-cache");
+        response.setHeader("Connection", "keep-alive");
         
         // Validate participant access using session attributes (will throw exception if not authorized)
         Participant participant = participantService.getParticipantForSession(request, retroId);
@@ -50,6 +53,6 @@ public class RetroEventController {
         participantService.updateLastSeen(request, retroId);
         
         // Create and return SseEmitter for this participant
-        return eventService.createSseEmitter(retroId, request);
+        return eventService.createSseEmitter(retroId, request, participant.getDisplayName(), participant.getParticipantId());
     }
 }

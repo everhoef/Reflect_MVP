@@ -43,7 +43,7 @@ public class Participant {
     
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false) // Role should be non-nullable for a participation
-    private ParticipantRole role = ParticipantRole.PARTICIPANT;
+    private ParticipantRole role;
     
     /**
      * Last seen timestamp for the user in this specific session.

@@ -70,7 +70,7 @@ class RetroEventControllerTest {
         mockMvc.perform(get("/api/retro/{retroId}/events", retroId)
                 .accept(MediaType.TEXT_EVENT_STREAM_VALUE))
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.TEXT_EVENT_STREAM_VALUE));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM));
                 
         // Verify service methods were called
         verify(participantService).getParticipantForSession(any(HttpServletRequest.class), eq(retroId));
@@ -153,7 +153,7 @@ class RetroEventControllerTest {
         mockMvc.perform(get("/api/retro/{retroId}/events", retroId)
                 .accept(MediaType.TEXT_EVENT_STREAM_VALUE))
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.TEXT_EVENT_STREAM_VALUE));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM));
                 
         // Verify guest participant was validated and SSE connection established
         verify(participantService).getParticipantForSession(any(HttpServletRequest.class), eq(retroId));

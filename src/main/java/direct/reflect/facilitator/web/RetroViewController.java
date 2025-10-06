@@ -16,9 +16,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import direct.reflect.facilitator.facilitation.RetroSessionService;
 import direct.reflect.facilitator.facilitation.ParticipantService;
 import direct.reflect.facilitator.auth.AuthenticationHelper;
-import direct.reflect.facilitator.facilitation.RetroSession;
-import direct.reflect.facilitator.facilitation.Participant;
-import direct.reflect.facilitator.configurator.RetroStage;
+import direct.reflect.facilitator.web.RetroTemplateDataService;
+import direct.reflect.facilitator.web.dto.RetroTemplateData;
 import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 
@@ -32,6 +31,7 @@ public class RetroViewController {
     private final RetroSessionService retroService;
     private final ParticipantService participantService;
     private final AuthenticationHelper authenticationHelper;
+    private final RetroTemplateDataService templateDataService;
 
     @GetMapping("/")
     public String home(Model model, HttpServletRequest request) {
@@ -71,82 +71,18 @@ public class RetroViewController {
     @GetMapping("/retro/{retroId}")
     public String retroView(@PathVariable UUID retroId, Model model, HttpServletRequest request) {
         try {
-            // Get session 
-            RetroSession session = retroService.getSessionById(retroId);
+            RetroTemplateData templateData = templateDataService.prepareRetroViewData(retroId, request);
             
-            // Get current participant (will throw ParticipantNotFoundException if not participating)
-            Participant participant = participantService.getParticipantForSession(request, retroId);
-            log.info("Got participant: {}", participant);
+            // Add the single DTO to model - templates will use templateData.*
+            model.addAttribute("templateData", templateData);
             
-            // Get facilitator status
-            boolean isFacilitator = participantService.isFacilitator(request, retroId);
-            log.info("Got facilitator status: {}", isFacilitator);
-            
-            // Default page to prevent null template references
-            String page = "lobby";
-            
-            // Log current phase for debugging
-            log.info("Session phase: {}, retroId: {}", session.getPhase(), retroId);
-            
-            // Set page based on phase
-            switch(session.getPhase()) {
-                case CREATED -> {
-                    page = "lobby"; // Show lobby while creating
-                }
-                case LOBBY -> {
-                    page = "lobby";
-                }
-                case SET_THE_STAGE, GATHER_DATA, GENERATE_INSIGHTS, DECIDE_ACTIONS, CLOSE_RETRO -> {
-                    page = "retro";
-                }
-                case PAUSED, COMPLETED, ABANDONED -> {
-                    // For now, just show the retro page for these states
-                    // TODO: Create specialized templates later
-                    page = "retro";
-                }
-                default -> {
-                    log.warn("Unknown phase: {}, defaulting to lobby", session.getPhase());
-                    page = "lobby";
-                }
-            }
-            
-            // Log the final page attribute with more context
-            log.info("Final page attribute: {}, session phase: {}", page, session.getPhase());
-            log.info("All modelAttributes being passed to template: page={}, retroId={}, title={}, isFacilitator={}", 
-                page, retroId, session.getName(), isFacilitator);
-            
-            // Add basic model attributes
-            model.addAttribute("retroId", retroId);
-            model.addAttribute("title", session.getName());
-            model.addAttribute("session", session);
-            model.addAttribute("participant", participant);
-            model.addAttribute("userName", participant.getDisplayName());
-            model.addAttribute("isFacilitator", isFacilitator);
-            model.addAttribute("page", page);
-            
-            // Add phase-specific attributes
-            switch(session.getPhase()) {
-                case CREATED, LOBBY -> {
-                    model.addAttribute("participants", participantService.getSessionParticipants(retroId));
-                }
-                case SET_THE_STAGE, GATHER_DATA, GENERATE_INSIGHTS, DECIDE_ACTIONS, CLOSE_RETRO -> {
-                    // These phases have stages - get the current stage from template
-                    RetroStage currentStage = session.getCurrentStage();
-                    model.addAttribute("currentPhase", session.getPhase());
-                    model.addAttribute("currentStage", currentStage);
-                    model.addAttribute("template", session.getTemplate());
-                }
-                case PAUSED, COMPLETED, ABANDONED -> {
-                    // These phases don't have stages, show minimal retro page
-                    model.addAttribute("currentPhase", session.getPhase());
-                }
-            }
+            log.info("Prepared template data for retro {} - page: {}, phase: {}", 
+                retroId, templateData.getPage(), templateData.getCurrentPhase());
             
             return "layout";
             
         } catch (ParticipantNotFoundException e) {
             log.error("Error in getParticipantForSession chain: ", e);
-            // Redirect to join page or login based on authentication
             return "redirect:/login";
         } catch (Exception e) {
             log.error("Error in retroView: ", e);
@@ -155,13 +91,19 @@ public class RetroViewController {
     }
 
     @GetMapping("/retro/{retroId}/participants")
-    public String getParticipantsList(@PathVariable UUID retroId, Model model) {
+    public String getParticipantsList(@PathVariable UUID retroId, Model model, HttpServletRequest request) {
         log.debug("Getting participants list for retro session: {}", retroId);
         
-        // Verify session exists first - this will throw RetroSessionNotFoundException if not found
-        retroService.getSessionById(retroId);
-        
-        model.addAttribute("participants", participantService.getSessionParticipants(retroId));
-        return "fragments/lobby :: ul.space-y-2";  // Direct fragment reference
+        try {
+            RetroTemplateData templateData = templateDataService.prepareRetroViewData(retroId, request);
+            model.addAttribute("templateData", templateData);
+            return "fragments/participants :: participantsList";
+            
+        } catch (ParticipantNotFoundException e) {
+            log.error("Participant not found when getting participants list: ", e);
+            // Return empty list for non-participants
+            model.addAttribute("participants", java.util.Collections.emptyList());
+            return "fragments/participants :: participantsList";
+        }
     }
 }

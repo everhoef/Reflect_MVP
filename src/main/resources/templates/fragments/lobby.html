@@ -1,13 +1,13 @@
-<div th:fragment="content" class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md" 
-     hx-ext="sse"
-     th:attr="sse-connect=@{/api/retro/{retroId}/events(retroId=${retroId})}">
+<div th:fragment="content" class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
+  <!-- Include SSE connection setup -->
+  <div th:replace="~{fragments/sse-connection :: sse-setup}"></div>
   <h2 class="text-2xl font-dosis mb-6">Session Lobby</h2>
 
   <!-- Session ID display with copy button -->
   <div class="mb-6 p-4 bg-gray-50 rounded-md flex items-center justify-between">
     <div>
       <span class="text-gray-600">Session ID:</span>
-      <span id="session-id" th:text="${retroId}" class="font-mono text-ocher-yellow ml-2"></span>
+      <span id="session-id" th:text="${templateData.retroId}" class="font-mono text-ocher-yellow ml-2"></span>
     </div>
     <button class="px-3 py-1 text-sm bg-ocher-yellow text-white rounded hover:bg-ocher-yellow-dark transition-colors"
       onclick="navigator.clipboard.writeText(document.getElementById('session-id').innerText)">
@@ -19,10 +19,10 @@
   <div class="participants mb-8">
     <h3 class="text-xl font-dosis mb-4">Participants</h3>
     <ul id="participants-list" class="space-y-2"
-        th:attr="hx-get=@{/retro/{retroId}/participants(retroId=${retroId})}"
+        th:attr="hx-get=@{/retro/{retroId}/participants(retroId=${templateData.retroId})}"
         hx-trigger="sse:participant_joined from:body, sse:participant_left from:body"
         hx-swap="innerHTML">
-      <li th:each="participant : ${participants}" class="px-4 py-2 bg-gray-50 rounded-md flex justify-between items-center">
+      <li th:each="participant : ${templateData.participants ?: {}}" class="px-4 py-2 bg-gray-50 rounded-md flex justify-between items-center">
         <span th:text="${participant.displayName}"></span>
         <span th:if="${participant.role.name() == 'FACILITATOR'}" 
               class="ml-2 text-xs bg-ocher-yellow text-white px-2 py-1 rounded">
@@ -33,8 +33,8 @@
   </div>
 
   <!-- Start button (facilitator only) -->
-  <div th:if="${isFacilitator}" class="mt-8">
-    <form th:attr="hx-post=@{/api/retro/{retroId}/start(retroId=${retroId})}">
+  <div th:if="${templateData.isFacilitator}" class="mt-8">
+    <form th:attr="hx-post=@{/api/retro/{retroId}/start(retroId=${templateData.retroId})}">
       <button type="submit"
         class="w-full bg-ocher-yellow text-white py-3 px-6 rounded-md hover:bg-ocher-yellow-dark transition-colors">
         Start Retrospective
@@ -42,12 +42,9 @@
     </form>
   </div>
 
-  <!-- Production-Ready Connection Status -->
-  <div class="mt-4 flex items-center space-x-2">
-    <div id="connection-status" 
-         class="h-3 w-3 rounded-full bg-yellow-500 animate-pulse">
-    </div>
-    <span id="connection-text" class="text-sm">Connecting...</span>
+  <!-- Connection Status -->
+  <div class="mt-4">
+    <div th:replace="~{fragments/sse-connection :: connection-status}"></div>
   </div>
   
   <!-- Debug Event Log (production-safe) -->
@@ -63,196 +60,47 @@
   <!-- Hidden div to handle session navigation on session start -->
   <div id="session-handler"
        hx-trigger="sse:session_started from:body"
-       th:attr="hx-get=@{/retro/{retroId}(retroId=${retroId})}"
+       th:attr="hx-get=@{/retro/{retroId}(retroId=${templateData.retroId})}"
        hx-push-url="true"
        hx-target="body"
        hx-swap="outerHTML"></div>
 
-  <!-- Production-Grade JavaScript with Comprehensive Error Handling -->
+  <!-- Shared SSE Handlers -->
+  <div th:replace="~{fragments/sse-connection :: sse-handlers}"></div>
+  
+  <!-- Lobby-specific JavaScript for debugging -->
   <script>
-    (function() {
-      'use strict';
+    // Lobby-specific event logging (can be removed in production)
+    function logEvent(message, level = 'info') {
+      const logDiv = document.getElementById('event-log');
+      if (!logDiv) return;
       
-      // Production logging (only logs critical events)
-      function logEvent(message, level = 'info') {
-        const logDiv = document.getElementById('event-log');
-        if (!logDiv) return;
-        
-        const timestamp = new Date().toLocaleTimeString();
-        const entry = document.createElement('div');
-        entry.textContent = `${timestamp}: ${message}`;
-        entry.className = level === 'error' ? 'text-red-600 text-xs' : 'text-gray-600 text-xs';
-        logDiv.appendChild(entry);
-        logDiv.scrollTop = logDiv.scrollHeight;
-        
-        // Keep only last 20 entries for performance
-        while (logDiv.children.length > 20) {
-          logDiv.removeChild(logDiv.firstChild);
-        }
+      const timestamp = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.textContent = `${timestamp}: ${message}`;
+      entry.className = level === 'error' ? 'text-red-600 text-xs' : 'text-gray-600 text-xs';
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+      
+      // Keep only last 20 entries for performance
+      while (logDiv.children.length > 20) {
+        logDiv.removeChild(logDiv.firstChild);
       }
-      
-      // Robust connection status updater
-      function updateConnectionStatus(status, message) {
-        const statusDiv = document.getElementById('connection-status');
-        const textDiv = document.getElementById('connection-text');
-        
-        if (!statusDiv || !textDiv) return;
-        
-        // Remove all status classes
-        statusDiv.className = 'h-3 w-3 rounded-full';
-        
-        switch(status) {
-          case 'connected':
-            statusDiv.classList.add('bg-green-500');
-            textDiv.textContent = 'Connected';
-            break;
-          case 'error':
-            statusDiv.classList.add('bg-red-500');
-            textDiv.textContent = message || 'Connection Error';
-            break;
-          case 'disconnected':
-            statusDiv.classList.add('bg-red-500');
-            textDiv.textContent = 'Disconnected';
-            break;
-          case 'connecting':
-          default:
-            statusDiv.classList.add('bg-yellow-500', 'animate-pulse');
-            textDiv.textContent = 'Connecting...';
-        }
-      }
-      
-      // Initialize when DOM is ready
-      document.addEventListener('DOMContentLoaded', function() {
-        logEvent('SSE client initializing...');
-        
-        // Verify HTMX and SSE extension
-        if (typeof htmx === 'undefined') {
-          logEvent('CRITICAL: HTMX not loaded', 'error');
-          updateConnectionStatus('error', 'HTMX Missing');
-          return;
-        }
-        
-        if (typeof htmx.createEventSource !== 'function') {
-          logEvent('CRITICAL: SSE extension not loaded', 'error');
-          updateConnectionStatus('error', 'SSE Extension Missing');
-          return;
-        }
-        
-        logEvent(`HTMX ${htmx.version || 'unknown'} with SSE extension ready`);
-        
-        // Production SSE Event Handlers
-        document.body.addEventListener('htmx:sseOpen', function(evt) {
-          logEvent('SSE Connected');
-          updateConnectionStatus('connected');
-        });
-        
-        document.body.addEventListener('htmx:sseError', function(evt) {
-          logEvent('SSE Error occurred', 'error');
-          updateConnectionStatus('error');
-          
-          // Auto-retry mechanism (built into HTMX, but we track it)
-          setTimeout(function() {
-            const statusText = document.getElementById('connection-text')?.textContent;
-            if (statusText === 'Connection Error') {
-              logEvent('Attempting SSE reconnection...');
-              updateConnectionStatus('connecting');
-            }
-          }, 2000);
-        });
-        
-        document.body.addEventListener('htmx:sseClose', function() {
-          logEvent('SSE Connection closed');
-          updateConnectionStatus('disconnected');
-        });
-        
-        // Track participant list updates
-        document.body.addEventListener('htmx:beforeRequest', function(evt) {
-          if (evt.detail.requestConfig?.path?.includes('participants')) {
-            logEvent('Updating participant list...');
-          }
-        });
-        
-        document.body.addEventListener('htmx:afterRequest', function(evt) {
-          if (evt.detail.requestConfig?.path?.includes('participants')) {
-            const status = evt.detail.xhr?.status;
-            if (status === 200) {
-              logEvent('Participant list updated');
-            } else {
-              logEvent(`Participant list update failed (${status})`, 'error');
-            }
-          }
-        });
-        
-        // Monitor SSE message reception
-        document.body.addEventListener('htmx:sseMessage', function(evt) {
-          // HTMX 2.x SSE event structure: evt.detail contains the SSE message details
-          const sseEvent = evt.detail;
-          const eventType = sseEvent?.type || 'unknown';
-          const eventData = sseEvent?.data || 'no data';
-          const eventId = sseEvent?.lastEventId || 'no id';
-          
-          logEvent(`SSE Message - Event: ${eventType}, ID: ${eventId}, Data: ${eventData}`);
-          
-          // Try to parse JSON data if it looks like JSON
-          try {
-            if (typeof eventData === 'string' && eventData.startsWith('{')) {
-              const parsedData = JSON.parse(eventData);
-              logEvent(`SSE Parsed Data: ${JSON.stringify(parsedData)}`);
-            }
-          } catch (e) {
-            // Not JSON or parsing failed, no problem
-          }
-        });
-        
-        // Monitor ALL SSE-related events for debugging
-        document.body.addEventListener('htmx:sseBeforeMessage', function(evt) {
-          logEvent(`SSE Before Message: ${JSON.stringify(evt.detail)}`);
-        });
-        
-        // Listen for specific HTMX SSE event patterns
-        ['participant_joined', 'participant_left', 'connection_established', 'session_started'].forEach(eventName => {
-          document.body.addEventListener(`sse:${eventName}`, function(evt) {
-            logEvent(`Direct SSE Event: sse:${eventName}`);
-          });
-        });
-        
-        // Connection timeout safety
-        const timeoutId = setTimeout(function() {
-          const statusText = document.getElementById('connection-text')?.textContent;
-          if (statusText === 'Connecting...') {
-            logEvent('Connection timeout - check server', 'error');
-            updateConnectionStatus('error', 'Timeout');
-          }
-        }, 15000);
-        
-        // Clear timeout if connection succeeds
-        document.body.addEventListener('htmx:sseOpen', function() {
-          clearTimeout(timeoutId);
-        }, { once: true });
-        
-        // Page visibility handling for connection management
-        document.addEventListener('visibilitychange', function() {
-          if (!document.hidden) {
-            // Page became visible - refresh participant list to sync state
-            const participantsList = document.getElementById('participants-list');
-            if (participantsList && htmx) {
-              htmx.trigger(participantsList, 'load');
-            }
-          }
-        });
-        
-        logEvent('SSE client ready');
-      });
-      
-      // Global error handler for SSE-related issues
-      window.addEventListener('error', function(evt) {
-        if (evt.message && evt.message.includes('EventSource')) {
-          logEvent('SSE Error: ' + evt.message, 'error');
-          updateConnectionStatus('error', 'SSE Failed');
-        }
-      });
-      
-    })();
+    }
+    
+    // Enhanced lobby-specific SSE logging
+    document.body.addEventListener('htmx:sseOpen', function() {
+      logEvent('SSE Connected in lobby');
+    });
+    
+    document.body.addEventListener('htmx:sseError', function() {
+      logEvent('SSE Error in lobby', 'error');
+    });
+    
+    document.body.addEventListener('htmx:sseMessage', function(evt) {
+      const sseEvent = evt.detail;
+      logEvent(`SSE Message: ${sseEvent?.type || 'unknown'}`);
+    });
   </script>
 
 </div>

@@ -1,0 +1,97 @@
+<div th:fragment="content" class="space-y-6">
+    <!-- Categorical activity using templateData.activityData -->
+    <div th:if="${templateData.activityData != null and templateData.activityData.categoricalData != null}"
+         th:with="categorical=${templateData.activityData.categoricalData}">
+
+        <!-- Sticky Note Submission Form -->
+        <div class="bg-white p-6 rounded-lg border">
+            <form th:attr="hx-post=@{/api/retro/{retroId}/step/{stepId}/categorical(retroId=${templateData.retroId}, stepId=${templateData.currentStep.id})}"
+                  hx-swap="none"
+                  hx-trigger="submit"
+                  class="space-y-4"
+                  x-data="{ selectedCategory: '' }">
+
+                <!-- Category Selection -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Category</label>
+                    <div class="flex gap-2 flex-wrap justify-center">
+                        <div th:each="cat : ${categorical.categories}" class="flex-1 min-w-[120px]">
+                            <input type="radio"
+                                   name="category"
+                                   th:value="${cat.name}"
+                                   th:id="'cat-' + ${cat.name}"
+                                   class="peer hidden"
+                                   required
+                                   x-model="selectedCategory">
+                            <label th:for="'cat-' + ${cat.name}"
+                                   th:style="'border-color: ' + ${cat.color} + '; color: ' + ${cat.color}"
+                                   class="block text-center py-3 px-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 peer-checked:bg-opacity-20 peer-checked:font-bold transition-all"
+                                   th:classappend="${cat.color == '#DC2626'} ? 'peer-checked:bg-red-100' : ${cat.color == '#FCD34D'} ? 'peer-checked:bg-yellow-100' : 'peer-checked:bg-green-100'">
+                                <span th:text="${cat.name}">Category</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sticky Note Content -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Your Note</label>
+                    <textarea name="content"
+                              class="w-full p-4 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              rows="3"
+                              required
+                              th:maxlength="${categorical.maxLength}"
+                              placeholder="Share your thoughts..."></textarea>
+                    <div class="flex justify-between items-center mt-2 text-sm text-gray-500">
+                        <span th:if="${categorical.allowMultiple}" class="text-blue-600">
+                            💡 You can submit multiple sticky notes
+                        </span>
+                        <span th:text="'Max ' + ${categorical.maxLength} + ' characters'">Max 200 characters</span>
+                    </div>
+                </div>
+
+                <div class="text-right">
+                    <button type="submit"
+                            class="bg-blue-600 text-white py-3 px-6 rounded-md hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            x-bind:disabled="!selectedCategory">
+                        <span th:text="${categorical.allowMultiple} ? '📌 Add Sticky Note' : '📌 Submit Note'">📌 Add Sticky Note</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Category Lanes with Sticky Notes -->
+        <div class="grid gap-4"
+             th:classappend="${#lists.size(categorical.categories) == 2} ? 'grid-cols-2' : ${#lists.size(categorical.categories) == 3} ? 'grid-cols-3' : 'grid-cols-1'">
+            <div th:each="cat : ${categorical.categories}"
+                 class="bg-gray-50 rounded-lg p-4 border-2"
+                 th:style="'border-color: ' + ${cat.color}">
+                <h4 class="font-bold text-lg mb-3 text-center"
+                    th:text="${cat.name}"
+                    th:style="'color: ' + ${cat.color}">Category</h4>
+                <div th:id="'category-lane-' + ${cat.name}" class="space-y-2 min-h-[200px]">
+                    <!-- Sticky notes will be dynamically inserted here via SSE -->
+                    <div class="text-center text-gray-400 text-sm py-8">
+                        <p>💭</p>
+                        <p class="mt-2">Notes will appear here...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Fallback if no activity data -->
+    <div th:unless="${templateData.activityData != null and templateData.activityData.categoricalData != null}" 
+         class="text-center py-8 text-gray-500">
+        <p>No categorical activity configuration available.</p>
+    </div>
+    
+    <!-- Facilitator Controls -->
+    <div th:if="${templateData.isFacilitator}" class="flex justify-center pt-4 border-t">
+        <button class="bg-ocher-yellow text-white px-6 py-2 rounded-md hover:bg-ocher-yellow-dark transition-colors"
+                th:attr="hx-post=@{/api/retro/{retroId}/step/{stepId}/reveal(retroId=${templateData.retroId}, stepId=${templateData.currentStep.id})}"
+                hx-swap="none">
+            🔍 Reveal All Notes
+        </button>
+    </div>
+</div>

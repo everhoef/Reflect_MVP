@@ -1,0 +1,90 @@
+<!-- SSE Connection Fragment - reusable across templates -->
+<div th:fragment="sse-setup" hx-ext="sse" 
+     th:attr="sse-connect=@{/api/retro/{retroId}/events(retroId=${templateData.retroId})}">
+</div>
+
+<!-- SSE JavaScript handlers fragment - common event handling -->
+<script th:fragment="sse-handlers">
+    (function() {
+        'use strict';
+        
+        // Common SSE event handlers for all retrospective templates
+        document.body.addEventListener('htmx:sseOpen', function(evt) {
+            console.log('SSE connection opened');
+            updateConnectionStatus('connected');
+        });
+
+        document.body.addEventListener('htmx:sseError', function(evt) {
+            console.debug('SSE connection error (expected on navigation):', evt.detail);
+            updateConnectionStatus('disconnected');
+            
+            // Don't let SSE errors propagate and interfere with other HTMX functionality
+            evt.stopPropagation();
+            evt.preventDefault();
+        });
+
+        document.body.addEventListener('htmx:sseClose', function(evt) {
+            console.log('SSE connection closed');
+            updateConnectionStatus('disconnected');
+        });
+
+        // Participant list updates (common to both lobby and retro)
+        document.body.addEventListener('htmx:beforeRequest', function(evt) {
+            if (evt.detail.requestConfig?.path?.includes('participants')) {
+                console.log('Updating participant list...');
+            }
+        });
+
+        document.body.addEventListener('htmx:afterRequest', function(evt) {
+            if (evt.detail.requestConfig?.path?.includes('participants')) {
+                const status = evt.detail.xhr?.status;
+                if (status === 200) {
+                    console.log('Participant list updated');
+                } else {
+                    console.log('Participant list update failed:', status);
+                }
+            }
+        });
+
+        // Common function to update connection status indicators
+        function updateConnectionStatus(status, message) {
+            const statusDiv = document.getElementById('connection-status');
+            const textDiv = document.getElementById('connection-text');
+            
+            if (!statusDiv || !textDiv) return;
+            
+            // Remove all status classes
+            statusDiv.className = 'h-3 w-3 rounded-full';
+            
+            switch(status) {
+                case 'connected':
+                    statusDiv.classList.add('bg-green-500');
+                    textDiv.textContent = 'Connected';
+                    break;
+                case 'error':
+                    statusDiv.classList.add('bg-red-500');
+                    textDiv.textContent = message || 'Connection Error';
+                    break;
+                case 'disconnected':
+                    statusDiv.classList.add('bg-red-500');
+                    textDiv.textContent = 'Disconnected';
+                    break;
+                case 'connecting':
+                default:
+                    statusDiv.classList.add('bg-yellow-500', 'animate-pulse');
+                    textDiv.textContent = 'Connecting...';
+            }
+        }
+
+        // Make function globally available
+        window.updateConnectionStatus = updateConnectionStatus;
+        
+        console.log('SSE handlers initialized');
+    })();
+</script>
+
+<!-- Connection status indicator fragment -->
+<div th:fragment="connection-status" class="flex items-center space-x-2 text-sm">
+    <div id="connection-status" class="h-3 w-3 rounded-full bg-yellow-500 animate-pulse"></div>
+    <span id="connection-text">Connecting...</span>
+</div>

@@ -81,4 +81,41 @@ public record RetroEvent<T>(
     public static RetroEvent<String> phaseStarted(UUID retroId, String facilitatorId, String phaseName) {
         return new RetroEvent<>(retroId, EventType.PHASE_STARTED, facilitatorId, Instant.now(), phaseName);
     }
+    
+    /**
+     * Response data for NOTE events (responses)
+     */
+    public record ResponseData(
+        String responseId,
+        Long stepId,
+        String participantId,
+        String participantName,
+        String content,
+        String category,
+        Integer rating,
+        String comment,
+        boolean isVisible,
+        Instant submittedAt
+    ) {}
+    
+    /**
+     * Create a response submitted event (NOTE_ADDED)
+     */
+    public static RetroEvent<ResponseData> responseSubmitted(UUID retroId, String participantId, ResponseData responseData) {
+        return new RetroEvent<>(retroId, EventType.NOTE_ADDED, participantId, Instant.now(), responseData);
+    }
+    
+    /**
+     * Create a response privacy changed event (NOTE_UPDATED) 
+     */
+    public static RetroEvent<ResponseData> responsePrivacyChanged(UUID retroId, String facilitatorId, ResponseData responseData) {
+        return new RetroEvent<>(retroId, EventType.NOTE_UPDATED, facilitatorId, Instant.now(), responseData);
+    }
+    
+    /**
+     * Create responses revealed event (batch privacy change)
+     */
+    public static RetroEvent<Long> responsesRevealed(UUID retroId, String facilitatorId, Long stepId) {
+        return new RetroEvent<>(retroId, EventType.NOTE_UPDATED, facilitatorId, Instant.now(), stepId);
+    }
 }

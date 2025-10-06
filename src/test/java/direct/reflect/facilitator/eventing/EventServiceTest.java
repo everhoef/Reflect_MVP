@@ -60,7 +60,7 @@ class EventServiceTest {
 
         // Then
         assertThat(emitter).isNotNull();
-        assertThat(emitter.getTimeout()).isEqualTo(300000L); // 5 minutes
+        assertThat(emitter.getTimeout()).isEqualTo(3600000L); // 1 hour
     }
 
     @Test

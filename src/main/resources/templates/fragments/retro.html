@@ -1,116 +1,487 @@
-<div th:fragment="content" class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-md">
-    <!-- Phase Header -->
-    <div class="border-b pb-6 mb-6">
-        <div class="mb-4">
-            <h2 class="text-2xl font-dosis" th:text="${currentPhase?.displayName ?: 'Phase Name'}">Phase Name</h2>
-            <p class="text-gray-600" th:text="${currentPhase?.description ?: 'Phase description'}">Phase description</p>
+<div th:fragment="content" class="max-w-full mx-auto"
+     hx-get="@{/retro/{retroId}(retroId=${templateData.retroId})}"
+     hx-trigger="sse:step_advanced from:body"
+     hx-swap="outerHTML"
+     hx-target="this">
+    <!-- Include SSE connection setup -->
+    <div th:replace="~{fragments/sse-connection :: sse-setup}"></div>
+    
+    <!-- Top Navigation Bar with Session Progress and Timer -->
+    <div class="bg-amber-500 text-white px-6 py-4 shadow-md">
+        <div class="flex items-center justify-between">
+            <!-- Left: Session Info -->
+            <div class="flex items-center space-x-4">
+                <div class="font-medium text-lg" th:text="${templateData.session.name}">Session Name</div>
+                <div class="text-amber-100 text-sm">
+                    Session ID: <span class="font-mono" th:text="${templateData.retroId}">12345</span>
+                </div>
+            </div>
+            
+            <!-- Center: Session Progress -->
+            <div th:if="${templateData.currentStep != null}" class="flex items-center space-x-6">
+                <!-- Stage Progress Indicators -->
+                <div class="flex items-center space-x-3">
+                    <!-- Previous stages (completed) -->
+                    <div class="flex items-center space-x-2">
+                        <div class="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                            ✓
+                        </div>
+                        <div class="h-0.5 w-8 bg-green-600"></div>
+                    </div>
+                    
+                    <!-- Current stage (active) -->
+                    <div class="flex items-center space-x-2">
+                        <div class="w-8 h-8 bg-white text-amber-600 rounded-full flex items-center justify-center text-sm font-bold border-2 border-white">
+                            <span th:text="${templateData.session.currentStepIndex >= 0 ? templateData.session.currentStepIndex + 1 : 1}">1</span>
+                        </div>
+                        <div class="text-white font-medium">
+                            <span th:text="'Stage ' + ${templateData.session.currentStepIndex >= 0 ? templateData.session.currentStepIndex + 1 : 1} + ': ' + ${templateData.currentStage?.name ?: 'Current Stage'}">Stage 1: Current Stage</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Future stages (pending) -->
+                    <div class="flex items-center space-x-2">
+                        <div class="h-0.5 w-8 bg-amber-300"></div>
+                        <div class="w-8 h-8 bg-amber-300 rounded-full flex items-center justify-center text-amber-600 text-sm font-bold">
+                            <span th:text="${templateData.session.currentStepIndex >= 0 ? templateData.session.currentStepIndex + 2 : 2}">2</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- LOBBY Phase Progress -->
+            <div th:if="${templateData.currentStep == null}" class="text-center">
+                <div class="text-white font-medium text-lg">Session Lobby</div>
+                <div class="text-amber-100 text-sm">Waiting to start retrospective</div>
+            </div>
+            
+            <!-- Right: Timer and Controls -->
+            <div class="flex items-center space-x-4">
+                <!-- Timer Display -->
+                <div th:if="${templateData.currentStep != null and templateData.currentStep.durationSeconds != null}" class="bg-amber-600 px-4 py-2 rounded-lg">
+                    <div class="text-center">
+                        <div class="text-2xl font-mono font-bold" id="timer-display">
+                            <span th:text="${T(java.time.Duration).ofSeconds(templateData.currentStep.durationSeconds).toMinutes()}">5</span>:00
+                        </div>
+                        <div class="text-xs text-amber-200">Time Remaining</div>
+                    </div>
+                </div>
+                
+                <!-- Participant Count -->
+                <div class="flex items-center space-x-2 bg-amber-600 px-3 py-2 rounded-lg">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                    <span class="font-medium" th:text="${#lists.size(templateData.participants ?: {})}">0</span>
+                </div>
+                
+                <!-- Facilitator Controls -->
+                <div th:if="${templateData.isFacilitator}" class="flex items-center space-x-2">
+                    <!-- Next Step Button -->
+                    <button th:if="${templateData.currentStage != null}" 
+                            class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+                            th:attr="hx-post=@{/api/retro/{retroId}/next(retroId=${templateData.retroId})}"
+                            hx-swap="none">
+                        <span>Next Step</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </button>
+                    
+                    <!-- Start Button (LOBBY only) -->
+                    <button th:if="${templateData.currentStep == null and templateData.currentPhase?.name() == 'LOBBY'}" 
+                            class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg font-medium transition-colors"
+                            th:attr="hx-post=@{/api/retro/{retroId}/start(retroId=${templateData.retroId})}">
+                        Start Retrospective
+                    </button>
+                </div>
+            </div>
         </div>
-
-        <!-- Stage Header (only for active phases with stages) -->
-        <div th:if="${currentStage != null}">
-            <h3 class="text-xl font-dosis mb-2" th:text="${currentStage?.name ?: 'Stage Name'}">Stage Name</h3>
-            <div class="space-y-2">
-                <p class="text-gray-600" th:text="${currentStage?.why ?: 'Why we are doing this'}">Why we're doing this</p>
-                <p th:text="${currentStage?.what ?: 'What to do'}">What to do</p>
-                <p class="text-sm text-gray-500" th:if="${currentStage?.duration}" th:text="'Duration: ' + ${currentStage.duration} + ' minutes'">Duration info</p>
+    </div>
+    
+    <!-- Stage Progress Bar -->
+    <div th:if="${templateData.currentStep != null}" class="bg-white border-b border-gray-200 px-6 py-4">
+        <div class="flex items-center justify-center space-x-8">
+            <!-- Dynamic stage indicators - simplified for now -->
+            <div class="flex items-center space-x-6">
+                <div class="flex flex-col items-center">
+                    <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-bold">✓</div>
+                    <div class="text-xs mt-1 text-green-600 font-medium">Complete</div>
+                    <div class="text-xs text-gray-600">Stage 1</div>
+                </div>
+                <div class="w-8 h-0.5 bg-gray-300"></div>
+                
+                <div class="flex flex-col items-center">
+                    <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-white text-sm font-bold">2</div>
+                    <div class="text-xs mt-1 text-yellow-600 font-medium">In Progress</div>
+                    <div class="text-xs text-gray-600">Stage 2</div>
+                </div>
+                <div class="w-8 h-0.5 bg-gray-300"></div>
+                
+                <div class="flex flex-col items-center">
+                    <div class="w-8 h-8 border-2 border-gray-300 rounded-full flex items-center justify-center text-gray-500 text-sm font-bold">3</div>
+                    <div class="text-xs mt-1 text-gray-500">To Do</div>
+                    <div class="text-xs text-gray-500">Stage 3</div>
+                </div>
+                <div class="w-8 h-0.5 bg-gray-300"></div>
+                
+                <div class="flex flex-col items-center">
+                    <div class="w-8 h-8 border-2 border-gray-300 rounded-full flex items-center justify-center text-gray-500 text-sm font-bold">4</div>
+                    <div class="text-xs mt-1 text-gray-500">To Do</div>
+                    <div class="text-xs text-gray-500">Stage 4</div>
+                </div>
+                <div class="w-8 h-0.5 bg-gray-300"></div>
+                
+                <div class="flex flex-col items-center">
+                    <div class="w-8 h-8 border-2 border-gray-300 rounded-full flex items-center justify-center text-gray-500 text-sm font-bold">5</div>
+                    <div class="text-xs mt-1 text-gray-500">To Do</div>
+                    <div class="text-xs text-gray-500">Stage 5</div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Generic RetroStep Content Area -->
-    <!-- TODO: This is where your generic retroStep view will go -->
-    <!-- For now, showing phase-specific placeholder content -->
-    <div class="min-h-96">
-        <div th:switch="${currentPhase?.name()}">
-            <div th:case="'SET_THE_STAGE'">
-                <div class="text-center py-12">
-                    <h4 class="text-lg font-semibold mb-4">Set the Stage Phase</h4>
-                    <p class="text-gray-600 mb-6">Generic retroStep content will be rendered here based on currentStage configuration</p>
-                    <div class="bg-blue-50 p-4 rounded-lg">
-                        <p class="text-sm">Stage: <span th:text="${currentStage?.name}">Current Stage</span></p>
-                        <p class="text-sm">Template: <span th:text="${template?.name}">Template Name</span></p>
+    <!-- Main Three-Column Layout -->
+    <div class="flex h-full" style="height: calc(100vh - 180px);">
+        
+        <!-- Left Sidebar: Guidance Video/Text Area -->
+        <div class="w-80 bg-gray-900 relative overflow-hidden">
+            <!-- Video/Image Placeholder -->
+            <div class="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900">
+                <div class="flex items-center justify-center h-full">
+                    <div class="text-white text-center">
+                        <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z"/>
+                            </svg>
+                        </div>
+                        <p class="text-sm opacity-75">Guidance content</p>
                     </div>
                 </div>
             </div>
-            <div th:case="'GATHER_DATA'">
-                <div class="text-center py-12">
-                    <h4 class="text-lg font-semibold mb-4">Gather Data Phase</h4>
-                    <p class="text-gray-600 mb-6">Generic retroStep content will be rendered here based on currentStage configuration</p>
-                    <div class="bg-green-50 p-4 rounded-lg">
-                        <p class="text-sm">Stage: <span th:text="${currentStage?.name}">Current Stage</span></p>
-                        <p class="text-sm">Template: <span th:text="${template?.name}">Template Name</span></p>
+            
+            <!-- Guidance Overlay Tooltip -->
+            <div class="absolute bottom-4 left-4 right-4 bg-black bg-opacity-90 text-white p-4 rounded-lg border border-gray-600">
+                <div class="flex items-start">
+                    <div class="w-7 h-7 bg-yellow-500 rounded-full flex items-center justify-center mr-3 mt-0.5 flex-shrink-0">
+                        <span th:switch="${templateData.currentStep != null ? templateData.currentStep.stepType?.name() : 'NONE'}" class="text-black text-sm font-bold">
+                            <span th:case="INSTRUCTION">📋</span>
+                            <span th:case="ACTIVITY">✏️</span>
+                            <span th:case="DISCUSSION">💬</span>
+                            <span th:case="*">ℹ️</span>
+                        </span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h4 class="font-medium text-sm mb-2 text-yellow-400" th:text="${templateData.currentStep != null ? templateData.currentStep.title : 'No Step'}">Current Step</h4>
+                        
+                        <!-- Clean step guidance from service layer -->
+                        <div class="text-xs text-gray-300 leading-relaxed mb-2">
+                            <p th:text="${templateData.stepGuidance}">Step guidance processed by service layer</p>
+                        </div>
+                        
+                        <!-- Facilitator-specific actions (not guidance, just actions) -->
+                        <div th:if="${templateData.isFacilitator}" class="text-xs text-yellow-300">
+                            <div th:switch="${templateData.currentStep != null ? templateData.currentStep.stepType?.name() : 'NONE'}">
+                                <p th:case="INSTRUCTION">💡 <strong>Click "Next"</strong> when everyone is ready</p>
+                                <p th:case="ACTIVITY">💡 <strong>Click "Reveal"</strong> when actions are ready, then <strong>"Next"</strong></p>
+                                <p th:case="DISCUSSION">💡 <strong>Click "Next"</strong> when discussion feels complete</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div th:case="'GENERATE_INSIGHTS'">
-                <div class="text-center py-12">
-                    <h4 class="text-lg font-semibold mb-4">Generate Insights Phase</h4>
-                    <p class="text-gray-600 mb-6">Generic retroStep content will be rendered here based on currentStage configuration</p>
-                    <div class="bg-yellow-50 p-4 rounded-lg">
-                        <p class="text-sm">Stage: <span th:text="${currentStage?.name}">Current Stage</span></p>
-                        <p class="text-sm">Template: <span th:text="${template?.name}">Template Name</span></p>
+        </div>
+        
+        <!-- Center: Main Content Area -->
+        <div class="flex-1 bg-white overflow-y-auto" th:if="${templateData.currentStep != null}">
+            <div class="p-8">
+                <!-- Stage Header -->
+                <div class="text-center mb-8">
+                    <h2 class="text-3xl font-bold mb-2" th:text="'Stage ' + ${templateData.session.currentStepIndex >= 0 ? templateData.session.currentStepIndex + 1 : 1} + ': ' + ${templateData.currentStage?.name ?: 'Current Stage'}">Stage 2: Mad Sad Glad</h2>
+                    
+                    <!-- Step Timer (clean version from controller) -->
+                    <div th:if="${templateData.stepDurationMinutes != null}" class="flex items-center justify-center space-x-2 text-sm text-gray-600 mb-4">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span th:text="${templateData.stepDurationMinutes} + ' minutes for this step'">10 minutes for this step</span>
+                    </div>
+                </div>
+
+                <!-- Pattern-specific Content -->
+                <div class="bg-purple-100 p-4 mb-4 border">
+                    <h3>🔍 MAIN SWITCH DEBUG</h3>
+                    <p>Switch Expression Value: <span class="font-mono bg-gray-200 p-1" th:text="${templateData.currentStep != null ? templateData.currentStep.stepType?.name() : 'NONE'}">NONE</span></p>
+                    <p>Expected to match: <code>ACTIVITY</code>, <code>INSTRUCTION</code>, <code>DISCUSSION</code></p>
+                    <p>Raw stepType: <span class="font-mono bg-gray-200 p-1" th:text="${templateData.currentStep?.stepType}">null</span></p>
+                    <p>stepType class: <span class="font-mono bg-gray-200 p-1" th:text="${templateData.currentStep?.stepType?.class?.name}">null</span></p>
+                </div>
+                <div th:switch="${templateData.currentStep != null ? templateData.currentStep.stepType?.name() : 'NONE'}">
+            <!-- INSTRUCTION Steps -->
+            <div th:case="INSTRUCTION">
+                <div th:replace="~{fragments/retro-instruction :: content}">
+                    <!-- Fallback content -->
+                    <div class="bg-blue-50 p-6 rounded-lg">
+                        <p class="text-gray-700" th:utext="${templateData.currentStep.configuration}">Step instructions...</p>
                     </div>
                 </div>
             </div>
-            <div th:case="'DECIDE_ACTIONS'">
-                <div class="text-center py-12">
-                    <h4 class="text-lg font-semibold mb-4">Decide Actions Phase</h4>
-                    <p class="text-gray-600 mb-6">Generic retroStep content will be rendered here based on currentStage configuration</p>
-                    <div class="bg-purple-50 p-4 rounded-lg">
-                        <p class="text-sm">Stage: <span th:text="${currentStage?.name}">Current Stage</span></p>
-                        <p class="text-sm">Template: <span th:text="${template?.name}">Template Name</span></p>
+            
+            <!-- ACTIVITY Steps (pattern-specific) -->
+            <div th:case="ACTIVITY">
+                <div th:switch="${templateData.currentStep != null ? templateData.currentStep.dataPattern?.name() : 'NONE'}">
+                <!-- CATEGORICAL Pattern (Mad Sad Glad) -->
+                <div th:case="CATEGORICAL">
+                    <div th:replace="~{fragments/retro-categorical :: content}">
+                        <!-- Fallback content -->
+                        <div class="bg-green-50 p-6 rounded-lg">
+                            <p class="mb-4">CATEGORICAL Activity: <span th:text="${templateData.currentStep.title}">Activity Title</span></p>
+                            <p class="text-sm text-gray-600" th:text="${templateData.currentStep.configuration}">Configuration...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- RATING Pattern (Happiness Histogram) -->
+                <div th:case="RATING">
+                    <div th:replace="~{fragments/retro-rating :: content}">
+                        <!-- Fallback content -->
+                        <div class="bg-yellow-50 p-6 rounded-lg">
+                            <p class="mb-4">RATING Activity: <span th:text="${templateData.currentStep.title}">Activity Title</span></p>
+                            <p class="text-sm text-gray-600" th:text="${templateData.currentStep.configuration}">Configuration...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- FREEFORM Pattern (One Word) -->
+                <div th:case="FREEFORM">
+                    <div th:replace="~{fragments/retro-freeform :: content}">
+                        <!-- Fallback content -->
+                        <div class="bg-purple-50 p-6 rounded-lg">
+                            <p class="mb-4">FREEFORM Activity: <span th:text="${templateData.currentStep.title}">Activity Title</span></p>
+                            <p class="text-sm text-gray-600" th:text="${templateData.currentStep.configuration}">Configuration...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Unknown Pattern -->
+                <div th:case="*">
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <p class="text-red-600">Unknown activity pattern: <span th:text="${templateData.currentStep != null ? templateData.currentStep.dataPattern?.name() : 'Unknown'}">Unknown</span></p>
+                    </div>
+                </div>
+                </div>
+            </div>
+            
+            <!-- DISCUSSION Steps -->
+            <div th:case="DISCUSSION">
+                <div th:replace="~{fragments/retro-discussion :: content}">
+                    <!-- Fallback content -->
+                    <div class="bg-orange-50 p-6 rounded-lg">
+                        <p class="text-gray-700" th:utext="${templateData.currentStep.configuration}">Discussion prompt...</p>
                     </div>
                 </div>
             </div>
-            <div th:case="'CLOSE_RETRO'">
-                <div class="text-center py-12">
-                    <h4 class="text-lg font-semibold mb-4">Close Retrospective Phase</h4>
-                    <p class="text-gray-600 mb-6">Generic retroStep content will be rendered here based on currentStage configuration</p>
-                    <div class="bg-red-50 p-4 rounded-lg">
-                        <p class="text-sm">Stage: <span th:text="${currentStage?.name}">Current Stage</span></p>
-                        <p class="text-sm">Template: <span th:text="${template?.name}">Template Name</span></p>
-                    </div>
-                </div>
-            </div>
-            <div th:case="'PAUSED'">
-                <div class="text-center py-12">
-                    <h4 class="text-lg font-semibold mb-4">Retrospective Paused</h4>
-                    <p class="text-gray-600">This retrospective has been paused by the facilitator.</p>
-                </div>
-            </div>
-            <div th:case="'COMPLETED'">
-                <div class="text-center py-12">
-                    <h4 class="text-lg font-semibold mb-4">Retrospective Complete</h4>
-                    <p class="text-gray-600">This retrospective has been completed. Thank you for participating!</p>
-                </div>
-            </div>
-            <div th:case="'ABANDONED'">
-                <div class="text-center py-12">
-                    <h4 class="text-lg font-semibold mb-4">Retrospective Abandoned</h4>
-                    <p class="text-gray-600">This retrospective has been abandoned.</p>
-                </div>
-            </div>
+            
+            <!-- Unknown Step Type -->
             <div th:case="*">
-                <div class="text-center py-12">
-                    <h4 class="text-lg font-semibold mb-4">Unknown Phase</h4>
-                    <p class="text-gray-600">Phase: <span th:text="${currentPhase?.name()}">Unknown</span></p>
+                <div class="bg-gray-50 p-6 rounded-lg">
+                    <p class="text-red-600">Unknown step type: <span th:text="${templateData.currentStep != null ? templateData.currentStep.stepType?.name() : 'Unknown'}">Unknown</span></p>
+                    <p class="text-sm text-gray-600">Debug - Step Type: <span th:text="${templateData.currentStep?.stepType}">null</span></p>
+                    <p class="text-sm text-gray-600">Debug - Data Pattern: <span th:text="${templateData.currentStep?.dataPattern}">null</span></p>
+                    <p class="text-sm text-gray-600">Debug - Current Step: <span th:text="${templateData.currentStep != null ? 'not null' : 'null'}">null</span></p>
+                </div>
+            </div>
+        </div>
+                
+                <!-- Action Buttons -->
+                <div class="mt-8 flex justify-center space-x-4">
+                    <button class="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                        Back
+                    </button>
+                    <button th:if="${templateData.isFacilitator}" 
+                            class="px-6 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600"
+                            th:attr="hx-post=@{/api/retro/{retroId}/next(retroId=${templateData.retroId})}"
+                            hx-swap="none">
+                        Next
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- LOBBY Phase Center Content -->
+        <div class="flex-1 bg-white overflow-y-auto flex items-center justify-center" th:if="${templateData.currentStep == null}">
+            <div class="p-6">
+                <div th:switch="${templateData.currentPhase?.name()}">
+                    <div th:case="'LOBBY'">
+                        <!-- Include lobby content -->
+                        <div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
+                            <h2 class="text-2xl font-dosis mb-6">Session Lobby</h2>
+
+                            <!-- Session ID display with copy button -->
+                            <div class="mb-6 p-4 bg-gray-50 rounded-md flex items-center justify-between">
+                                <div>
+                                    <span class="text-gray-600">Session ID:</span>
+                                    <span id="session-id" th:text="${templateData.retroId}" class="font-mono text-ocher-yellow ml-2"></span>
+                                </div>
+                                <button class="px-3 py-1 text-sm bg-ocher-yellow text-white rounded hover:bg-ocher-yellow-dark transition-colors"
+                                        onclick="navigator.clipboard.writeText(document.getElementById('session-id').innerText)">
+                                    Copy
+                                </button>
+                            </div>
+
+                            <!-- Participants list that auto-updates with new participants -->
+                            <div class="participants mb-8">
+                                <h3 class="text-xl font-dosis mb-4">Participants</h3>
+                                <ul id="participants-list" class="space-y-2"
+                                    th:attr="hx-get=@{/retro/{retroId}/participants(retroId=${templateData.retroId})}"
+                                    hx-trigger="sse:participant_joined from:body, sse:participant_left from:body"
+                                    hx-swap="innerHTML">
+                                    <li th:each="participant : ${templateData.participants}" class="px-4 py-2 bg-gray-50 rounded-md flex justify-between items-center">
+                                        <span th:text="${participant.displayName}"></span>
+                                        <span th:if="${participant.role.name() == 'FACILITATOR'}" 
+                                              class="ml-2 text-xs bg-ocher-yellow text-white px-2 py-1 rounded">
+                                            Facilitator
+                                        </span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                        </div>
+                    </div>
+                    <div th:case="'PAUSED'">
+                        <div class="text-center py-12">
+                            <h4 class="text-lg font-semibold mb-4">Retrospective Paused</h4>
+                            <p class="text-gray-600">This retrospective has been paused by the facilitator.</p>
+                        </div>
+                    </div>
+                    <div th:case="'COMPLETED'">
+                        <div class="text-center py-12">
+                            <h4 class="text-lg font-semibold mb-4">Retrospective Complete</h4>
+                            <p class="text-gray-600">This retrospective has been completed. Thank you for participating!</p>
+                        </div>
+                    </div>
+                    <div th:case="'ABANDONED'">
+                        <div class="text-center py-12">
+                            <h4 class="text-lg font-semibold mb-4">Retrospective Abandoned</h4>
+                            <p class="text-gray-600">This retrospective has been abandoned.</p>
+                        </div>
+                    </div>
+                    <div th:case="*">
+                        <div class="text-center py-12">
+                            <h4 class="text-lg font-semibold mb-4">No Active Step</h4>
+                            <p class="text-gray-600">Phase: <span th:text="${templateData.currentPhase?.name()}">Unknown</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right Sidebar: Participants and Results -->
+        <div class="w-80 bg-gray-50 border-l border-gray-200 overflow-y-auto">
+            <div class="p-6">
+                <!-- Participants Section -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Participants</h3>
+                    <div class="space-y-2">
+                        <div th:each="participant : ${templateData.participants ?: {}}" 
+                             class="flex items-center justify-between p-3 bg-white rounded-lg border">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium mr-3">
+                                    <span th:text="${#strings.substring(participant.displayName, 0, 1)}">A</span>
+                                </div>
+                                <span class="text-sm font-medium" th:text="${participant.displayName}">Alice</span>
+                            </div>
+                            <div th:if="${participant.role.name() == 'FACILITATOR'}" 
+                                 class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
+                                Facilitator
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Results/Insights Section (show when available) -->
+                <div th:if="${templateData.currentStep != null and templateData.currentStep.stepType?.name() == 'ACTIVITY'}" class="mb-8">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Insights</h3>
+                    <div class="bg-white p-4 rounded-lg border">
+                        <p class="text-sm text-gray-600 text-center">
+                            Results will appear here when responses are revealed
+                        </p>
+                        <!-- TODO: Add actual results display based on data pattern -->
+                    </div>
+                </div>
+                
+                <!-- Facilitator Controls -->
+                <div th:if="${templateData.isFacilitator ?: false}" class="mb-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Facilitator Actions</h3>
+                    <div class="space-y-3">
+                        <div th:if="${templateData.currentStep != null and templateData.currentStep.stepType?.name() == 'ACTIVITY'}" 
+                             class="bg-white p-4 rounded-lg border">
+                            <button class="w-full bg-blue-600 text-white py-2 px-3 rounded hover:bg-blue-700 transition-colors text-sm"
+                                    th:attr="hx-post=@{/api/retro/{retroId}/step/{stepId}/reveal(retroId=${templateData.retroId}, stepId=${templateData.currentStep.id})}"
+                                    hx-swap="none">
+                                👁️ Reveal All Responses
+                            </button>
+                            <p class="text-xs text-gray-500 text-center mt-2">
+                                Reveal responses when participants are ready
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Center content for LOBBY phase -->
+    <div th:if="${templateData.currentStep == null}" class="flex-1 flex items-center justify-center bg-white">
+        <div class="text-center">
+            <div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-md">
+                <h2 class="text-2xl font-bold mb-6">Session Lobby</h2>
+                <!-- Session ID display -->
+                <div class="mb-6 p-4 bg-gray-50 rounded-md flex items-center justify-between">
+                    <div>
+                        <span class="text-gray-600">Session ID:</span>
+                        <span id="session-id" th:text="${templateData.retroId}" class="font-mono text-yellow-600 ml-2 font-bold"></span>
+                    </div>
+                    <button class="px-3 py-1 text-sm bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors"
+                            onclick="navigator.clipboard.writeText(document.getElementById('session-id').innerText)">
+                        Copy
+                    </button>
+                </div>
+                
+                <!-- Start Button for Facilitator -->
+                <div th:if="${templateData.isFacilitator and templateData.currentPhase?.name() == 'LOBBY'}" class="mt-6">
+                    <button class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg text-white font-medium transition-colors"
+                            th:attr="hx-post=@{/api/retro/{retroId}/start(retroId=${templateData.retroId})}">
+                        Start Retrospective
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Facilitator Controls (only for active phases with stages) -->
-    <div th:if="${(isFacilitator ?: false) and currentStage != null}" class="mt-8 border-t pt-6">
-        <div class="flex justify-between items-center">
-            <span class="text-sm text-gray-500">
-                Current stage: <span th:text="${currentStage?.name ?: 'Unknown'}">Stage Name</span>
-                <span th:if="${currentStage?.duration}" th:text="'(' + ${currentStage.duration} + ' min)'"></span>
-            </span>
-            <button class="bg-ocher-yellow text-white px-6 py-2 rounded-lg hover:bg-ocher-yellow-dark transition-colors"
-                    th:attr="hx-post=@{/api/retro/{retroId}/next(retroId=${retroId})}"
-                    hx-swap="none">
-                Next Stage →
-            </button>
-        </div>
-    </div>
+
+    <!-- Shared SSE Handlers -->
+    <div th:replace="~{fragments/sse-connection :: sse-handlers}"></div>
+    
+    <!-- Retro-specific SSE handling -->
+    <script>
+        // Store eventSource reference for integration tests
+        document.body.addEventListener('htmx:sseOpen', function(evt) {
+            window.eventSource = evt.detail.source; // For integration tests
+        });
+        
+        document.body.addEventListener('htmx:sseClose', function() {
+            window.eventSource = null;
+        });
+
+        // Handle major state changes that require full page reload
+        document.body.addEventListener('htmx:sseMessage', function(evt) {
+            if (evt.detail.type === 'session_started' || evt.detail.type === 'step_advanced') {
+                console.log('Major state change detected, reloading page to synchronize...');
+                window.location.reload();
+            }
+        });
+    </script>
 </div>

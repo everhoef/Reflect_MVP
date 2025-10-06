@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 
 import direct.reflect.facilitator.common.exception.NotAuthenticatedException;
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
@@ -65,6 +67,7 @@ public class ApiExceptionHandler {
     public ResponseEntity<String> handleAuthorizationDenied(AuthorizationDeniedException ex) {
         log.error("Access denied: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .header("HX-Redirect", "/home?error=authentication_required")
             .body("{\"error\":\"Authentication required\",\"loginUrl\":\"/login\"}");
     }
 
@@ -72,7 +75,28 @@ public class ApiExceptionHandler {
     public ResponseEntity<String> handleValidationException(Exception ex) {
         log.warn("Input validation failed: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .header("HX-Redirect", "/home?error=invalid_input")
             .body("Invalid input provided");
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<String> handleJsonDeserialization(HttpMessageNotReadableException ex) {
+        log.warn("JSON deserialization failed: {}", ex.getMessage());
+        
+        // Check if this is a UUID format error specifically
+        if (ex.getCause() instanceof InvalidFormatException) {
+            InvalidFormatException ife = (InvalidFormatException) ex.getCause();
+            if (ife.getTargetType().equals(java.util.UUID.class)) {
+                log.warn("UUID format error for value: {}", ife.getValue());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .header("HX-Redirect", "/home?error=invalid_input")
+                    .body("Invalid session ID format");
+            }
+        }
+        
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .header("HX-Redirect", "/home?error=invalid_input")
+            .body("Invalid request format");
     }
 
     @ExceptionHandler(Exception.class)

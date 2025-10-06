@@ -13,6 +13,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -41,8 +42,9 @@ public class TestAuthController {
     /**
      * Sets up OAuth2/OIDC authentication for a test user.
      * Returns session cookie that can be used in browser tests.
+     * Supports both GET and POST for test flexibility.
      */
-    @PostMapping("/login-oauth-user")
+    @RequestMapping(value = "/login-oauth-user", method = {RequestMethod.POST, RequestMethod.GET})
     public ResponseEntity<String> loginOAuthUser(
             HttpServletRequest request, 
             @RequestParam String username,
@@ -73,16 +75,14 @@ public class TestAuthController {
                 "github"  // registrationId
             );
             
-            // Set up security context
+            // Set up security context and ensure it's properly saved to session
             SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
             securityContext.setAuthentication(authToken);
             SecurityContextHolder.setContext(securityContext);
             
-            // Store in session
-            request.getSession().setAttribute(
-                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, 
-                securityContext
-            );
+            // Store in session using the exact same mechanism Spring Security uses
+            HttpSessionSecurityContextRepository repository = new HttpSessionSecurityContextRepository();
+            repository.saveContext(securityContext, request, null);
             
             // Set up session attributes that OidcSuccessHandler would normally set
             request.getSession().setAttribute("authenticatedUser", username);
@@ -101,35 +101,14 @@ public class TestAuthController {
                      request.getSession().getAttribute("userDisplayName"),
                      request.getSession().getAttribute("authType"));
             
-            return ResponseEntity.ok("OAuth2 authentication set up for: " + username);
+            // Instead of returning plain text, redirect to home page to complete authentication flow
+            return ResponseEntity.status(302)
+                .header("Location", "/")
+                .body("OAuth2 authentication set up for: " + username);
             
         } catch (Exception e) {
             log.error("Failed to set up OAuth2 test authentication", e);
             return ResponseEntity.internalServerError().body("Authentication setup failed");
-        }
-    }
-    
-    /**
-     * Sets up guest authentication for a test user.
-     * Returns session cookie that can be used in browser tests.
-     */
-    @PostMapping("/login-guest")
-    public ResponseEntity<String> loginGuest(
-            HttpServletRequest request,
-            @RequestParam String displayName) {
-        
-        log.info("Setting up guest test authentication for: {}", displayName);
-        
-        try {
-            // Use the existing AuthenticationHelper to set up guest session
-            authenticationHelper.initializeGuestSession(request, displayName);
-            
-            log.info("Guest test authentication successful for: {}", displayName);
-            return ResponseEntity.ok("Guest authentication set up for: " + displayName);
-            
-        } catch (Exception e) {
-            log.error("Failed to set up guest test authentication", e);
-            return ResponseEntity.internalServerError().body("Guest authentication setup failed");
         }
     }
     
