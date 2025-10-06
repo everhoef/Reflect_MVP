@@ -11,8 +11,6 @@ import direct.reflect.facilitator.configurator.RetroTemplateRepository;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.EventType;
 import direct.reflect.facilitator.eventing.RetroEvent;
-import direct.reflect.facilitator.web.dto.RetroTemplateData;
-import direct.reflect.facilitator.web.dto.ActivityTemplateData;
 
 import java.time.LocalDateTime;
 import java.util.List;

@@ -246,7 +246,7 @@ public class ResponseService {
     private void publishResponseSubmittedEvent(java.util.UUID retroId, ParticipantResponse response) {
         try {
             RetroEvent.ResponseData responseData = new RetroEvent.ResponseData(
-                response.getId(),
+                response.getId().toString(),
                 response.getRetroStep().getId(),
                 response.getParticipant().getParticipantId().toString(),
                 response.getParticipant().getDisplayName(),

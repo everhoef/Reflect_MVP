@@ -15,13 +15,13 @@ import lombok.extern.slf4j.Slf4j;
 
 import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
-import direct.reflect.facilitator.auth.AuthenticationHelper;
+import direct.reflect.facilitator.auth.AuthService;
 
 /**
  * Service responsible for managing {@link Participant} entities.
  * 
  * Refactored for OIDC + Anonymous Guest hybrid authentication:
- * - Uses AuthenticationHelper for clean identity extraction
+ * - Uses AuthService for clean identity extraction
  * - Supports both OIDC users and anonymous guests uniformly
  * - Focuses on business logic rather than authentication concerns
  * 
@@ -34,7 +34,7 @@ import direct.reflect.facilitator.auth.AuthenticationHelper;
 public class ParticipantService {
     private final ParticipantRepository participantRepository;
     private final RetroSessionService retroSessionService;
-    private final AuthenticationHelper authHelper;
+    private final AuthService authHelper;
 
 
     /**
@@ -230,7 +230,7 @@ public class ParticipantService {
      * Prevents duplicate participants by checking if this participantId already exists in the session.
      */
     private Participant createParticipantForSession(RetroSession session, ParticipantRole role, HttpServletRequest request) {
-        // Get user identity from AuthenticationHelper
+        // Get user identity from AuthService
         UUID participantId = authHelper.getParticipantId(request);
         String username = authHelper.getUsername(request); // null for guests
         String displayName = authHelper.getDisplayName(request);

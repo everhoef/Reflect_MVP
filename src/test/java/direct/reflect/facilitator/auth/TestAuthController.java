@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import direct.reflect.facilitator.auth.AuthenticationHelper;
+import direct.reflect.facilitator.auth.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +37,7 @@ import java.util.Map;
 @Slf4j
 public class TestAuthController {
     
-    private final AuthenticationHelper authenticationHelper;
+    private final AuthService authenticationHelper;
     
     /**
      * Sets up OAuth2/OIDC authentication for a test user.

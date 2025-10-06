@@ -7,7 +7,7 @@
   <div class="mb-6 p-4 bg-gray-50 rounded-md flex items-center justify-between">
     <div>
       <span class="text-gray-600">Session ID:</span>
-      <span id="session-id" th:text="${templateData.retroId}" class="font-mono text-ocher-yellow ml-2"></span>
+      <span id="session-id" th:text="${session.id}" class="font-mono text-ocher-yellow ml-2"></span>
     </div>
     <button class="px-3 py-1 text-sm bg-ocher-yellow text-white rounded hover:bg-ocher-yellow-dark transition-colors"
       onclick="navigator.clipboard.writeText(document.getElementById('session-id').innerText)">
@@ -19,10 +19,10 @@
   <div class="participants mb-8">
     <h3 class="text-xl font-dosis mb-4">Participants</h3>
     <ul id="participants-list" class="space-y-2"
-        th:attr="hx-get=@{/retro/{retroId}/participants(retroId=${templateData.retroId})}"
+        th:attr="hx-get=@{/retro/{retroId}/participants(retroId=${session.id})}"
         hx-trigger="sse:participant_joined from:body, sse:participant_left from:body"
         hx-swap="innerHTML">
-      <li th:each="participant : ${templateData.participants ?: {}}" class="px-4 py-2 bg-gray-50 rounded-md flex justify-between items-center">
+      <li th:each="participant : ${participants}" class="px-4 py-2 bg-gray-50 rounded-md flex justify-between items-center">
         <span th:text="${participant.displayName}"></span>
         <span th:if="${participant.role.name() == 'FACILITATOR'}" 
               class="ml-2 text-xs bg-ocher-yellow text-white px-2 py-1 rounded">
@@ -33,8 +33,8 @@
   </div>
 
   <!-- Start button (facilitator only) -->
-  <div th:if="${templateData.isFacilitator}" class="mt-8">
-    <form th:attr="hx-post=@{/api/retro/{retroId}/start(retroId=${templateData.retroId})}">
+  <div th:if="${isFacilitator}" class="mt-8">
+    <form th:attr="hx-post=@{/api/retro/{retroId}/start(retroId=${session.id})}"
       <button type="submit"
         class="w-full bg-ocher-yellow text-white py-3 px-6 rounded-md hover:bg-ocher-yellow-dark transition-colors">
         Start Retrospective
@@ -60,7 +60,7 @@
   <!-- Hidden div to handle session navigation on session start -->
   <div id="session-handler"
        hx-trigger="sse:session_started from:body"
-       th:attr="hx-get=@{/retro/{retroId}(retroId=${templateData.retroId})}"
+       th:attr="hx-get=@{/retro/{retroId}(retroId=${session.id})}"
        hx-push-url="true"
        hx-target="body"
        hx-swap="outerHTML"></div>

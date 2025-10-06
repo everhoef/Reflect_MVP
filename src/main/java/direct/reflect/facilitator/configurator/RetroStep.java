@@ -38,16 +38,32 @@ public class RetroStep {
     
     @Transient
     private String parsedContent;
-    
+
+    @Transient
+    private Map<String, Object> parsedConfigMap;
+
     @PostLoad
     public void parseConfiguration() {
         try {
             ObjectMapper mapper = new ObjectMapper();
             Map<String, Object> config = mapper.readValue(configuration, new TypeReference<Map<String, Object>>() {});
+            this.parsedConfigMap = config;
             this.parsedContent = (String) config.get("content");
         } catch (Exception e) {
             // Fallback to raw configuration if parsing fails
+            this.parsedConfigMap = Map.of();
             this.parsedContent = configuration;
         }
+    }
+
+    /**
+     * Get parsed configuration as a Map for template access.
+     * For POC - provides direct access to configuration fields like categories, scale, etc.
+     */
+    public Map<String, Object> getConfig() {
+        if (parsedConfigMap == null) {
+            parseConfiguration();
+        }
+        return parsedConfigMap != null ? parsedConfigMap : Map.of();
     }
 }

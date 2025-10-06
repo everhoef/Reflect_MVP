@@ -41,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 })
 @Import({
     direct.reflect.facilitator.config.TestSecurityOverride.class,
-    direct.reflect.facilitator.auth.AuthenticationHelper.class
+    direct.reflect.facilitator.auth.AuthService.class
 })
 @EnableAutoConfiguration(exclude = {
     DataSourceAutoConfiguration.class,
@@ -66,7 +66,7 @@ public class RetroApiControllerTest {
     private direct.reflect.facilitator.configurator.ParticipantResponseService participantResponseService;
     
     @MockitoBean
-    private direct.reflect.facilitator.auth.AuthenticationHelper authHelper;
+    private direct.reflect.facilitator.auth.AuthService authHelper;
     
     @Test
     @WithMockUser(roles = "USER")

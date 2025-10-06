@@ -1,6 +1,6 @@
 <!-- SSE Connection Fragment - reusable across templates -->
-<div th:fragment="sse-setup" hx-ext="sse" 
-     th:attr="sse-connect=@{/api/retro/{retroId}/events(retroId=${templateData.retroId})}">
+<div th:fragment="sse-setup" hx-ext="sse"
+     th:attr="sse-connect=@{/api/retro/{retroId}/events(retroId=${session.id})}">
 </div>
 
 <!-- SSE JavaScript handlers fragment - common event handling -->

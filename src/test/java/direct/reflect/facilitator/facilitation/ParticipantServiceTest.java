@@ -8,7 +8,7 @@ import direct.reflect.facilitator.facilitation.ParticipantRepository;
 import direct.reflect.facilitator.facilitation.ParticipantService;
 import direct.reflect.facilitator.facilitation.RetroSessionService;
 import direct.reflect.facilitator.facilitation.RetroPhase;
-import direct.reflect.facilitator.auth.AuthenticationHelper;
+import direct.reflect.facilitator.auth.AuthService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,7 +40,7 @@ class ParticipantServiceTest {
     private RetroSessionService retroSessionService;
     
     @Mock
-    private AuthenticationHelper authHelper;
+    private AuthService authHelper;
 
     @InjectMocks
     private ParticipantService participantService;
@@ -67,7 +67,7 @@ class ParticipantServiceTest {
         session.setId(UUID.randomUUID());
         session.setName(sessionName);
         
-        // Mock AuthenticationHelper for guest user
+        // Mock AuthService for guest user
         when(authHelper.getParticipantId(mockRequest)).thenReturn(guestParticipantId);
         when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
         when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guests don't have usernames
@@ -102,7 +102,7 @@ class ParticipantServiceTest {
         session.setId(UUID.randomUUID());
         session.setName(sessionName);
         
-        // Mock AuthenticationHelper for OIDC user
+        // Mock AuthService for OIDC user
         when(authHelper.getParticipantId(mockRequest)).thenReturn(userParticipantId);
         when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
         when(authHelper.getUsername(mockRequest)).thenReturn(username);
@@ -128,7 +128,7 @@ class ParticipantServiceTest {
         String sessionName = "Test Session";
         UUID guestParticipantId = UUID.randomUUID();
         
-        // Mock AuthenticationHelper to throw exception when display name is missing
+        // Mock AuthService to throw exception when display name is missing
         when(authHelper.getParticipantId(mockRequest)).thenReturn(guestParticipantId);
         when(authHelper.getDisplayName(mockRequest)).thenThrow(new IllegalStateException("Guest session missing guestDisplayName - call initializeGuestSession first"));
 
@@ -161,7 +161,7 @@ class ParticipantServiceTest {
         existingParticipant.setDisplayName(displayName);
         existingParticipant.setRole(ParticipantRole.FACILITATOR);
         
-        // Mock AuthenticationHelper for guest user
+        // Mock AuthService for guest user
         when(authHelper.getParticipantId(mockRequest)).thenReturn(participantId);
         when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
         when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guest user
@@ -195,7 +195,7 @@ class ParticipantServiceTest {
         RetroSession session = new RetroSession();
         session.setId(UUID.randomUUID());
         
-        // Mock AuthenticationHelper for guest user
+        // Mock AuthService for guest user
         when(authHelper.getParticipantId(mockRequest)).thenReturn(participantId);
         when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
         when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guest user
@@ -233,7 +233,7 @@ class ParticipantServiceTest {
         existingParticipant.setDisplayName(displayName);
         existingParticipant.setRole(ParticipantRole.PARTICIPANT);
         
-        // Mock AuthenticationHelper for guest user
+        // Mock AuthService for guest user
         when(authHelper.getParticipantId(mockRequest)).thenReturn(participantId);
         when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
         when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guest user
@@ -280,7 +280,7 @@ class ParticipantServiceTest {
         existingParticipant.setDisplayName(displayName);
         existingParticipant.setRole(ParticipantRole.PARTICIPANT);
         
-        // Mock AuthenticationHelper for guest user
+        // Mock AuthService for guest user
         when(authHelper.getParticipantId(mockRequest)).thenReturn(participantId);
         when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
         when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guest user
@@ -336,7 +336,7 @@ class ParticipantServiceTest {
         session.setAttribute("participantRole", "PARTICIPANT");
         session.setAttribute("participantId", participantId);
         
-        // Mock AuthenticationHelper for guest user
+        // Mock AuthService for guest user
         when(authHelper.getParticipantId(mockRequest)).thenReturn(participantId);
         
         when(participantRepository.findByParticipantIdWithSession(participantId))

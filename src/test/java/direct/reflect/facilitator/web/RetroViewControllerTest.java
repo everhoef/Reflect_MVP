@@ -53,7 +53,7 @@ class RetroViewControllerTest {
     private ParticipantService participantService;
     
     @MockitoBean
-    private direct.reflect.facilitator.auth.AuthenticationHelper authenticationHelper;
+    private direct.reflect.facilitator.auth.AuthService authenticationHelper;
     
     @MockitoBean
     private RetroTemplateDataService templateDataService;

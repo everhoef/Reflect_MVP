@@ -20,7 +20,7 @@ import lombok.extern.slf4j.Slf4j;
  * Session Isolation:
  * - Guest sessions are completely isolated from OIDC sessions
  * - When an OIDC user authenticates, SecurityConfig.OidcSuccessHandler clears any existing guest session data
- * - When a guest authenticates, any previous OIDC session is cleared by AuthenticationHelper
+ * - When a guest authenticates, any previous OIDC session is cleared by AuthService
  * - This ensures clean state transitions between authentication types
  *
  * Responsibilities:
@@ -33,13 +33,13 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class AuthController {
 
-    private final AuthenticationHelper authenticationHelper;
+    private final AuthService authenticationHelper;
 
     /**
      * Guest authentication endpoint.
      *
      * Session Cleanup:
-     * - Clears any existing OIDC session data (via AuthenticationHelper)
+     * - Clears any existing OIDC session data (via AuthService)
      * - Establishes new guest session with ROLE_GUEST authority
      * - Guest sessions don't conflict with OIDC sessions due to isolation guarantees
      *

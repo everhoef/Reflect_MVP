@@ -14,9 +14,11 @@ import direct.reflect.facilitator.configurator.DataPattern;
  *
  * Supports:
  * - Categorization (category field)
- * - Clustering (via ResponseCluster relationship)
- * - Voting (via ResponseVote)
  * - Color coding (optional)
+ *
+ * Future POC phase:
+ * - Clustering (grouping similar sticky notes)
+ * - Voting on sticky notes
  */
 @Entity
 @DiscriminatorValue("CATEGORICAL")
@@ -32,10 +34,6 @@ public class CategoricalResponse extends ParticipantResponse {
 
     @Column(length = 20)
     private String color; // Optional: hex color for visual coding (#FF5733)
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cluster_id")
-    private ResponseCluster cluster; // For grouping similar sticky notes
 
     @Override
     public DataPattern getDataPattern() {

@@ -7,7 +7,7 @@
         </div>
         <div class="ml-4 flex-1">
             <h4 class="text-lg font-semibold text-blue-900 mb-3">Instructions</h4>
-            <div class="prose prose-blue text-blue-800" th:utext="${templateData.currentStep != null ? (templateData.currentStep.parsedContent ?: templateData.currentStep.configuration) : 'No step content available'}">
+            <div class="prose prose-blue text-blue-800" th:utext="${currentStep != null ? (currentStep.parsedContent ?: currentStep.configuration) : 'No step content available'}">
                 Step instructions will appear here...
             </div>
         </div>
