@@ -79,7 +79,7 @@ class CsvImporterServiceTest {
         assertEquals(true, defaultTemplate.isReleased());
 
         assertNotNull(defaultTemplate.getSetTheStage());
-        assertEquals("Hapiness Histogram", defaultTemplate.getSetTheStage().getName());
+        assertEquals("Happiness Histogram", defaultTemplate.getSetTheStage().getName());
 
         assertNotNull(defaultTemplate.getGatherData());
         assertEquals("Mad Sad Glad", defaultTemplate.getGatherData().getName());
@@ -109,7 +109,7 @@ class CsvImporterServiceTest {
         assertNotNull(madSadGlad.getWhat());
         
         RetroStage happinessHistogram = stages.stream()
-                .filter(s -> s.getName().equals("Hapiness Histogram"))
+                .filter(s -> s.getName().equals("Happiness Histogram"))
                 .findFirst().orElse(null);
         assertNotNull(happinessHistogram);
         assertNotNull(happinessHistogram.getWhy());
@@ -222,7 +222,7 @@ class CsvImporterServiceTest {
         
         // Test Happiness Histogram configuration
         RetroStage happinessHistogram = retroStageRepository.findAll().stream()
-                .filter(s -> s.getName().equals("Hapiness Histogram"))
+                .filter(s -> s.getName().equals("Happiness Histogram"))
                 .findFirst().orElse(null);
         assertNotNull(happinessHistogram);
         

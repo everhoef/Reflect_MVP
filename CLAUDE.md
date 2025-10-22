@@ -421,6 +421,62 @@ The `system-ui/` folder contains UI design screenshots with mock data that illus
 
 ## Claude-Specific Instructions
 
+### Application Management
+
+**User runs the application in a separate iTerm2 terminal tab.**
+
+#### How It Works
+- User runs: `mvn spring-boot:run -Dspring-boot.run.profiles=import` in dedicated terminal
+- Spring Boot logs to **both** console (for user) **and** `/tmp/facilitator.log` (for Claude)
+- User sees live logs in their terminal, Claude reads from log file
+
+#### Starting the Application
+1. **Check if running**:
+   ```bash
+   curl -s http://localhost:8080/ > /dev/null && echo "✅ Running" || echo "❌ Not running"
+   ```
+
+2. **If not running**, tell the user:
+   > "Please start the application in a separate iTerm2 tab:
+   > ```bash
+   > mvn spring-boot:run -Dspring-boot.run.profiles=import
+   > ```"
+
+3. Wait for user confirmation before proceeding
+
+#### Monitoring Logs (Claude)
+```bash
+# Follow live logs
+tail -f /tmp/facilitator.log
+
+# Filter for specific events
+tail -f /tmp/facilitator.log | grep -i "ERROR\|Publishing\|step_advanced"
+
+# Check last N lines
+tail -50 /tmp/facilitator.log
+
+# Search for patterns
+grep "SSE" /tmp/facilitator.log | tail -20
+```
+
+#### Stopping the Application
+```bash
+pkill -f "spring-boot:run"
+```
+User will see graceful shutdown in their terminal tab.
+
+#### Checking Status
+```bash
+# Quick HTTP check
+curl -s http://localhost:8080/ > /dev/null && echo "Running" || echo "Not running"
+
+# Port check
+lsof -i :8080
+
+# Process check
+ps aux | grep -i "[m]vn spring-boot:run"
+```
+
 ### Task Management
 - Use the TodoWrite tool to track multi-step tasks
 - Mark tasks as completed immediately after finishing

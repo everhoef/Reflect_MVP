@@ -42,14 +42,23 @@
         <th:block th:if="${page == 'home'}">
             <div th:replace="~{fragments/home :: content}"></div>
         </th:block>
-        <th:block th:if="${templateData?.page == 'lobby'}">
-            <div th:replace="~{fragments/lobby :: content}"></div>
-        </th:block>
-        <th:block th:if="${templateData?.page == 'retro'}">
-            <div th:replace="~{fragments/retro :: content}"></div>
-        </th:block>
-        <div th:unless="${page == 'welcome' or page == 'login' or page == 'home' or templateData?.page == 'lobby' or templateData?.page == 'retro'}">
-            <p>Unknown page: <span th:text="${page ?: templateData?.page}">unknown</span></p>
+
+        <!-- SSE-enabled pages: lobby and retro -->
+        <!-- IMPORTANT: SSE listeners MUST be children of this div for HTMX 2.x SSE extension to work -->
+        <div th:if="${page == 'lobby' or page == 'retro'}"
+             hx-ext="sse"
+             th:attr="sse-connect=@{/api/retro/{retroId}/events(retroId=${retroSession.id})}">
+
+            <th:block th:if="${page == 'lobby'}">
+                <div th:replace="~{fragments/lobby :: content(retroSession=${retroSession})}"></div>
+            </th:block>
+            <th:block th:if="${page == 'retro'}">
+                <div th:replace="~{fragments/retro :: content(retroSession=${retroSession})}"></div>
+            </th:block>
+        </div>
+
+        <div th:unless="${page == 'welcome' or page == 'login' or page == 'home' or page == 'lobby' or page == 'retro'}">
+            <p>Unknown page: <span th:text="${page}">unknown</span></p>
         </div>
     </main>
 

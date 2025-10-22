@@ -9,6 +9,8 @@ import jakarta.servlet.http.HttpSession;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -301,19 +303,78 @@ public class ParticipantService {
      */
     @Transactional
     public void removeParticipantFromSession(Participant participant) {
-        log.info("=== REMOVING PARTICIPANT === {} from session {} ({})", 
-            participant.getParticipantId(), 
-            participant.getSession().getId(), 
+        log.info("=== REMOVING PARTICIPANT === {} from session {} ({})",
+            participant.getParticipantId(),
+            participant.getSession().getId(),
             participant.getSession().getName());
-        
+
         // Notify RetroSessionService to handle the event publishing
         log.info("About to call retroSessionService.onParticipantLeaving for participant: {}", participant.getDisplayName());
         retroSessionService.onParticipantLeaving(participant);
-        
+
         // Remove the participant from the database
         log.info("About to delete participant {} from database", participant.getDisplayName());
         participantRepository.delete(participant);
         log.info("Successfully deleted participant {} from database", participant.getDisplayName());
+    }
+
+    // ========== AUTHORIZATION METHODS (for Spring Security @PreAuthorize) ==========
+
+    /**
+     * Check if current user can access a retrospective session.
+     * Used in @PreAuthorize("@participantService.canAccessRetro(#retroId)")
+     *
+     * Note: This method uses RequestContextHolder to extract the request since
+     * @PreAuthorize expressions execute before controller methods run.
+     * All other methods in this service use explicit HttpServletRequest parameters.
+     */
+    public boolean canAccessRetro(UUID retroId) {
+        HttpServletRequest request = getCurrentRequest();
+        if (request == null) {
+            log.warn("No HTTP request context available for authorization check");
+            return false;
+        }
+
+        try {
+            return isParticipating(request, retroId);
+        } catch (Exception e) {
+            log.debug("Access denied to retro {}: {}", retroId, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Check if current user is facilitator for a retrospective session.
+     * Used in @PreAuthorize("@participantService.isFacilitator(#retroId)")
+     *
+     * Note: This is an overload for @PreAuthorize usage that extracts the request internally.
+     * The standard isFacilitator(HttpServletRequest, UUID) method should be used elsewhere.
+     */
+    public boolean isFacilitator(UUID retroId) {
+        HttpServletRequest request = getCurrentRequest();
+        if (request == null) {
+            log.warn("No HTTP request context available for authorization check");
+            return false;
+        }
+
+        try {
+            return isFacilitator(request, retroId);
+        } catch (Exception e) {
+            log.debug("Facilitator check failed for retro {}: {}", retroId, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Extract current HttpServletRequest from Spring's RequestContextHolder.
+     *
+     * IMPORTANT: This method should ONLY be used by authorization methods for @PreAuthorize.
+     * All other methods should use explicit HttpServletRequest parameters for consistency.
+     */
+    private HttpServletRequest getCurrentRequest() {
+        ServletRequestAttributes attributes =
+            (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        return attributes != null ? attributes.getRequest() : null;
     }
 
 }

@@ -46,3 +46,6 @@ spring:
 logging:
   level:
     direct.reflect.facilitator: "debug"
+    direct.reflect.facilitator.eventing: "trace"
+  file:
+    name: /tmp/facilitator.log

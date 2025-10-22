@@ -1,105 +1,11 @@
-<div th:fragment="content" class="max-w-full mx-auto"
-     hx-get="@{/retro/{retroId}(retroId=${session.id})}"
+<div th:fragment="content(retroSession)" class="max-w-full mx-auto"
+     id="retro-content"
+     th:attr="hx-get=@{/retro/{retroId}/content(retroId=${retroSession.id})}"
      hx-trigger="sse:step_advanced from:body"
-     hx-swap="outerHTML"
+     hx-swap="innerHTML"
      hx-target="this">
-    <!-- Include SSE connection setup -->
-    <div th:replace="~{fragments/sse-connection :: sse-setup}"></div>
-    
-    <!-- Top Navigation Bar with Session Progress and Timer -->
-    <div class="bg-amber-500 text-white px-6 py-4 shadow-md">
-        <div class="flex items-center justify-between">
-            <!-- Left: Session Info -->
-            <div class="flex items-center space-x-4">
-                <div class="font-medium text-lg" th:text="${session.name}">Session Name</div>
-                <div class="text-amber-100 text-sm">
-                    Session ID: <span class="font-mono" th:text="${session.id}">12345</span>
-                </div>
-            </div>
-            
-            <!-- Center: Session Progress -->
-            <div th:if="${currentStep != null}" class="flex items-center space-x-6">
-                <!-- Stage Progress Indicators -->
-                <div class="flex items-center space-x-3">
-                    <!-- Previous stages (completed) -->
-                    <div class="flex items-center space-x-2">
-                        <div class="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
-                            ✓
-                        </div>
-                        <div class="h-0.5 w-8 bg-green-600"></div>
-                    </div>
-                    
-                    <!-- Current stage (active) -->
-                    <div class="flex items-center space-x-2">
-                        <div class="w-8 h-8 bg-white text-amber-600 rounded-full flex items-center justify-center text-sm font-bold border-2 border-white">
-                            <span th:text="${session.currentStepIndex >= 0 ? session.currentStepIndex + 1 : 1}">1</span>
-                        </div>
-                        <div class="text-white font-medium">
-                            <span th:text="'Stage ' + ${session.currentStepIndex >= 0 ? session.currentStepIndex + 1 : 1} + ': ' + ${currentStep.retroStage?.name ?: 'Current Stage'}">Stage 1: Current Stage</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Future stages (pending) -->
-                    <div class="flex items-center space-x-2">
-                        <div class="h-0.5 w-8 bg-amber-300"></div>
-                        <div class="w-8 h-8 bg-amber-300 rounded-full flex items-center justify-center text-amber-600 text-sm font-bold">
-                            <span th:text="${session.currentStepIndex >= 0 ? session.currentStepIndex + 2 : 2}">2</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- LOBBY Phase Progress -->
-            <div th:if="${currentStep == null}" class="text-center">
-                <div class="text-white font-medium text-lg">Session Lobby</div>
-                <div class="text-amber-100 text-sm">Waiting to start retrospective</div>
-            </div>
-            
-            <!-- Right: Timer and Controls -->
-            <div class="flex items-center space-x-4">
-                <!-- Timer Display -->
-                <div th:if="${currentStep != null and currentStep.durationSeconds != null}" class="bg-amber-600 px-4 py-2 rounded-lg">
-                    <div class="text-center">
-                        <div class="text-2xl font-mono font-bold" id="timer-display">
-                            <span th:text="${T(java.time.Duration).ofSeconds(currentStep.durationSeconds).toMinutes()}">5</span>:00
-                        </div>
-                        <div class="text-xs text-amber-200">Time Remaining</div>
-                    </div>
-                </div>
-                
-                <!-- Participant Count -->
-                <div class="flex items-center space-x-2 bg-amber-600 px-3 py-2 rounded-lg">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
-                    <span class="font-medium" th:text="${#lists.size(participants)}">0</span>
-                </div>
-                
-                <!-- Facilitator Controls -->
-                <div th:if="${isFacilitator}" class="flex items-center space-x-2">
-                    <!-- Next Step Button -->
-                    <button th:if="${currentStep.retroStage != null}" 
-                            class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
-                            th:attr="hx-post=@{/api/retro/{retroId}/next(retroId=${session.id})}"
-                            hx-swap="none">
-                        <span>Next Step</span>
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                        </svg>
-                    </button>
-                    
-                    <!-- Start Button (LOBBY only) -->
-                    <button th:if="${currentStep == null and session.phase?.name() == 'LOBBY'}" 
-                            class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg font-medium transition-colors"
-                            th:attr="hx-post=@{/api/retro/{retroId}/start(retroId=${session.id})}">
-                        Start Retrospective
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    
+
+    <div th:fragment="inner-content">
     <!-- Stage Progress Bar -->
     <div th:if="${currentStep != null}" class="bg-white border-b border-gray-200 px-6 py-4">
         <div class="flex items-center justify-center space-x-8">
@@ -198,7 +104,7 @@
             <div class="p-8">
                 <!-- Stage Header -->
                 <div class="text-center mb-8">
-                    <h2 class="text-3xl font-bold mb-2" th:text="'Stage ' + ${session.currentStepIndex >= 0 ? session.currentStepIndex + 1 : 1} + ': ' + ${currentStep.retroStage?.name ?: 'Current Stage'}">Stage 2: Mad Sad Glad</h2>
+                    <h2 class="text-3xl font-bold mb-2" th:text="'Stage ' + ${retroSession.currentStepIndex >= 0 ? retroSession.currentStepIndex + 1 : 1} + ': ' + ${currentStep.retroStage?.name ?: 'Current Stage'}">Stage 2: Mad Sad Glad</h2>
                     
                     <!-- Step Timer (clean version from controller) -->
                     <div th:if="${stepDurationMinutes != null}" class="flex items-center justify-center space-x-2 text-sm text-gray-600 mb-4">
@@ -211,13 +117,6 @@
                 </div>
 
                 <!-- Pattern-specific Content -->
-                <div class="bg-purple-100 p-4 mb-4 border">
-                    <h3>🔍 MAIN SWITCH DEBUG</h3>
-                    <p>Switch Expression Value: <span class="font-mono bg-gray-200 p-1" th:text="${currentStep != null ? currentStep.stepType?.name() : 'NONE'}">NONE</span></p>
-                    <p>Expected to match: <code>ACTIVITY</code>, <code>INSTRUCTION</code>, <code>DISCUSSION</code></p>
-                    <p>Raw stepType: <span class="font-mono bg-gray-200 p-1" th:text="${currentStep?.stepType}">null</span></p>
-                    <p>stepType class: <span class="font-mono bg-gray-200 p-1" th:text="${currentStep?.stepType?.class?.name}">null</span></p>
-                </div>
                 <div th:switch="${currentStep != null ? currentStep.stepType?.name() : 'NONE'}">
             <!-- INSTRUCTION Steps -->
             <div th:case="INSTRUCTION">
@@ -302,7 +201,7 @@
                     </button>
                     <button th:if="${isFacilitator}" 
                             class="px-6 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600"
-                            th:attr="hx-post=@{/api/retro/{retroId}/next(retroId=${session.id})}"
+                            th:attr="hx-post=@{/api/retro/{retroId}/next(retroId=${retroSession.id})}"
                             hx-swap="none">
                         Next
                     </button>
@@ -313,7 +212,7 @@
         <!-- LOBBY Phase Center Content -->
         <div class="flex-1 bg-white overflow-y-auto flex items-center justify-center" th:if="${currentStep == null}">
             <div class="p-6">
-                <div th:switch="${session.phase?.name()}">
+                <div th:switch="${retroSession.phase?.name()}">
                     <div th:case="'LOBBY'">
                         <!-- Include lobby content -->
                         <div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
@@ -323,7 +222,7 @@
                             <div class="mb-6 p-4 bg-gray-50 rounded-md flex items-center justify-between">
                                 <div>
                                     <span class="text-gray-600">Session ID:</span>
-                                    <span id="session-id" th:text="${session.id}" class="font-mono text-ocher-yellow ml-2"></span>
+                                    <span id="session-id" th:text="${retroSession.id}" class="font-mono text-ocher-yellow ml-2"></span>
                                 </div>
                                 <button class="px-3 py-1 text-sm bg-ocher-yellow text-white rounded hover:bg-ocher-yellow-dark transition-colors"
                                         onclick="navigator.clipboard.writeText(document.getElementById('session-id').innerText)">
@@ -335,7 +234,7 @@
                             <div class="participants mb-8">
                                 <h3 class="text-xl font-dosis mb-4">Participants</h3>
                                 <ul id="participants-list" class="space-y-2"
-                                    th:attr="hx-get=@{/retro/{retroId}/participants(retroId=${session.id})}"
+                                    th:attr="hx-get=@{/retro/{retroId}/participants(retroId=${retroSession.id})}"
                                     hx-trigger="sse:participant_joined from:body, sse:participant_left from:body"
                                     hx-swap="innerHTML">
                                     <li th:each="participant : ${participants}" class="px-4 py-2 bg-gray-50 rounded-md flex justify-between items-center">
@@ -371,7 +270,7 @@
                     <div th:case="*">
                         <div class="text-center py-12">
                             <h4 class="text-lg font-semibold mb-4">No Active Step</h4>
-                            <p class="text-gray-600">Phase: <span th:text="${session.phase?.name()}">Unknown</span></p>
+                            <p class="text-gray-600">Phase: <span th:text="${retroSession.phase?.name()}">Unknown</span></p>
                         </div>
                     </div>
                 </div>
@@ -419,7 +318,7 @@
                         <div th:if="${currentStep != null and currentStep.stepType?.name() == 'ACTIVITY'}" 
                              class="bg-white p-4 rounded-lg border">
                             <button class="w-full bg-blue-600 text-white py-2 px-3 rounded hover:bg-blue-700 transition-colors text-sm"
-                                    th:attr="hx-post=@{/api/retro/{retroId}/step/{stepId}/reveal(retroId=${session.id}, stepId=${currentStep.id})}"
+                                    th:attr="hx-post=@{/api/retro/{retroId}/step/{stepId}/reveal(retroId=${retroSession.id}, stepId=${currentStep.id})}"
                                     hx-swap="none">
                                 👁️ Reveal All Responses
                             </button>
@@ -442,7 +341,7 @@
                 <div class="mb-6 p-4 bg-gray-50 rounded-md flex items-center justify-between">
                     <div>
                         <span class="text-gray-600">Session ID:</span>
-                        <span id="session-id" th:text="${session.id}" class="font-mono text-yellow-600 ml-2 font-bold"></span>
+                        <span id="session-id" th:text="${retroSession.id}" class="font-mono text-yellow-600 ml-2 font-bold"></span>
                     </div>
                     <button class="px-3 py-1 text-sm bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors"
                             onclick="navigator.clipboard.writeText(document.getElementById('session-id').innerText)">
@@ -451,9 +350,9 @@
                 </div>
                 
                 <!-- Start Button for Facilitator -->
-                <div th:if="${isFacilitator and session.phase?.name() == 'LOBBY'}" class="mt-6">
+                <div th:if="${isFacilitator and retroSession.phase?.name() == 'LOBBY'}" class="mt-6">
                     <button class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg text-white font-medium transition-colors"
-                            th:attr="hx-post=@{/api/retro/{retroId}/start(retroId=${session.id})}">
+                            th:attr="hx-post=@{/api/retro/{retroId}/start(retroId=${retroSession.id})}">
                         Start Retrospective
                     </button>
                 </div>
@@ -469,19 +368,12 @@
     <script>
         // Store eventSource reference for integration tests
         document.body.addEventListener('htmx:sseOpen', function(evt) {
-            window.eventSource = evt.detail.source; // For integration tests
+            window.eventSource = evt.detail.source;
         });
-        
+
         document.body.addEventListener('htmx:sseClose', function() {
             window.eventSource = null;
         });
-
-        // Handle major state changes that require full page reload
-        document.body.addEventListener('htmx:sseMessage', function(evt) {
-            if (evt.detail.type === 'session_started' || evt.detail.type === 'step_advanced') {
-                console.log('Major state change detected, reloading page to synchronize...');
-                window.location.reload();
-            }
-        });
     </script>
-</div>
+    </div> <!-- end inner-content fragment -->
+</div> <!-- end content fragment -->

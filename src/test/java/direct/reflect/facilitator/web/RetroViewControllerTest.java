@@ -32,8 +32,9 @@ import direct.reflect.facilitator.facilitation.RetroPhase;
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.facilitation.RetroSessionService;
 import direct.reflect.facilitator.facilitation.ParticipantService;
+import direct.reflect.facilitator.facilitation.response.ResponseService;
+import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.web.RetroViewController;
-import direct.reflect.facilitator.web.dto.RetroTemplateData;
 
 @WebMvcTest(controllers = RetroViewController.class)
 @EnableAutoConfiguration(exclude = {
@@ -51,12 +52,12 @@ class RetroViewControllerTest {
 
     @MockitoBean
     private ParticipantService participantService;
-    
+
     @MockitoBean
-    private direct.reflect.facilitator.auth.AuthService authenticationHelper;
-    
+    private ResponseService responseService;
+
     @MockitoBean
-    private RetroTemplateDataService templateDataService;
+    private AuthService authenticationHelper;
 
     @Test
     @WithMockUser
@@ -88,9 +89,9 @@ class RetroViewControllerTest {
     void retroView_AuthenticatedUser_NotParticipating_ShouldRedirect() throws Exception {
         // Given
         UUID retroId = UUID.randomUUID();
-        
-        // Mock that templateDataService throws ParticipantNotFoundException 
-        when(templateDataService.prepareRetroViewData(eq(retroId), any()))
+
+        // Mock that participantService throws ParticipantNotFoundException
+        when(participantService.getParticipantForSession(any(), eq(retroId)))
             .thenThrow(new ParticipantNotFoundException("Participant not found for session: " + retroId));
 
         // When & Then
@@ -119,19 +120,19 @@ class RetroViewControllerTest {
         participant.setUsername("authenticateduser"); // Should match @WithMockUser
         participant.setDisplayName("Authenticated User");
 
-        // Mock the new template data service
-        RetroTemplateData mockTemplateData = RetroTemplateData.forPassivePhase(
-            retroId, session.getName(), session, participant, 
-            java.util.Collections.emptyList(), false);
-        when(templateDataService.prepareRetroViewData(eq(retroId), any()))
-            .thenReturn(mockTemplateData);
+        // Mock the service calls
+        when(retroService.getSessionById(retroId)).thenReturn(session);
+        when(participantService.getParticipantForSession(any(), eq(retroId))).thenReturn(participant);
+        when(participantService.isFacilitator(any(), eq(retroId))).thenReturn(false);
+        when(participantService.getSessionParticipants(retroId)).thenReturn(java.util.Collections.singletonList(participant));
 
         // When & Then - Test with participant cookie
         mockMvc.perform(get("/retro/{retroId}", retroId)
                 .cookie(new jakarta.servlet.http.Cookie("participantId", participantId.toString())))
             .andExpect(status().isOk())
             .andExpect(view().name("layout"))
-            .andExpect(model().attributeExists("templateData"));
+            .andExpect(model().attributeExists("session"))
+            .andExpect(model().attributeExists("participant"));
     }
 
     @Test
@@ -156,18 +157,18 @@ class RetroViewControllerTest {
         participant.setUsername("authenticateduser");
         participant.setDisplayName("Authenticated User");
 
-        // Mock the template data service
-        RetroTemplateData mockTemplateData = RetroTemplateData.forPassivePhase(
-            retroId, session.getName(), session, participant, 
-            java.util.Collections.emptyList(), false);
-        when(templateDataService.prepareRetroViewData(eq(retroId), any()))
-            .thenReturn(mockTemplateData);
+        // Mock the service calls
+        when(retroService.getSessionById(retroId)).thenReturn(session);
+        when(participantService.getParticipantForSession(any(), eq(retroId))).thenReturn(participant);
+        when(participantService.isFacilitator(any(), eq(retroId))).thenReturn(false);
+        when(participantService.getSessionParticipants(retroId)).thenReturn(java.util.Collections.singletonList(participant));
 
         // When & Then - Test without participant cookie (should still work)
         mockMvc.perform(get("/retro/{retroId}", retroId))
             .andExpect(status().isOk())
             .andExpect(view().name("layout"))
-            .andExpect(model().attributeExists("templateData"));
+            .andExpect(model().attributeExists("session"))
+            .andExpect(model().attributeExists("participant"));
     }
 
     @Test
@@ -190,20 +191,23 @@ class RetroViewControllerTest {
         Participant participant = createMockParticipant();
         participant.setUsername("authenticateduser");
 
-        // Mock the template data service - use appropriate method based on phase
-        RetroTemplateData mockTemplateData = (phase == RetroPhase.LOBBY || phase == RetroPhase.CREATED) 
-            ? RetroTemplateData.forPassivePhase(retroId, session.getName(), session, participant, 
-                java.util.Collections.emptyList(), false)
-            : RetroTemplateData.forActivePhase(retroId, session.getName(), session, session.getTemplate(),
-                null, null, participant, java.util.Collections.emptyList(), false, "Test guidance", 10, null);
-        when(templateDataService.prepareRetroViewData(eq(retroId), any()))
-            .thenReturn(mockTemplateData);
+        // Mock the service calls
+        when(retroService.getSessionById(retroId)).thenReturn(session);
+        when(participantService.getParticipantForSession(any(), eq(retroId))).thenReturn(participant);
+        when(participantService.isFacilitator(any(), eq(retroId))).thenReturn(false);
+        when(participantService.getSessionParticipants(retroId)).thenReturn(java.util.Collections.singletonList(participant));
+
+        // For active phases, mock getCurrentStep
+        if (phase != RetroPhase.LOBBY && phase != RetroPhase.CREATED) {
+            when(retroService.getCurrentStep(retroId)).thenReturn(null);
+        }
 
         // When & Then
         mockMvc.perform(get("/retro/{retroId}", retroId))
             .andExpect(status().isOk())
             .andExpect(view().name("layout"))
-            .andExpect(model().attributeExists("templateData"));
+            .andExpect(model().attributeExists("session"))
+            .andExpect(model().attributeExists("participant"));
     }
 
     @ParameterizedTest
@@ -229,18 +233,19 @@ class RetroViewControllerTest {
         facilitator.setUsername("facilitatoruser");
         facilitator.setDisplayName("Facilitator User");
 
-        // Mock the template data service - this time as facilitator
-        RetroTemplateData mockTemplateData = RetroTemplateData.forPassivePhase(
-            retroId, session.getName(), session, facilitator, 
-            java.util.Collections.emptyList(), true);
-        when(templateDataService.prepareRetroViewData(eq(retroId), any()))
-            .thenReturn(mockTemplateData);
+        // Mock the service calls - this time as facilitator
+        when(retroService.getSessionById(retroId)).thenReturn(session);
+        when(participantService.getParticipantForSession(any(), eq(retroId))).thenReturn(facilitator);
+        when(participantService.isFacilitator(any(), eq(retroId))).thenReturn(true);
+        when(participantService.getSessionParticipants(retroId)).thenReturn(java.util.Collections.singletonList(facilitator));
 
         // When & Then
         mockMvc.perform(get("/retro/{retroId}", retroId))
             .andExpect(status().isOk())
             .andExpect(view().name("layout"))
-            .andExpect(model().attributeExists("templateData"));
+            .andExpect(model().attributeExists("session"))
+            .andExpect(model().attributeExists("participant"))
+            .andExpect(model().attribute("isFacilitator", true));
     }
 
     @Test
@@ -248,9 +253,9 @@ class RetroViewControllerTest {
     void retroView_AuthenticatedUser_ParticipantNotFound_ShouldRedirect() throws Exception {
         // Given
         UUID retroId = UUID.randomUUID();
-        
-        // Mock that templateDataService throws ParticipantNotFoundException
-        when(templateDataService.prepareRetroViewData(eq(retroId), any()))
+
+        // Mock that participantService throws ParticipantNotFoundException
+        when(participantService.getParticipantForSession(any(), eq(retroId)))
             .thenThrow(new ParticipantNotFoundException("Participant not found for session: " + retroId));
 
         // When & Then

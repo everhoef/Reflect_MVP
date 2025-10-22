@@ -22,6 +22,8 @@ import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.facilitation.RetroApiController;
 import direct.reflect.facilitator.facilitation.dto.CreateRetroRequest;
 import direct.reflect.facilitator.facilitation.dto.JoinRetroRequest;
+import direct.reflect.facilitator.facilitation.response.ResponseService;
+import direct.reflect.facilitator.auth.AuthService;
 
 import java.util.UUID;
 
@@ -63,10 +65,10 @@ public class RetroApiControllerTest {
     private EventService eventService;
     
     @MockitoBean
-    private direct.reflect.facilitator.configurator.ParticipantResponseService participantResponseService;
-    
+    private ResponseService responseService;
+
     @MockitoBean
-    private direct.reflect.facilitator.auth.AuthService authHelper;
+    private AuthService authHelper;
     
     @Test
     @WithMockUser(roles = "USER")

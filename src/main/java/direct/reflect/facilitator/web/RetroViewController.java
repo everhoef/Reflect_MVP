@@ -110,7 +110,7 @@ public class RetroViewController {
             // Add data to model
             model.addAttribute("page", page);
             model.addAttribute("title", "Retrospective: " + session.getName());
-            model.addAttribute("session", session);
+            model.addAttribute("retroSession", session);
             model.addAttribute("currentStep", currentStep);
             model.addAttribute("stepDurationMinutes", stepDurationMinutes);
             model.addAttribute("participant", participant);
@@ -122,6 +122,65 @@ public class RetroViewController {
                 retroId, page, session.getPhase());
 
             return "layout";
+
+        } catch (ParticipantNotFoundException e) {
+            log.error("Participant not found: ", e);
+            return "redirect:/login";
+        } catch (Exception e) {
+            log.error("Error in retroView: ", e);
+            throw e;
+        }
+    }
+
+    /**
+     * Get only the retro/lobby fragment content for HTMX partial updates.
+     * This avoids duplicating headers and other layout elements.
+     */
+    @GetMapping("/retro/{retroId}/content")
+    public String retroContentFragment(@PathVariable UUID retroId, Model model, HttpServletRequest request) {
+        try {
+            // Get session
+            RetroSession session = retroService.getSessionById(retroId);
+            if (session == null) {
+                log.warn("Session not found: {}", retroId);
+                return "redirect:/?error=session_not_found";
+            }
+
+            // Get participant
+            Participant participant = participantService.getParticipantForSession(request, retroId);
+            boolean isFacilitator = participantService.isFacilitator(request, retroId);
+
+            // Get all participants
+            List<Participant> participants = participantService.getSessionParticipants(retroId);
+
+            // Determine page type based on phase
+            String page = (session.getPhase() == RetroPhase.CREATED || session.getPhase() == RetroPhase.LOBBY)
+                         ? "lobby" : "retro";
+
+            // Get current step if in retro phase
+            RetroStep currentStep = null;
+            Integer stepDurationMinutes = null;
+            if (session.getPhase() != RetroPhase.CREATED && session.getPhase() != RetroPhase.LOBBY) {
+                currentStep = retroService.getCurrentStep(retroId);
+                if (currentStep != null && currentStep.getDurationSeconds() != null) {
+                    stepDurationMinutes = (int) java.time.Duration.ofSeconds(currentStep.getDurationSeconds()).toMinutes();
+                }
+            }
+
+            // Add data to model
+            model.addAttribute("page", page);
+            model.addAttribute("retroSession", session);
+            model.addAttribute("currentStep", currentStep);
+            model.addAttribute("stepDurationMinutes", stepDurationMinutes);
+            model.addAttribute("participant", participant);
+            model.addAttribute("participants", participants);
+            model.addAttribute("isFacilitator", isFacilitator);
+
+            log.debug("Returning fragment for session {} - page: {}, phase: {}",
+                retroId, page, session.getPhase());
+
+            // Return only the inner content (not the wrapper div to preserve SSE connection)
+            return page.equals("lobby") ? "fragments/lobby :: content" : "fragments/retro :: inner-content";
 
         } catch (ParticipantNotFoundException e) {
             log.error("Participant not found: ", e);
@@ -153,7 +212,7 @@ public class RetroViewController {
      * Called by HTMX when SSE events trigger (note_added, note_updated).
      */
     @GetMapping("/retro/{retroId}/step/{stepId}/responses/categorical")
-    @PreAuthorize("@authService.canAccessRetro(#retroId)")
+    @PreAuthorize("@participantService.canAccessRetro(#retroId)")
     public String getCategoricalResponses(
             @PathVariable UUID retroId,
             @PathVariable Long stepId,
@@ -195,7 +254,7 @@ public class RetroViewController {
      * Called by HTMX when SSE events trigger (note_added, note_updated).
      */
     @GetMapping("/retro/{retroId}/step/{stepId}/responses/rating")
-    @PreAuthorize("@authService.canAccessRetro(#retroId)")
+    @PreAuthorize("@participantService.canAccessRetro(#retroId)")
     public String getRatingResponses(
             @PathVariable UUID retroId,
             @PathVariable Long stepId,
@@ -233,7 +292,7 @@ public class RetroViewController {
      * Called by HTMX when SSE events trigger (note_added, note_updated).
      */
     @GetMapping("/retro/{retroId}/step/{stepId}/responses/freeform")
-    @PreAuthorize("@authService.canAccessRetro(#retroId)")
+    @PreAuthorize("@participantService.canAccessRetro(#retroId)")
     public String getFreeformResponses(
             @PathVariable UUID retroId,
             @PathVariable Long stepId,

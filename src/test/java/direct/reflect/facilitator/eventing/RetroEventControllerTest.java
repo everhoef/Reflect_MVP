@@ -61,9 +61,9 @@ class RetroEventControllerTest {
         
         when(participantService.getParticipantForSession(any(HttpServletRequest.class), eq(retroId)))
             .thenReturn(mockParticipant);
-        
+
         SseEmitter testEmitter = new SseEmitter(30000L);
-        when(eventService.createSseEmitter(eq(retroId), any(HttpServletRequest.class)))
+        when(eventService.createSseEmitter(eq(retroId), any(HttpServletRequest.class), eq("TestUser"), eq(mockParticipant.getParticipantId())))
             .thenReturn(testEmitter);
 
         // When & Then
@@ -75,7 +75,7 @@ class RetroEventControllerTest {
         // Verify service methods were called
         verify(participantService).getParticipantForSession(any(HttpServletRequest.class), eq(retroId));
         verify(participantService).updateLastSeen(any(HttpServletRequest.class), eq(retroId));
-        verify(eventService).createSseEmitter(eq(retroId), any(HttpServletRequest.class));
+        verify(eventService).createSseEmitter(eq(retroId), any(HttpServletRequest.class), eq("TestUser"), eq(mockParticipant.getParticipantId()));
     }
 
     @Test  
@@ -129,7 +129,7 @@ class RetroEventControllerTest {
         // Verify participant validation was attempted
         verify(participantService).getParticipantForSession(any(HttpServletRequest.class), eq(retroId));
         // Verify no SSE emitter was created for unauthorized access
-        verify(eventService, org.mockito.Mockito.never()).createSseEmitter(any(UUID.class), any(HttpServletRequest.class));
+        verify(eventService, org.mockito.Mockito.never()).createSseEmitter(any(UUID.class), any(HttpServletRequest.class), any(String.class), any(UUID.class));
     }
 
     @Test
@@ -144,9 +144,9 @@ class RetroEventControllerTest {
         
         when(participantService.getParticipantForSession(any(HttpServletRequest.class), eq(retroId)))
             .thenReturn(guestParticipant);
-        
+
         SseEmitter testEmitter = new SseEmitter(30000L);
-        when(eventService.createSseEmitter(eq(retroId), any(HttpServletRequest.class)))
+        when(eventService.createSseEmitter(eq(retroId), any(HttpServletRequest.class), eq("Guest User"), eq(guestParticipant.getParticipantId())))
             .thenReturn(testEmitter);
 
         // When & Then
@@ -158,7 +158,7 @@ class RetroEventControllerTest {
         // Verify guest participant was validated and SSE connection established
         verify(participantService).getParticipantForSession(any(HttpServletRequest.class), eq(retroId));
         verify(participantService).updateLastSeen(any(HttpServletRequest.class), eq(retroId));
-        verify(eventService).createSseEmitter(eq(retroId), any(HttpServletRequest.class));
+        verify(eventService).createSseEmitter(eq(retroId), any(HttpServletRequest.class), eq("Guest User"), eq(guestParticipant.getParticipantId()));
     }
 
     @Test
@@ -173,6 +173,6 @@ class RetroEventControllerTest {
                 
         // Verify no service methods were called due to authentication failure
         verify(participantService, org.mockito.Mockito.never()).getParticipantForSession(any(HttpServletRequest.class), any(UUID.class));
-        verify(eventService, org.mockito.Mockito.never()).createSseEmitter(any(UUID.class), any(HttpServletRequest.class));
+        verify(eventService, org.mockito.Mockito.never()).createSseEmitter(any(UUID.class), any(HttpServletRequest.class), any(String.class), any(UUID.class));
     }
 }

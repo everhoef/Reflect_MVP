@@ -54,9 +54,10 @@ class EventServiceTest {
         // Given
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setSession(new MockHttpSession());
+        UUID participantId = UUID.randomUUID();
 
         // When
-        SseEmitter emitter = eventService.createSseEmitter(testRetroId, request);
+        SseEmitter emitter = eventService.createSseEmitter(testRetroId, request, "Test User", participantId);
 
         // Then
         assertThat(emitter).isNotNull();
@@ -68,21 +69,22 @@ class EventServiceTest {
         // Given
         MockHttpServletRequest request1 = new MockHttpServletRequest();
         MockHttpServletRequest request2 = new MockHttpServletRequest();
-        
+        UUID participantId = UUID.randomUUID();
+
         // Same session ID to simulate same user making multiple connections
         MockHttpSession session = new MockHttpSession();
         request1.setSession(session);
         request2.setSession(session);
 
         // When
-        SseEmitter emitter1 = eventService.createSseEmitter(testRetroId, request1);
-        SseEmitter emitter2 = eventService.createSseEmitter(testRetroId, request2);
+        SseEmitter emitter1 = eventService.createSseEmitter(testRetroId, request1, "Test User", participantId);
+        SseEmitter emitter2 = eventService.createSseEmitter(testRetroId, request2, "Test User", participantId);
 
         // Then
         assertThat(emitter1).isNotNull();
         assertThat(emitter2).isNotNull();
         assertThat(emitter2).isNotSameAs(emitter1);
-        
+
         // Only one active connection should remain
         // (This is tested by the implementation logic - old connection gets completed)
     }
@@ -92,15 +94,17 @@ class EventServiceTest {
         // Given
         MockHttpServletRequest user1Request = new MockHttpServletRequest();
         MockHttpServletRequest user2Request = new MockHttpServletRequest();
-        
+        UUID participant1Id = UUID.randomUUID();
+        UUID participant2Id = UUID.randomUUID();
+
         MockHttpSession session1 = new MockHttpSession();
         MockHttpSession session2 = new MockHttpSession();
         user1Request.setSession(session1);
         user2Request.setSession(session2);
 
         // When
-        SseEmitter emitter1 = eventService.createSseEmitter(testRetroId, user1Request);
-        SseEmitter emitter2 = eventService.createSseEmitter(testRetroId, user2Request);
+        SseEmitter emitter1 = eventService.createSseEmitter(testRetroId, user1Request, "User 1", participant1Id);
+        SseEmitter emitter2 = eventService.createSseEmitter(testRetroId, user2Request, "User 2", participant2Id);
 
         // Then
         assertThat(emitter1).isNotNull();
@@ -113,13 +117,14 @@ class EventServiceTest {
         // Given
         UUID retro1 = UUID.randomUUID();
         UUID retro2 = UUID.randomUUID();
-        
+        UUID participantId = UUID.randomUUID();
+
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setSession(new MockHttpSession());
 
         // When
-        SseEmitter emitter1 = eventService.createSseEmitter(retro1, request);
-        SseEmitter emitter2 = eventService.createSseEmitter(retro2, request);
+        SseEmitter emitter1 = eventService.createSseEmitter(retro1, request, "Test User", participantId);
+        SseEmitter emitter2 = eventService.createSseEmitter(retro2, request, "Test User", participantId);
 
         // Then
         assertThat(emitter1).isNotNull();
