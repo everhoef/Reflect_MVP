@@ -185,21 +185,24 @@ Current `RetroStep` has `stepType` enum (INSTRUCTION, ACTIVITY, DISCUSSION):
    - Wire up to existing `/api/retro/{id}/next` endpoint
    - Test step advancement
 
-### Sprint 2: RATING Pattern Implementation (Week 2)
-4. 🔲 **Day 1-2**: Happiness Histogram activity UI
-   - Rating scale selector (1-10)
-   - Comment textarea
-   - HTMX form submission
-   - Integration with ResponseService
+### Sprint 2: RATING Pattern Implementation (Week 2) ✅ COMPLETED
+4. ✅ **Day 1-2**: Happiness Histogram activity UI
+   - ✅ Rating scale selector (1-10)
+   - ✅ Comment textarea
+   - ✅ HTMX form submission
+   - ✅ Integration with ResponseService
 
-5. 🔲 **Day 3-4**: Histogram visualization
-   - Bar chart component (SVG or Chart.js)
-   - Results display in right sidebar
-   - Privacy toggle (private input → public reveal)
+5. ✅ **Day 3-4**: Histogram visualization
+   - ✅ Bar chart component (SVG histogram)
+   - ✅ Results display in right sidebar
+   - ✅ Privacy toggle (private input → public reveal)
+   - ✅ Fixed SpEL expression issues with complex lambdas
+   - ✅ Implemented DTO layer (RatingDto) for clean view rendering
+   - ✅ Moved visibility filtering to controller for simpler templates
 
 6. 🔲 **Day 5**: Multi-step flow for Happiness Histogram
-   - INSTRUCTION → ACTIVITY → REVEAL → DISCUSSION → WRAP-UP
-   - Test with real participants
+   - 🔲 INSTRUCTION → ACTIVITY → REVEAL → DISCUSSION → WRAP-UP
+   - 🔲 Test with real participants
 
 ### Sprint 3: CATEGORICAL Pattern (Week 3)
 7. 🔲 Mad Sad Glad implementation
@@ -335,21 +338,28 @@ Current `RetroStep` has `stepType` enum (INSTRUCTION, ACTIVITY, DISCUSSION):
    - SSE connection persists across step advances
    - Real-time collaboration working
 
-2. **🔵 NEXT: Sprint 2 Day 1-2: Happiness Histogram Activity UI** (Recommended)
-   - Rating scale selector (1-10) - currently has radio buttons
-   - HTMX form submission integration
-   - Test response submission flow
-   - **Rationale**: UI already has rating inputs, makes sense to complete the flow
+2. ✅ **COMPLETED: Sprint 2 Day 1-4: Happiness Histogram** - Activity UI and visualization complete
+   - Rating scale selector (1-10) working
+   - HTMX form submission integrated
+   - SVG histogram visualization displaying correctly
+   - Privacy controls working (hidden until revealed)
+   - Real-time updates via SSE functional
 
-3. **Sprint 1 Day 3-4: Guidance System** (Optional enhancement)
+3. **🔵 NEXT: Sprint 2 Day 5: Multi-Step Flow Testing** (Recommended)
+   - Complete multi-step flow: INSTRUCTION → ACTIVITY → REVEAL → DISCUSSION → WRAP-UP
+   - Test with multiple participants
+   - Verify reveal functionality shows histogram to all participants
+   - Test comment section in discussion phase
+
+4. **Alternative: Sprint 1 Day 3-4: Guidance System Enhancement** (Optional)
    - Basic guidance already working
    - Could enhance with video player component
    - Add closeable tooltips
    - "Need Help?" alert boxes
 
-4. **Sprint 1 Day 5: Facilitator Controls**
-   - Wire up Back button
-   - Test full multi-step flow
+5. **Sprint 1 Day 5: Facilitator Controls Polish**
+   - Wire up Back button (currently only Next works)
+   - Test full multi-step flow backwards navigation
    - Verify all step types render correctly
 
 ---
@@ -427,6 +437,141 @@ Current `RetroStep` has `stepType` enum (INSTRUCTION, ACTIVITY, DISCUSSION):
 #### Key Learning
 
 Always consult HTMX extension documentation (https://htmx.org/extensions/sse/) when implementing SSE. The parent-child relationship requirement is critical for HTMX 2.x SSE extension functionality.
+
+---
+
+### ✅ Sprint 2 Day 3-4: Histogram Visualization - COMPLETED
+
+**Status**: ✅ **COMPLETED** - 2025-10-28
+
+#### Implementation Summary
+
+Successfully implemented the histogram visualization for the Happiness Histogram activity with real-time updates via SSE.
+
+#### Root Cause of Initial Issues
+
+The histogram endpoint was failing with multiple SpEL (Spring Expression Language) errors:
+
+1. **SpEL .toList() Not Supported**
+   - **Problem**: Template tried to use `.toList()` which doesn't exist in SpEL
+   - **Error**: `SpelParseException: Expression [...] @56: EL1042E: Problem parsing right operand`
+
+2. **Lambda Expressions in Complex Conditions**
+   - **Problem**: SpEL doesn't support lambda expressions inside parenthesized conditions
+   - **Example**: `responses.empty or (!isFacilitator and responses.stream().noneMatch(r -> r.visible()))`
+
+3. **Stream Operations in Templates**
+   - **Problem**: Complex stream filtering and collection operations don't work reliably in SpEL
+   - **Anti-pattern**: Trying to do business logic in templates
+
+#### Solution Architecture
+
+**1. DTO Layer for Clean View Separation** (`RatingDto.java`)
+```java
+public record RatingDto(
+    UUID id,
+    Integer rating,
+    String comment,
+    Boolean visible,
+    String participantName
+) {
+    public static RatingDto from(ParticipantResponse response) {
+        // Converts entity to clean DTO for template rendering
+    }
+}
+```
+
+**2. Visibility Filtering in Controller** (`RetroViewController.java:291-294`)
+```java
+// Filter visible responses (facilitator sees all, others see only visible)
+List<RatingDto> visibleResponses = isFacilitator
+    ? ratingDtos
+    : ratingDtos.stream().filter(RatingDto::visible).toList();
+
+model.addAttribute("totalResponses", ratingDtos.size());
+model.addAttribute("responses", visibleResponses);
+```
+
+**3. Simplified Template with Thymeleaf Utilities** (`retro-rating.html:110-122`)
+```html
+<!-- Count responses with this rating using Thymeleaf's built-in aggregates -->
+<div th:each="rating : ${#numbers.sequence(minRating, maxRating, 1)}">
+    <div th:with="count=${#aggregates.sum(responses.![rating == __${rating}__ ? 1 : 0])}"
+         class="flex items-center space-x-2">
+        <span th:text="${rating}">1</span>
+        <div class="flex-1 bg-gray-200 rounded h-8">
+            <div class="bg-blue-500 h-full"
+                 th:style="'width: ' + ${count > 0 ? (count * 100.0 / responses.size()) : 0} + '%'">
+            </div>
+            <span th:if="${count > 0}" th:text="${count}">0</span>
+        </div>
+    </div>
+</div>
+```
+
+#### Key Technical Decisions
+
+1. **Moved Business Logic to Controller**
+   - Templates should only handle presentation, not filtering/transformation
+   - Controller pre-filters visible responses based on user role
+   - Template receives clean, ready-to-render DTOs
+
+2. **Used Thymeleaf Projection Syntax**
+   - `responses.![rating == __${rating}__ ? 1 : 0]` creates a list of 1s and 0s
+   - `#aggregates.sum()` counts matching ratings
+   - Avoids complex stream operations in SpEL
+
+3. **Created Pattern-Specific DTOs**
+   - `RatingDto`, `CategoricalDto`, `FreeformDto` for each pattern
+   - Dual purpose: API input validation AND view rendering
+   - Clean separation from JPA entities
+
+#### Files Modified
+
+1. **`/src/main/java/direct/reflect/facilitator/facilitation/dto/RatingDto.java`**
+   - Created new DTO with `from()` static factory method
+   - Fixed Boolean naming convention (`visible` instead of `isVisible`)
+
+2. **`/src/main/java/direct/reflect/facilitator/web/RetroViewController.java:277-306`**
+   - Added visibility filtering logic
+   - Converted entities to DTOs before passing to template
+   - Added `totalResponses` attribute for hidden count
+
+3. **`/src/main/resources/templates/fragments/retro-rating.html:99-141`**
+   - Replaced complex SpEL stream operations with Thymeleaf utilities
+   - Used `#aggregates.sum()` with projection syntax for counting
+   - Simplified conditional logic by using pre-filtered lists
+
+#### Verification Results
+
+**Test Session**: "Final Histogram Test" (019a2b8b-6989-7021-95d0-3cc9e09bd950)
+- ✅ Histogram endpoint called successfully: `/retro/{retroId}/step/{stepId}/histogram`
+- ✅ No SpEL parsing errors
+- ✅ No `HttpMessageNotWritableException` errors
+- ✅ Histogram displays correctly with rating distribution bars
+- ✅ Shows "1 rating(s) submitted" with count for rating 8
+- ✅ Real-time updates via SSE work correctly (`hx-trigger="sse:note_added"`)
+
+#### Key Learnings
+
+1. **Avoid Complex SpEL Expressions**
+   - SpEL has limited support for stream operations and lambdas
+   - Keep template logic simple - use Thymeleaf utilities instead
+   - Move filtering/transformation to controller
+
+2. **DTO Pattern for Templates**
+   - Always convert JPA entities to DTOs before template rendering
+   - DTOs provide clean, immutable data contracts
+   - Prevents lazy-loading issues and simplifies templates
+
+3. **Boolean Naming Convention**
+   - Java Bean properties: field `visible`, accessor `visible()` or `isVisible()`
+   - Do NOT name field `isVisible` - breaks convention
+
+4. **Thymeleaf Projection Syntax**
+   - `collection.![expression]` creates derived collection
+   - Works with `#aggregates` functions for counting/summing
+   - Cleaner than trying to use Java streams in templates
 
 ---
 

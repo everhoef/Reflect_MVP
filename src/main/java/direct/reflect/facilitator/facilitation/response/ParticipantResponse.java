@@ -2,34 +2,37 @@ package direct.reflect.facilitator.facilitation.response;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import direct.reflect.facilitator.facilitation.Participant;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.DataPattern;
 import direct.reflect.facilitator.common.entity.GeneratedUuidV7;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /**
- * Base class for all participant responses using Single Table Inheritance.
+ * Base class for all participant responses using JSON column storage.
  *
  * Design rationale:
+ * - PostgreSQL JSONB column for type-specific fields (flexible, indexable)
  * - Single table for easier data analysis and cross-pattern queries (POC requirement)
- * - Type-safe subclasses prevent invalid field combinations
- * - Discriminator column enables polymorphic queries
- * - Supports clustering, voting, and visibility controls
+ * - DataPattern enum identifies response type
+ * - No NULL constraint conflicts - each response has its own JSON structure
+ * - Easy schema evolution - add fields without migrations
  *
- * Subclasses:
- * - CategoricalResponse: Sticky notes with categories (Mad/Sad/Glad, Start/Stop/Continue)
- * - RatingResponse: Numeric ratings with optional comments (Happiness Histogram, ROTI)
- * - FreeformResponse: Open text responses (One Word, Kudos, Closing Statements)
+ * Response patterns stored in responseData JSON:
+ * - CATEGORICAL: {category, content, color}
+ * - RATING: {rating, minRating, maxRating, comment}
+ * - FREEFORM: {content, tags, isMultiLine}
  */
 @Entity
 @Table(name = "participant_responses")
-@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
-@DiscriminatorColumn(name = "response_type", discriminatorType = DiscriminatorType.STRING)
 @Data
-public abstract class ParticipantResponse {
+public class ParticipantResponse {
 
     @Id
     @GeneratedUuidV7
@@ -60,14 +63,51 @@ public abstract class ParticipantResponse {
     private Integer displayOrder = 0; // Order within category/cluster
 
     /**
-     * Get the data pattern for this response (determined by subclass type).
+     * Response type pattern (CATEGORICAL, RATING, FREEFORM)
      */
-    @Transient
-    public abstract DataPattern getDataPattern();
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private DataPattern dataPattern;
+
+    /**
+     * Type-specific response data stored as JSON.
+     * Structure depends on dataPattern:
+     * - CATEGORICAL: {category: "Mad", content: "text", color: "#FF5733"}
+     * - RATING: {rating: 8, minRating: 1, maxRating: 10, comment: "text"}
+     * - FREEFORM: {content: "text", tags: "tag1,tag2", isMultiLine: false}
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb", nullable = false)
+    private Map<String, Object> responseData = new HashMap<>();
 
     /**
      * Get a display-friendly summary of this response.
      */
     @Transient
-    public abstract String getDisplaySummary();
+    public String getDisplaySummary() {
+        return switch (dataPattern) {
+            case RATING -> {
+                Integer rating = (Integer) responseData.get("rating");
+                String comment = (String) responseData.get("comment");
+                String summary = "Rating: " + rating;
+                if (comment != null && !comment.trim().isEmpty()) {
+                    summary += " - " + (comment.length() > 30 ? comment.substring(0, 27) + "..." : comment);
+                }
+                yield summary;
+            }
+            case CATEGORICAL -> {
+                String category = (String) responseData.get("category");
+                String content = (String) responseData.get("content");
+                yield String.format("[%s] %s", category,
+                    content.length() > 50 ? content.substring(0, 47) + "..." : content);
+            }
+            case FREEFORM -> {
+                String content = (String) responseData.get("content");
+                if (content.length() > 100) {
+                    yield content.substring(0, 97) + "...";
+                }
+                yield content;
+            }
+        };
+    }
 }

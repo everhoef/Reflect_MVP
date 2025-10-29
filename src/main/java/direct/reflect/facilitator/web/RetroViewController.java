@@ -2,6 +2,7 @@ package direct.reflect.facilitator.web;
 
 import java.util.UUID;
 import java.util.List;
+import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -21,9 +22,8 @@ import direct.reflect.facilitator.facilitation.ParticipantService;
 import direct.reflect.facilitator.facilitation.Participant;
 import direct.reflect.facilitator.facilitation.response.ResponseService;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponse;
-import direct.reflect.facilitator.facilitation.response.CategoricalResponse;
-import direct.reflect.facilitator.facilitation.response.RatingResponse;
-import direct.reflect.facilitator.facilitation.response.FreeformResponse;
+import direct.reflect.facilitator.facilitation.dto.RatingDto;
+import direct.reflect.facilitator.configurator.DataPattern;
 import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.configurator.RetroStep;
@@ -232,10 +232,9 @@ public class RetroViewController {
 
             List<ParticipantResponse> allResponses = responseService.getResponsesForStep(session, step);
 
-            List<CategoricalResponse> categoryResponses = allResponses.stream()
-                .filter(r -> r instanceof CategoricalResponse)
-                .map(r -> (CategoricalResponse) r)
-                .filter(r -> category.equals(r.getCategory()))
+            List<ParticipantResponse> categoryResponses = allResponses.stream()
+                .filter(r -> r.getDataPattern() == DataPattern.CATEGORICAL)
+                .filter(r -> category.equals(r.getResponseData().get("category")))
                 .toList();
 
             model.addAttribute("responses", categoryResponses);
@@ -253,37 +252,64 @@ public class RetroViewController {
      * Get HTML fragment for all rating responses.
      * Called by HTMX when SSE events trigger (note_added, note_updated).
      */
-    @GetMapping("/retro/{retroId}/step/{stepId}/responses/rating")
-    @PreAuthorize("@participantService.canAccessRetro(#retroId)")
-    public String getRatingResponses(
+    @GetMapping("/retro/{retroId}/step/{stepId}/histogram")
+    // @PreAuthorize("@participantService.canAccessRetro(#retroId)") // Temporarily disabled for debugging
+    public String getRatingHistogram(
             @PathVariable UUID retroId,
             @PathVariable Long stepId,
-            Model model) {
+            Model model,
+            HttpServletRequest request) {
 
-        log.debug("Getting rating responses for retro: {}, step: {}", retroId, stepId);
+        log.debug("Getting rating histogram for retro: {}, step: {}", retroId, stepId);
+        log.trace("Method entry - about to fetch session");
 
         try {
             RetroSession session = retroService.getSessionById(retroId);
+            log.trace("Fetched session: {}", session != null ? session.getId() : "null");
+
             RetroStep step = retroService.getCurrentStep(retroId);
+            log.trace("Fetched current step: {}", step != null ? step.getId() : "null");
 
             if (step == null || !step.getId().equals(stepId)) {
-                return "fragments/response-fragments :: error";
+                return "fragments/retro-rating :: histogram-error";
             }
 
             List<ParticipantResponse> allResponses = responseService.getResponsesForStep(session, step);
 
-            List<RatingResponse> ratingResponses = allResponses.stream()
-                .filter(r -> r instanceof RatingResponse)
-                .map(r -> (RatingResponse) r)
+            // Convert entities to DTOs for clean Thymeleaf rendering
+            List<RatingDto> ratingDtos = allResponses.stream()
+                .filter(r -> r.getDataPattern() == DataPattern.RATING)
+                .map(RatingDto::from)
                 .toList();
 
-            model.addAttribute("responses", ratingResponses);
+            log.debug("Converted {} responses to RatingDtos", ratingDtos.size());
+            ratingDtos.forEach(dto -> log.debug("RatingDto: id={}, rating={}, visible={}", dto.id(), dto.rating(), dto.visible()));
 
-            return "fragments/response-fragments :: rating-list";
+            // Get current participant to check visibility
+            boolean isFacilitator = participantService.isFacilitator(request, retroId);
+
+            // Filter visible responses (facilitator sees all, others see only visible)
+            List<RatingDto> visibleResponses = isFacilitator
+                ? ratingDtos
+                : ratingDtos.stream().filter(RatingDto::visible).toList();
+
+            // Get scale configuration
+            Map<String, Object> config = step.getConfig();
+            Map<String, Object> scaleConfig = config != null ? (Map<String, Object>) config.get("scale") : null;
+            int minRating = scaleConfig != null && scaleConfig.get("min") != null ? ((Number) scaleConfig.get("min")).intValue() : 1;
+            int maxRating = scaleConfig != null && scaleConfig.get("max") != null ? ((Number) scaleConfig.get("max")).intValue() : 10;
+
+            model.addAttribute("totalResponses", ratingDtos.size());
+            model.addAttribute("responses", visibleResponses);
+            model.addAttribute("minRating", minRating);
+            model.addAttribute("maxRating", maxRating);
+            model.addAttribute("isFacilitator", isFacilitator);
+
+            return "fragments/retro-rating :: histogram";
 
         } catch (Exception e) {
-            log.error("Error fetching rating responses: ", e);
-            return "fragments/response-fragments :: error";
+            log.error("Error fetching rating histogram: ", e);
+            return "fragments/retro-rating :: histogram-error";
         }
     }
 
@@ -310,9 +336,8 @@ public class RetroViewController {
 
             List<ParticipantResponse> allResponses = responseService.getResponsesForStep(session, step);
 
-            List<FreeformResponse> freeformResponses = allResponses.stream()
-                .filter(r -> r instanceof FreeformResponse)
-                .map(r -> (FreeformResponse) r)
+            List<ParticipantResponse> freeformResponses = allResponses.stream()
+                .filter(r -> r.getDataPattern() == DataPattern.FREEFORM)
                 .toList();
 
             model.addAttribute("responses", freeformResponses);

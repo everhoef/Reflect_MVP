@@ -44,10 +44,11 @@ public interface ParticipantResponseRepository extends JpaRepository<Participant
     Long countResponsesForStep(@Param("session") RetroSession session, @Param("step") RetroStep step);
 
     /**
-     * Find all categorical responses for a specific category.
+     * Find all responses for a specific category (CATEGORICAL pattern).
+     * Uses JSON query to filter by category field in responseData.
      */
-    @Query("SELECT r FROM CategoricalResponse r WHERE r.participant.session = :session AND r.retroStep = :step AND r.category = :category ORDER BY r.displayOrder ASC, r.submittedAt ASC")
-    List<CategoricalResponse> findCategoricalByCategory(
+    @Query(value = "SELECT * FROM participant_responses r WHERE r.session_id = :#{#session.id} AND r.retro_step_id = :#{#step.id} AND r.data_pattern = 'CATEGORICAL' AND r.response_data->>'category' = :category ORDER BY r.display_order ASC, r.submitted_at ASC", nativeQuery = true)
+    List<ParticipantResponse> findCategoricalByCategory(
         @Param("session") RetroSession session,
         @Param("step") RetroStep step,
         @Param("category") String category);

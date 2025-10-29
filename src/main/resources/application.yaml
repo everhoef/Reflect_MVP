@@ -47,5 +47,7 @@ logging:
   level:
     direct.reflect.facilitator: "debug"
     direct.reflect.facilitator.eventing: "trace"
+    direct.reflect.facilitator.web.RetroViewController: "trace"
+    org.springframework.web.servlet.mvc.method.annotation: "debug"
   file:
     name: /tmp/facilitator.log

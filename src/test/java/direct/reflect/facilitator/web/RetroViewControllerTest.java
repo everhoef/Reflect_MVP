@@ -131,7 +131,7 @@ class RetroViewControllerTest {
                 .cookie(new jakarta.servlet.http.Cookie("participantId", participantId.toString())))
             .andExpect(status().isOk())
             .andExpect(view().name("layout"))
-            .andExpect(model().attributeExists("session"))
+            .andExpect(model().attributeExists("retroSession"))
             .andExpect(model().attributeExists("participant"));
     }
 
@@ -167,7 +167,7 @@ class RetroViewControllerTest {
         mockMvc.perform(get("/retro/{retroId}", retroId))
             .andExpect(status().isOk())
             .andExpect(view().name("layout"))
-            .andExpect(model().attributeExists("session"))
+            .andExpect(model().attributeExists("retroSession"))
             .andExpect(model().attributeExists("participant"));
     }
 
@@ -206,7 +206,7 @@ class RetroViewControllerTest {
         mockMvc.perform(get("/retro/{retroId}", retroId))
             .andExpect(status().isOk())
             .andExpect(view().name("layout"))
-            .andExpect(model().attributeExists("session"))
+            .andExpect(model().attributeExists("retroSession"))
             .andExpect(model().attributeExists("participant"));
     }
 
@@ -243,7 +243,7 @@ class RetroViewControllerTest {
         mockMvc.perform(get("/retro/{retroId}", retroId))
             .andExpect(status().isOk())
             .andExpect(view().name("layout"))
-            .andExpect(model().attributeExists("session"))
+            .andExpect(model().attributeExists("retroSession"))
             .andExpect(model().attributeExists("participant"))
             .andExpect(model().attribute("isFacilitator", true));
     }

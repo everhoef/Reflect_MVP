@@ -16,6 +16,8 @@ import direct.reflect.facilitator.facilitation.dto.CreateRetroRequest;
 import direct.reflect.facilitator.facilitation.dto.JoinRetroRequest;
 import direct.reflect.facilitator.facilitation.dto.SessionInfo;
 import direct.reflect.facilitator.facilitation.response.ResponseService;
+import direct.reflect.facilitator.configurator.DataPattern;
+import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException;
 
 import jakarta.validation.Valid;
@@ -25,6 +27,8 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.UUID;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/retro")
@@ -253,123 +257,70 @@ public class RetroApiController {
         }
     }
     
-    @PostMapping("/{retroId}/step/{stepId}/categorical")
+    @PostMapping("/{retroId}/step/{stepId}/response")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<Void> submitCategoricalResponse(
+    public ResponseEntity<Void> submitResponse(
             @PathVariable UUID retroId,
             @PathVariable Long stepId,
-            @RequestParam String category,
-            @RequestParam String content,
+            @RequestParam Map<String, String> params,
             HttpServletRequest httpRequest) {
-        
-        log.debug("Submitting categorical response for retro: {}, step: {}, category: {}", retroId, stepId, category);
-        
+
+        log.debug("Submitting response for retro: {}, step: {}", retroId, stepId);
+
         try {
-            // Get the session and participant
             RetroSession session = retroService.getSessionById(retroId);
             if (session == null) {
                 return ResponseEntity.notFound().build();
             }
-            
+
             Participant participant = participantService.getParticipantForSession(httpRequest, retroId);
             if (participant == null) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
-            
-            // Submit the response (service handles validation and event publishing)
-            responseService.submitCategoricalResponse(session, stepId, participant, category, content);
-            
-            log.info("Submitted categorical response for participant: {} in step: {}", 
-                participant.getDisplayName(), stepId);
-                
+
+            RetroStep step = retroService.getCurrentStep(retroId);
+            if (step == null || !step.getId().equals(stepId)) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            // Convert String params to Object map for JSON storage
+            Map<String, Object> responseData = new HashMap<>(params);
+
+            // Convert numeric strings to integers for RATING pattern
+            if (step.getDataPattern() == DataPattern.RATING) {
+                if (params.containsKey("rating")) {
+                    responseData.put("rating", Integer.parseInt(params.get("rating")));
+                }
+
+                // Read scale configuration from step
+                Map<String, Object> config = step.getConfig();
+                Map<String, Object> scale = config != null ? (Map<String, Object>) config.get("scale") : null;
+
+                if (scale != null) {
+                    responseData.put("minRating", scale.get("min"));
+                    responseData.put("maxRating", scale.get("max"));
+                } else {
+                    // Fallback defaults
+                    responseData.put("minRating", 1);
+                    responseData.put("maxRating", 10);
+                }
+            }
+
+            responseService.submitResponse(session, stepId, participant, step.getDataPattern(), responseData);
+
+            log.info("Submitted {} response for participant: {} in step: {}",
+                step.getDataPattern(), participant.getDisplayName(), stepId);
+
             return ResponseEntity.ok()
                 .header("HX-Trigger", "responseSubmitted")
                 .build();
-                
+
         } catch (Exception e) {
-            log.error("Error submitting categorical response: ", e);
+            log.error("Error submitting response: ", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-    
-    @PostMapping("/{retroId}/step/{stepId}/rating")
-    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<Void> submitRatingResponse(
-            @PathVariable UUID retroId,
-            @PathVariable Long stepId,
-            @RequestParam Integer rating,
-            @RequestParam(required = false) String comment,
-            HttpServletRequest httpRequest) {
-        
-        log.debug("Submitting rating response for retro: {}, step: {}, rating: {}", retroId, stepId, rating);
-        
-        try {
-            // Get the session and participant
-            RetroSession session = retroService.getSessionById(retroId);
-            if (session == null) {
-                return ResponseEntity.notFound().build();
-            }
-            
-            Participant participant = participantService.getParticipantForSession(httpRequest, retroId);
-            if (participant == null) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-            }
-            
-            // Submit the response (with default min/max for POC)
-            responseService.submitRatingResponse(session, stepId, participant, rating, 1, 10, comment);
-            
-            log.info("Submitted rating response for participant: {} in step: {}", 
-                participant.getDisplayName(), stepId);
-                
-            return ResponseEntity.ok()
-                .header("HX-Trigger", "responseSubmitted")
-                .build();
-                
-        } catch (Exception e) {
-            log.error("Error submitting rating response: ", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-    
-    @PostMapping("/{retroId}/step/{stepId}/freeform")
-    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<Void> submitFreeformResponse(
-            @PathVariable UUID retroId,
-            @PathVariable Long stepId,
-            @RequestParam String content,
-            HttpServletRequest httpRequest) {
-        
-        log.debug("Submitting freeform response for retro: {}, step: {}, content length: {}", 
-            retroId, stepId, content.length());
-        
-        try {
-            // Get the session and participant
-            RetroSession session = retroService.getSessionById(retroId);
-            if (session == null) {
-                return ResponseEntity.notFound().build();
-            }
-            
-            Participant participant = participantService.getParticipantForSession(httpRequest, retroId);
-            if (participant == null) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-            }
-            
-            // Submit the response
-            responseService.submitFreeformResponse(session, stepId, participant, content, true);
-            
-            log.info("Submitted freeform response for participant: {} in step: {}", 
-                participant.getDisplayName(), stepId);
-                
-            return ResponseEntity.ok()
-                .header("HX-Trigger", "responseSubmitted")
-                .build();
-                
-        } catch (Exception e) {
-            log.error("Error submitting freeform response: ", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-    
+
     @PostMapping("/{retroId}/step/{stepId}/reveal")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     public ResponseEntity<Void> revealResponses(

@@ -83,7 +83,7 @@
                         
                         <!-- Clean step guidance from service layer -->
                         <div class="text-xs text-gray-300 leading-relaxed mb-2">
-                            <p th:text="${currentStep.parsedContent}">Step guidance processed by service layer</p>
+                            <p th:text="${currentStep != null ? currentStep.parsedContent : 'No guidance available'}">Step guidance processed by service layer</p>
                         </div>
                         
                         <!-- Facilitator-specific actions (not guidance, just actions) -->
@@ -239,7 +239,7 @@
                                     hx-swap="innerHTML">
                                     <li th:each="participant : ${participants}" class="px-4 py-2 bg-gray-50 rounded-md flex justify-between items-center">
                                         <span th:text="${participant.displayName}"></span>
-                                        <span th:if="${participant.role.name() == 'FACILITATOR'}" 
+                                        <span th:if="${participant.role == T(direct.reflect.facilitator.facilitation.ParticipantRole).FACILITATOR}"
                                               class="ml-2 text-xs bg-ocher-yellow text-white px-2 py-1 rounded">
                                             Facilitator
                                         </span>
@@ -292,7 +292,7 @@
                                 </div>
                                 <span class="text-sm font-medium" th:text="${participant.displayName}">Alice</span>
                             </div>
-                            <div th:if="${participant.role.name() == 'FACILITATOR'}" 
+                            <div th:if="${participant.role == T(direct.reflect.facilitator.facilitation.ParticipantRole).FACILITATOR}"
                                  class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
                                 Facilitator
                             </div>

@@ -90,10 +90,7 @@ public record RetroEvent<T>(
         Long stepId,
         String participantId,
         String participantName,
-        String content,
-        String category,
-        Integer rating,
-        String comment,
+        String displaySummary,
         boolean isVisible,
         Instant submittedAt
     ) {}
