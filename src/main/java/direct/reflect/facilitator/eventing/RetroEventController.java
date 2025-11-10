@@ -36,23 +36,32 @@ public class RetroEventController {
             @PathVariable UUID retroId,
             HttpServletRequest request,
             HttpServletResponse response) {
-        
-        log.info("SSE connection requested for retro {}", retroId);
-        
+
         // Set proper SSE headers
         response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
         response.setCharacterEncoding("UTF-8");
         response.setHeader("Cache-Control", "no-cache");
         response.setHeader("Connection", "keep-alive");
-        
-        // Validate participant access using session attributes (will throw exception if not authorized)
-        Participant participant = participantService.getParticipantForSession(request, retroId);
-        log.info("Participant {} authorized for SSE connection to retro {}", participant.getParticipantId(), retroId);
-        
-        // Update last seen
-        participantService.updateLastSeen(request, retroId);
-        
-        // Create and return SseEmitter for this participant
-        return eventService.createSseEmitter(retroId, request, participant.getDisplayName(), participant.getParticipantId());
+
+        try {
+            // Validate participant access using session attributes (will throw exception if not authorized)
+            Participant participant = participantService.getParticipantForSession(request, retroId);
+
+            String httpSessionId = request.getSession(false) != null ? request.getSession(false).getId() : "none";
+            log.debug("SSE connection established - participantId: {}, role: {}, retroId: {}, httpSessionId: {}",
+                participant.getParticipantId(), participant.getRole(), retroId, httpSessionId);
+
+            // Update last seen
+            participantService.updateLastSeen(request, retroId);
+
+            // Create and return SseEmitter for this participant
+            return eventService.createSseEmitter(retroId, request, participant.getDisplayName(), participant.getParticipantId());
+
+        } catch (Exception e) {
+            String httpSessionId = request.getSession(false) != null ? request.getSession(false).getId() : "none";
+            log.error("SSE connection failed - retroId: {}, httpSessionId: {}, error: {}",
+                retroId, httpSessionId, e.getMessage());
+            throw e;
+        }
     }
 }

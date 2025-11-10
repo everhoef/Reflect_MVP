@@ -39,15 +39,21 @@ public class AuthService {
     public UUID getParticipantId(HttpServletRequest request) {
         HttpSession session = request.getSession(true);
         String authType = (String) session.getAttribute("authType");
-        
+
         if ("OIDC".equals(authType)) {
             String username = (String) session.getAttribute("authenticatedUser");
             if (username == null) {
                 throw new IllegalStateException("OIDC session missing authenticatedUser");
             }
-            return generateUserBasedId(username);
+            UUID participantId = generateUserBasedId(username);
+            log.debug("Retrieved OIDC participantId: {} for username: {}, httpSessionId: {}",
+                participantId, username, session.getId());
+            return participantId;
         } else {
-            return getOrCreateGuestId(session);
+            UUID participantId = getOrCreateGuestId(session);
+            log.debug("Retrieved GUEST participantId: {}, httpSessionId: {}",
+                participantId, session.getId());
+            return participantId;
         }
     }
     

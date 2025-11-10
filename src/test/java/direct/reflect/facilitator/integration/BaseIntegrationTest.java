@@ -19,7 +19,16 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
+
+import direct.reflect.facilitator.configurator.RetroTemplateRepository;
+import direct.reflect.facilitator.configurator.RetroStageRepository;
+import direct.reflect.facilitator.configurator.RetroTemplate;
+import direct.reflect.facilitator.configurator.RetroStage;
+import direct.reflect.facilitator.facilitation.RetroSessionService;
+
+import java.util.List;
 
 /**
  * Base class for integration tests with common setup for Playwright, TestContainers, and authentication.
@@ -64,6 +73,15 @@ public abstract class BaseIntegrationTest {
     protected Playwright playwright;
     protected Browser browser;
     protected String baseUrl;
+
+    @Autowired
+    protected RetroTemplateRepository templateRepository;
+
+    @Autowired
+    protected RetroStageRepository stageRepository;
+
+    @Autowired
+    protected RetroSessionService sessionService;
 
     @BeforeEach
     void setUp() {

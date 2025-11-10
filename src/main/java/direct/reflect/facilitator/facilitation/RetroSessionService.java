@@ -4,10 +4,9 @@ import org.springframework.stereotype.Service;
 import direct.reflect.facilitator.configurator.RetroStage;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.RetroTemplate;
+import direct.reflect.facilitator.configurator.RetroTemplateService;
 import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException;
-import direct.reflect.facilitator.common.exception.RetroTemplateNotFoundException;
 import direct.reflect.facilitator.configurator.RetroStepRepository;
-import direct.reflect.facilitator.configurator.RetroTemplateRepository;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.EventType;
 import direct.reflect.facilitator.eventing.RetroEvent;
@@ -28,25 +27,28 @@ import com.fasterxml.jackson.databind.JsonNode;
 @RequiredArgsConstructor
 public class RetroSessionService {
     private final RetroSessionRepository sessionRepository;
-    private final RetroTemplateRepository templateRepository;
+    private final RetroTemplateService retroTemplateService;
     private final RetroStepRepository stepRepository;
     private final @Lazy EventService eventService;
     private final ObjectMapper objectMapper;
 
     @Transactional
-    public RetroSession createNewSession(String sessionName, RetroTemplate template) {
+    public RetroSession createNewSession(String sessionName) {
+        // Select appropriate template for this session
+        RetroTemplate template = retroTemplateService.selectTemplateForSession();
+
         RetroSession session = new RetroSession();
         session.setName(sessionName);
         session.setCreatedAt(LocalDateTime.now());
         session.setTemplate(template);
         session.setPhase(RetroPhase.LOBBY);
-        
+
         RetroSession savedSession = sessionRepository.save(session);
-        
+
         // Publish RETRO_CREATED event to establish SSE connection immediately
         eventService.publish(RetroEvent.retroCreated(savedSession.getId(), "system"));
         log.info("Published RETRO_CREATED event for session: {}", savedSession.getName());
-        
+
         return savedSession;
     }
 
@@ -59,12 +61,6 @@ public class RetroSessionService {
         // Start first step
         advanceToNextStep(sessionId);
         // Note: Participant notification is handled at the API layer via eventService.publish()
-    }
-
-    public RetroTemplate getDefaultTemplate() {
-        // Assuming there's a default template defined in the system
-        return templateRepository.findById(1L)
-            .orElseThrow(() -> new RetroTemplateNotFoundException(1L));
     }
 
 
@@ -87,7 +83,7 @@ public class RetroSessionService {
     }
 
     public List<RetroTemplate> getAvailableTemplates() {
-        return templateRepository.findAll();
+        return retroTemplateService.getAvailableTemplates();
     }
     
     /**
@@ -169,11 +165,6 @@ public class RetroSessionService {
         }
         
         sessionRepository.save(session);
-    }
-
-    public RetroTemplate getTemplateById(Long templateId) {
-        return templateRepository.findById(templateId)
-            .orElseThrow(() -> new RetroTemplateNotFoundException(templateId));
     }
 
     /**

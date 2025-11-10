@@ -375,10 +375,7 @@ The `system-ui/` folder contains UI design screenshots with mock data that illus
 ### Testing with Testcontainers
 - Tests use Testcontainers for PostgreSQL and Redis - no manual setup needed
 - Containers managed automatically during test execution
-- **Docker/Colima Issue**: If you encounter Testcontainers (Ryuk) errors, run:
-  ```bash
-  export TESTCONTAINERS_HOST_OVERRIDE=$(colima ls -j | jq -r '.address') && mvn test
-  ```
+- Simply run `mvn test` to execute integration tests
 
 ### Important Notes
 - **Always use `import` profile** when running the application

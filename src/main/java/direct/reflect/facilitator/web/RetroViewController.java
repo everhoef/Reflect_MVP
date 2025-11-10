@@ -287,6 +287,7 @@ public class RetroViewController {
 
             // Get current participant to check visibility
             boolean isFacilitator = participantService.isFacilitator(request, retroId);
+            log.debug("isFacilitator={}, will show {} of {} responses", isFacilitator, isFacilitator ? ratingDtos.size() : ratingDtos.stream().filter(RatingDto::visible).count(), ratingDtos.size());
 
             // Filter visible responses (facilitator sees all, others see only visible)
             List<RatingDto> visibleResponses = isFacilitator

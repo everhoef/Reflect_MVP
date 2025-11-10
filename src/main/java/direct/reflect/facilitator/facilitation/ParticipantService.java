@@ -2,6 +2,7 @@ package direct.reflect.facilitator.facilitation;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,7 +16,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.auth.AuthService;
 
@@ -61,8 +61,7 @@ public class ParticipantService {
         }
         
         // Create session and add user as facilitator
-        RetroTemplate template = retroSessionService.getDefaultTemplate();
-        RetroSession newSession = retroSessionService.createNewSession(sessionName, template);
+        RetroSession newSession = retroSessionService.createNewSession(sessionName);
         return createParticipantForSession(newSession, ParticipantRole.FACILITATOR, request);
     }
     
@@ -100,9 +99,34 @@ public class ParticipantService {
      */
     public Participant getParticipantForSession(HttpServletRequest request, UUID sessionId) {
         UUID participantId = authHelper.getParticipantId(request);
-        return participantRepository.findByParticipantIdAndSession_Id(participantId, sessionId)
-            .orElseThrow(() -> new ParticipantNotFoundException(
-                "Not authorized for session: " + sessionId + " (participant: " + participantId + ")"));
+        log.debug("Looking up participant: participantId={}, sessionId={}", participantId, sessionId);
+
+        // Check if participant exists in database
+        Optional<Participant> result = participantRepository.findByParticipantIdAndSession_Id(participantId, sessionId);
+
+        if (result.isEmpty()) {
+            // Log context for debugging session issues
+            HttpSession httpSession = request.getSession(false);
+            String authType = httpSession != null ? (String) httpSession.getAttribute("authType") : "null";
+            String displayName = httpSession != null ? (String) httpSession.getAttribute("userDisplayName") : "null";
+            String httpSessionId = httpSession != null ? httpSession.getId() : "null";
+
+            log.warn("Participant NOT FOUND in database: participantId={}, sessionId={}", participantId, sessionId);
+            log.debug("Session context: authType={}, displayName={}, httpSessionId={}", authType, displayName, httpSessionId);
+
+            // List all participants in this session for debugging
+            List<Participant> allParticipants = participantRepository.findBySession_Id(sessionId);
+            log.debug("Total participants in session {}: {}", sessionId, allParticipants.size());
+            allParticipants.forEach(p ->
+                log.debug("  - Participant: id={}, displayName={}, role={}",
+                    p.getParticipantId(), p.getDisplayName(), p.getRole()));
+
+            throw new ParticipantNotFoundException(
+                "Not authorized for session: " + sessionId + " (participant: " + participantId + ")");
+        }
+
+        log.debug("Participant found: displayName={}, role={}", result.get().getDisplayName(), result.get().getRole());
+        return result.get();
     }
     
     /**

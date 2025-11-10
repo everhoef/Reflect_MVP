@@ -72,8 +72,7 @@ class ParticipantServiceTest {
         when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
         when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guests don't have usernames
         
-        when(retroSessionService.getDefaultTemplate()).thenReturn(template);
-        when(retroSessionService.createNewSession(sessionName, template)).thenReturn(session);
+        when(retroSessionService.createNewSession(sessionName)).thenReturn(session);
         when(participantRepository.findByParticipantIdWithSession(any(UUID.class))).thenReturn(Collections.emptyList());
         when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -107,8 +106,7 @@ class ParticipantServiceTest {
         when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
         when(authHelper.getUsername(mockRequest)).thenReturn(username);
         
-        when(retroSessionService.getDefaultTemplate()).thenReturn(template);
-        when(retroSessionService.createNewSession(sessionName, template)).thenReturn(session);
+        when(retroSessionService.createNewSession(sessionName)).thenReturn(session);
         when(participantRepository.findByParticipantIdWithSession(any(UUID.class))).thenReturn(Collections.emptyList());
         when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -166,8 +164,7 @@ class ParticipantServiceTest {
         when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
         when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guest user
         
-        when(retroSessionService.getDefaultTemplate()).thenReturn(template);
-        when(retroSessionService.createNewSession(sessionName, template)).thenReturn(newSession);
+        when(retroSessionService.createNewSession(sessionName)).thenReturn(newSession);
         when(participantRepository.findByParticipantIdWithSession(participantId))
             .thenReturn(List.of(existingParticipant));
         when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
