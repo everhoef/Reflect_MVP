@@ -15,10 +15,14 @@ import direct.reflect.facilitator.eventing.RetroEvent;
 import direct.reflect.facilitator.facilitation.dto.CreateRetroRequest;
 import direct.reflect.facilitator.facilitation.dto.JoinRetroRequest;
 import direct.reflect.facilitator.facilitation.dto.SessionInfo;
+import direct.reflect.facilitator.facilitation.dto.ComponentResponseDto;
+import direct.reflect.facilitator.facilitation.dto.ColumnResponseDto;
+import direct.reflect.facilitator.facilitation.dto.RatingResponseDto;
 import direct.reflect.facilitator.facilitation.response.ResponseService;
-import direct.reflect.facilitator.configurator.DataPattern;
 import direct.reflect.facilitator.configurator.RetroStep;
+import direct.reflect.facilitator.configurator.ComponentType;
 import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException;
+import direct.reflect.facilitator.common.exception.VoteLimitExceededException;
 
 import jakarta.validation.Valid;
 
@@ -27,8 +31,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.UUID;
 import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/retro")
@@ -53,32 +55,28 @@ public class RetroApiController {
         log.debug("Request method: {}", httpRequest.getMethod());
         log.debug("Request URI: {}", httpRequest.getRequestURI());
         
-        log.debug("Creating new retro session with name: {} by user: {}", 
+        log.debug("Creating new retro session with name: {} by user: {}",
             request.sessionName(), authentication.getName());
-        
+
         try {
-            // Display name is derived from the authentication context (no need to pass it)
-            Participant participant = participantService.createAndAssignFacilitatorForSession(request.sessionName(), httpRequest);
-            
-            // The participant object now holds the session reference
-            RetroSession retro = participant.getSession();
-            log.info("Created new retro session: {} (id: {}) by facilitator: {}", 
-                retro.getName(), retro.getId(), participant.getDisplayName());
-            
-            // Publish retro created event
-            try {
-                eventService.publish(RetroEvent.retroCreated(retro.getId(), "system"));
-            } catch (Exception eventError) {
-                log.error("Failed to publish retro created event: {}", eventError.getMessage());
-                // Continue anyway - event publishing failure shouldn't block user flow
-            }
-            
-            return ResponseEntity.status(HttpStatus.FOUND)
-                .header("HX-Redirect", "/retro/" + retro.getId())
+            // Service layer orchestrates the complete workflow
+            RetroSession retro = retroService.createSessionWithFacilitator(request.sessionName(), httpRequest);
+            String redirectUrl = "/retro/" + retro.getId();
+
+            log.info("✅ Created retro session: {} (id: {})", retro.getName(), retro.getId());
+            log.debug("Setting HX-Redirect header to: {}", redirectUrl);
+            log.debug("Returning response with status: {}", HttpStatus.FOUND);
+
+            ResponseEntity<Void> response = ResponseEntity.status(HttpStatus.FOUND)
+                .header("HX-Redirect", redirectUrl)
                 .build();
-            
+
+            log.debug("=== CREATE REQUEST SUCCESS - Response built with HX-Redirect: {} ===", redirectUrl);
+            return response;
+
         } catch (Exception e) {
-            log.error("Error creating retro session: ", e);
+            log.error("❌ ERROR creating retro session", e);
+            log.error("Exception type: {}, message: {}", e.getClass().getName(), e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .header("HX-Redirect", "/home?error=creation_failed")
                 .build();
@@ -149,24 +147,12 @@ public class RetroApiController {
         }
         
         try {
+            // Service handles both database changes and event publishing within transaction
             retroService.startSession(retroId);
-            
-            // Publish session started event
-            try {
-                eventService.publish(RetroEvent.sessionStarted(retroId));
-            } catch (Exception eventError) {
-                log.error("Failed to publish session started event: {}", eventError.getMessage());
-                // Continue anyway - event publishing failure shouldn't block user flow
-            }
-            
-            return ResponseEntity.status(HttpStatus.FOUND)
-                .header("HX-Redirect", "/retro/" + retroId)
-                .build();
+            return ResponseEntity.ok().build();
         } catch (Exception e) {
             log.error("Error starting session", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .header("HX-Redirect", "/retro/" + retroId + "?error=start_failed")
-                .build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
@@ -175,25 +161,18 @@ public class RetroApiController {
     public ResponseEntity<Void> nextStep(
             @PathVariable UUID retroId,
             HttpServletRequest httpRequest) {
-        
+
         boolean isFacilitator = participantService.isFacilitator(httpRequest, retroId);
         if (!isFacilitator) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .header("HX-Redirect", "/retro/" + retroId)
                 .build();
         }
-        
+
         try {
+            // Service handles both database changes and event publishing within transaction
             retroService.advanceToNextStep(retroId);
-            
-            // Publish step advanced event
-            try {
-                eventService.publish(RetroEvent.stepAdvanced(retroId));
-            } catch (Exception eventError) {
-                log.error("Failed to publish step advanced event: {}", eventError.getMessage());
-                // Continue anyway - event publishing failure shouldn't block user flow
-            }
-            
+
             return ResponseEntity.ok()
                 .header("HX-Trigger", "stepAdvanced")
                 .build();
@@ -257,66 +236,127 @@ public class RetroApiController {
         }
     }
     
-    @PostMapping("/{retroId}/step/{stepId}/response")
+    /**
+     * Submit a categorical response (MULTI_COLUMN_BOARD component type).
+     * Form data is automatically validated using Jakarta Bean Validation annotations.
+     */
+    @PostMapping("/{retroId}/step/{stepId}/response/column")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<Void> submitResponse(
+    public ResponseEntity<Void> submitColumnResponse(
             @PathVariable UUID retroId,
             @PathVariable Long stepId,
-            @RequestParam Map<String, String> params,
+            @Valid @ModelAttribute ColumnResponseDto dto,
             HttpServletRequest httpRequest) {
 
-        log.debug("Submitting response for retro: {}, step: {}", retroId, stepId);
+        log.debug("Submitting column response for retro: {}, step: {}, column: {}",
+            retroId, stepId, dto.columnId());
 
         try {
-            RetroSession session = retroService.getSessionById(retroId);
-            if (session == null) {
-                return ResponseEntity.notFound().build();
-            }
-
-            Participant participant = participantService.getParticipantForSession(httpRequest, retroId);
-            if (participant == null) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-            }
-
-            RetroStep step = retroService.getCurrentStep(retroId);
-            if (step == null || !step.getId().equals(stepId)) {
-                return ResponseEntity.badRequest().build();
-            }
-
-            // Convert String params to Object map for JSON storage
-            Map<String, Object> responseData = new HashMap<>(params);
-
-            // Convert numeric strings to integers for RATING pattern
-            if (step.getDataPattern() == DataPattern.RATING) {
-                if (params.containsKey("rating")) {
-                    responseData.put("rating", Integer.parseInt(params.get("rating")));
-                }
-
-                // Read scale configuration from step
-                Map<String, Object> config = step.getConfig();
-                Map<String, Object> scale = config != null ? (Map<String, Object>) config.get("scale") : null;
-
-                if (scale != null) {
-                    responseData.put("minRating", scale.get("min"));
-                    responseData.put("maxRating", scale.get("max"));
-                } else {
-                    // Fallback defaults
-                    responseData.put("minRating", 1);
-                    responseData.put("maxRating", 10);
-                }
-            }
-
-            responseService.submitResponse(session, stepId, participant, step.getDataPattern(), responseData);
-
-            log.info("Submitted {} response for participant: {} in step: {}",
-                step.getDataPattern(), participant.getDisplayName(), stepId);
+            responseService.submitResponse(retroId, stepId, dto, httpRequest);
+            log.info("Submitted column response for step: {}", stepId);
 
             return ResponseEntity.ok()
                 .header("HX-Trigger", "responseSubmitted")
                 .build();
 
+        } catch (RetroSessionNotFoundException e) {
+            log.warn("Session not found: {}", retroId);
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
-            log.error("Error submitting response: ", e);
+            log.error("Error submitting column response: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Submit a rating response (RATING_SCALE component type).
+     * Form data is automatically validated using Jakarta Bean Validation annotations.
+     */
+    @PostMapping("/{retroId}/step/{stepId}/response/rating")
+    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    public ResponseEntity<Void> submitRatingResponse(
+            @PathVariable UUID retroId,
+            @PathVariable Long stepId,
+            @Valid @ModelAttribute RatingResponseDto dto,
+            HttpServletRequest httpRequest) {
+
+        log.debug("Submitting rating response for retro: {}, step: {}, rating: {}",
+            retroId, stepId, dto.rating());
+
+        try {
+            responseService.submitResponse(retroId, stepId, dto, httpRequest);
+            log.info("Submitted rating response for step: {}", stepId);
+
+            return ResponseEntity.ok()
+                .header("HX-Trigger", "responseSubmitted")
+                .build();
+
+        } catch (RetroSessionNotFoundException e) {
+            log.warn("Session not found: {}", retroId);
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error submitting rating response: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PutMapping("/{retroId}/response/{responseId}")
+    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    public ResponseEntity<Void> updateResponse(
+            @PathVariable UUID retroId,
+            @PathVariable UUID responseId,
+            @RequestParam String content,
+            HttpServletRequest httpRequest) {
+
+        log.debug("Updating response {} for retro: {}", responseId, retroId);
+
+        try {
+            Participant participant = participantService.getParticipantForSession(httpRequest, retroId);
+            if (participant == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+
+            responseService.updateResponse(responseId, participant, content);
+
+            log.info("Updated response: {}", responseId);
+
+            return ResponseEntity.ok().build();
+
+        } catch (SecurityException e) {
+            log.warn("Unauthorized response update attempt: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (Exception e) {
+            log.error("Error updating response: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PostMapping("/{retroId}/response/{responseId}/vote")
+    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    public ResponseEntity<String> toggleVote(
+            @PathVariable UUID retroId,
+            @PathVariable UUID responseId,
+            HttpServletRequest httpRequest) {
+
+        log.debug("Toggling vote for response {} in retro: {}", responseId, retroId);
+
+        try {
+            responseService.toggleVote(retroId, responseId, httpRequest);
+            log.info("Toggled vote for response: {}", responseId);
+
+            return ResponseEntity.ok()
+                .header("HX-Trigger", "voteToggled")
+                .build();
+
+        } catch (VoteLimitExceededException e) {
+            log.warn("Vote limit exceeded: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(e.getMessage());
+        } catch (SecurityException e) {
+            log.warn("Unauthorized vote attempt: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (Exception e) {
+            log.error("Error toggling vote: ", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

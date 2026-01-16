@@ -33,10 +33,11 @@ public class RetroSession {
 
   private LocalDateTime createdAt;
   private LocalDateTime finishedAt;
+  private LocalDateTime stepStartedAt;
 
   @ManyToOne(fetch = FetchType.LAZY)
   private RetroTemplate template;
-  
+
   private int currentStepIndex = -1;
 
   @Enumerated(EnumType.STRING)

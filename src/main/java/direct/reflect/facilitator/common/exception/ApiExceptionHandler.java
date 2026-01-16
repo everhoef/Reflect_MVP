@@ -11,12 +11,15 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import tools.jackson.databind.exc.InvalidFormatException;
 
 import direct.reflect.facilitator.common.exception.NotAuthenticatedException;
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException;
 import direct.reflect.facilitator.common.exception.RetroTemplateNotFoundException;
+import direct.reflect.facilitator.common.exception.InvalidSessionStateException;
+import direct.reflect.facilitator.common.exception.InvalidStepException;
+import direct.reflect.facilitator.common.exception.VoteLimitExceededException;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -73,16 +76,33 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
     public ResponseEntity<String> handleValidationException(Exception ex) {
-        log.warn("Input validation failed: {}", ex.getMessage());
+        String errors;
+
+        if (ex instanceof MethodArgumentNotValidException validEx) {
+            errors = validEx.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(error -> error.getDefaultMessage())
+                .collect(java.util.stream.Collectors.joining("; "));
+        } else if (ex instanceof BindException bindEx) {
+            errors = bindEx.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(error -> error.getDefaultMessage())
+                .collect(java.util.stream.Collectors.joining("; "));
+        } else {
+            errors = "Invalid input provided";
+        }
+
+        log.warn("Input validation failed: {}", errors);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .header("HX-Redirect", "/home?error=invalid_input")
-            .body("Invalid input provided");
+            .body("Validation failed: " + errors);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<String> handleJsonDeserialization(HttpMessageNotReadableException ex) {
         log.warn("JSON deserialization failed: {}", ex.getMessage());
-        
+
         // Check if this is a UUID format error specifically
         if (ex.getCause() instanceof InvalidFormatException) {
             InvalidFormatException ife = (InvalidFormatException) ex.getCause();
@@ -93,10 +113,31 @@ public class ApiExceptionHandler {
                     .body("Invalid session ID format");
             }
         }
-        
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
             .header("HX-Redirect", "/home?error=invalid_input")
             .body("Invalid request format");
+    }
+
+    @ExceptionHandler(InvalidSessionStateException.class)
+    public ResponseEntity<String> handleInvalidSessionState(InvalidSessionStateException ex) {
+        log.warn("Invalid session state: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidStepException.class)
+    public ResponseEntity<String> handleInvalidStep(InvalidStepException ex) {
+        log.warn("Invalid step: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(VoteLimitExceededException.class)
+    public ResponseEntity<String> handleVoteLimitExceeded(VoteLimitExceededException ex) {
+        log.warn("Vote limit exceeded: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

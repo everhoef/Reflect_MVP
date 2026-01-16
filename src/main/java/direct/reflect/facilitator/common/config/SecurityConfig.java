@@ -61,7 +61,7 @@ public class SecurityConfig {
             // Authorization rules - permissive approach with service-level enforcement
             .authorizeHttpRequests(requests -> requests
                 // Public static resources
-                .requestMatchers("/css/**", "/js/**", "/images/**", "/img/**", "/static/**").permitAll()
+                .requestMatchers("/css/**", "/js/**", "/images/**", "/img/**", "/static/**", "/webjars/**").permitAll()
                 .requestMatchers("/favicon.ico", "/htmx.min.js", "/sse.js", "/json-enc.js", "/script.js").permitAll()
                 
                 // Public pages

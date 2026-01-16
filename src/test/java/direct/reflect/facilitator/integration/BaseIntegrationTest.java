@@ -1,15 +1,22 @@
 package direct.reflect.facilitator.integration;
 
 import com.microsoft.playwright.*;
+import com.microsoft.playwright.Tracing;
+import com.microsoft.playwright.ConsoleMessage;
 import com.microsoft.playwright.options.LoadState;
+import com.microsoft.playwright.options.WaitUntilState;
+import com.microsoft.playwright.options.WaitForSelectorState;
 import com.microsoft.playwright.options.SelectOption;
 import com.microsoft.playwright.options.RequestOptions;
 import com.microsoft.playwright.options.FormData;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.extension.ExtensionContext;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -17,23 +24,53 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.annotation.DirtiesContext.ClassMode;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.UUID;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
 
 import direct.reflect.facilitator.configurator.RetroTemplateRepository;
 import direct.reflect.facilitator.configurator.RetroStageRepository;
 import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.configurator.RetroStage;
 import direct.reflect.facilitator.facilitation.RetroSessionService;
+import direct.reflect.facilitator.facilitation.ParticipantRepository;
+import direct.reflect.facilitator.facilitation.RetroSessionRepository;
+import direct.reflect.facilitator.facilitation.response.ParticipantResponseRepository;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 /**
  * Base class for integration tests with common setup for Playwright, TestContainers, and authentication.
  * All browser-based integration tests should extend this class.
- * 
+ *
  * Note: Each browser context maintains its own session, so multiple users can be authenticated
  * simultaneously using Spring Security's session-based authentication.
  */
@@ -44,8 +81,18 @@ import java.util.List;
     direct.reflect.facilitator.auth.TestAuthConfiguration.class, // Provides TestAuthController with /test/* endpoints
     direct.reflect.facilitator.config.TestSecurityOverride.class // Extends SecurityConfig to allow /test/* endpoints
 })
+@DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 @Slf4j
 public abstract class BaseIntegrationTest {
+
+    // ==================== PLAYWRIGHT CONFIGURATION ====================
+
+    /**
+     * Timeout constants for Playwright operations.
+     * Keep it simple: one default for most operations, one short for quick checks.
+     */
+    protected static final int DEFAULT_TIMEOUT_MS = 5000;   // Navigation, elements, SSE - use for 95% of cases
+    protected static final int SHORT_TIMEOUT_MS = 2000;     // Quick checks when element should already exist
 
     @LocalServerPort
     protected int port;
@@ -72,7 +119,13 @@ public abstract class BaseIntegrationTest {
 
     protected Playwright playwright;
     protected Browser browser;
+    protected BrowserContext context;
     protected String baseUrl;
+
+    // Test failure reporting infrastructure
+    private TestInfo currentTestInfo;
+    private List<ConsoleMessage> consoleErrors = new ArrayList<>();
+    private List<String> networkFailures = new ArrayList<>();
 
     @Autowired
     protected RetroTemplateRepository templateRepository;
@@ -83,83 +136,333 @@ public abstract class BaseIntegrationTest {
     @Autowired
     protected RetroSessionService sessionService;
 
+    @Autowired
+    protected ParticipantRepository participantRepository;
+
+    @Autowired
+    protected RetroSessionRepository retroSessionRepository;
+
+    @Autowired
+    protected ParticipantResponseRepository participantResponseRepository;
+
+    // ==================== ACTIVITY BREADCRUMB TRAIL ====================
+
+    /**
+     * ThreadLocal storage for tracking test activities.
+     * Provides breadcrumb trail for debugging test failures.
+     */
+    private static final ThreadLocal<List<String>> activityBreadcrumbs =
+        ThreadLocal.withInitial(ArrayList::new);
+
+    /**
+     * Records an activity with timestamp for the breadcrumb trail.
+     * Use this in all helper methods to track the sequence of operations.
+     */
+    protected void recordActivity(String action) {
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_TIME);
+        activityBreadcrumbs.get().add(String.format("[%s] %s", timestamp, action));
+    }
+
+    /**
+     * Logs the activity trail to help debug test failures.
+     * Shows the sequence of operations leading up to a failure.
+     */
+    protected void logActivityTrail() {
+        List<String> trail = activityBreadcrumbs.get();
+        if (!trail.isEmpty()) {
+            log.error("[TEST_FAILURE_REPORT] ╔═══════════════════════════════════════════════════════════");
+            log.error("[TEST_FAILURE_REPORT] ║ ACTIVITY TRAIL (last {} operations):", trail.size());
+            log.error("[TEST_FAILURE_REPORT] ╠═══════════════════════════════════════════════════════════");
+            for (int i = 0; i < trail.size(); i++) {
+                log.error("[TEST_FAILURE_REPORT] ║ {}/{}: {}", i + 1, trail.size(), trail.get(i));
+            }
+            log.error("[TEST_FAILURE_REPORT] ╚═══════════════════════════════════════════════════════════");
+        }
+    }
+
+    /**
+     * Clears the activity trail.
+     * Called at the start of each test to ensure clean state.
+     */
+    protected void clearActivityTrail() {
+        activityBreadcrumbs.get().clear();
+    }
+
+    // ==================== FORM STATE CAPTURE ====================
+
+    /**
+     * Captures current form state from the page using Playwright's native JavaScript evaluation.
+     * Extracts all form fields (input, textarea, select) with their current values.
+     *
+     * @param page Page to capture form state from
+     * @return Map of field names/IDs to their current values
+     */
+    @SuppressWarnings("unchecked")
+    protected Map<String, String> captureFormState(Page page) {
+        try {
+            // Use Playwright's native JavaScript evaluation
+            // Try-catch prevents indefinite hangs by using Playwright's default timeout
+            Object result = page.evaluate("""
+                () => {
+                    const state = {};
+                    document.querySelectorAll('form input, form textarea, form select')
+                        .forEach(el => {
+                            const key = el.name || el.id || el.type || 'unnamed';
+                            state[key] = el.value || '[empty]';
+                        });
+                    return state;
+                }
+            """);
+
+            if (result instanceof Map) {
+                return (Map<String, String>) result;
+            }
+            return new HashMap<>();
+        } catch (Exception e) {
+            log.warn("Failed to capture form state: {}", e.getMessage());
+            return new HashMap<>();
+        }
+    }
+
+    /**
+     * Logs form state with TEST_FAILURE_REPORT marker for debugging.
+     * Shows what values were in form fields at time of failure.
+     *
+     * @param page Page to capture form state from
+     * @param context Description of when this capture occurred (e.g., "authentication failure")
+     */
+    protected void logFormState(Page page, String context) {
+        Map<String, String> formState = captureFormState(page);
+        if (!formState.isEmpty()) {
+            log.error("[TEST_FAILURE_REPORT] ╔═══════════════════════════════════════════════════════════");
+            log.error("[TEST_FAILURE_REPORT] ║ FORM STATE at {}", context);
+            log.error("[TEST_FAILURE_REPORT] ╠═══════════════════════════════════════════════════════════");
+            formState.forEach((field, value) ->
+                log.error("[TEST_FAILURE_REPORT] ║   {} = {}", field, value));
+            log.error("[TEST_FAILURE_REPORT] ╚═══════════════════════════════════════════════════════════");
+        }
+    }
+
+    // ==================== CONSOLE AND NETWORK MONITORING ====================
+
+    /**
+     * Sets up Playwright's native console and network listeners on the browser context.
+     * This automatically applies to all pages created from this context.
+     *
+     * Uses Playwright's built-in listeners for:
+     * - Console error messages (logged immediately and stored for summary)
+     * - Network request failures (connection errors, timeouts)
+     * - HTTP error responses (4xx, 5xx status codes)
+     */
+    private void setupConsoleAndNetworkMonitoring(BrowserContext context) {
+        // Clear previous test's errors
+        consoleErrors.clear();
+        networkFailures.clear();
+
+        // ✅ Use Playwright's native console message listener
+        context.onConsoleMessage(msg -> {
+            if (msg.type().equals("error")) {
+                // Immediately log AND store for later summary reporting
+                log.error("[TEST_FAILURE_REPORT] 🔴 Browser Console: {}", msg.text());
+                consoleErrors.add(msg);
+            }
+        });
+
+        // ✅ Use Playwright's native network failure listener
+        context.onRequestFailed(request -> {
+            String failure = String.format("%s %s - %s",
+                request.method(), request.url(), request.failure());
+            log.error("[TEST_FAILURE_REPORT] ❌ Network Failed: {}", failure);
+            networkFailures.add(failure);
+        });
+
+        // ✅ Use Playwright's native response listener for HTTP errors
+        context.onResponse(response -> {
+            if (response.status() >= 400) {
+                String failure = String.format("HTTP %d: %s %s",
+                    response.status(),
+                    response.request().method(),
+                    response.url());
+                log.error("[TEST_FAILURE_REPORT] ❌ {}", failure);
+                networkFailures.add(failure);
+            }
+        });
+    }
+
+    /**
+     * Logs summary of browser console errors captured during test execution.
+     * Called from comprehensive error reporter on test failure.
+     */
+    protected void logBrowserConsoleErrors() {
+        if (!consoleErrors.isEmpty()) {
+            log.error("[TEST_FAILURE_REPORT] ╔═══════════════════════════════════════════════════════════");
+            log.error("[TEST_FAILURE_REPORT] ║ BROWSER CONSOLE ERRORS SUMMARY:");
+            log.error("[TEST_FAILURE_REPORT] ╠═══════════════════════════════════════════════════════════");
+            for (ConsoleMessage msg : consoleErrors) {
+                log.error("[TEST_FAILURE_REPORT] ║ {}", msg.text());
+                if (msg.location() != null) {
+                    log.error("[TEST_FAILURE_REPORT] ║   at {}:{}", msg.location(), msg.location());
+                }
+            }
+            log.error("[TEST_FAILURE_REPORT] ╚═══════════════════════════════════════════════════════════");
+        }
+    }
+
+    /**
+     * Logs summary of network failures captured during test execution.
+     * Called from comprehensive error reporter on test failure.
+     */
+    protected void logNetworkFailures() {
+        if (!networkFailures.isEmpty()) {
+            log.error("[TEST_FAILURE_REPORT] ╔═══════════════════════════════════════════════════════════");
+            log.error("[TEST_FAILURE_REPORT] ║ NETWORK FAILURES SUMMARY:");
+            log.error("[TEST_FAILURE_REPORT] ╠═══════════════════════════════════════════════════════════");
+            for (String failure : networkFailures) {
+                log.error("[TEST_FAILURE_REPORT] ║ {}", failure);
+            }
+            log.error("[TEST_FAILURE_REPORT] ╚═══════════════════════════════════════════════════════════");
+        }
+    }
+
+    /**
+     * Creates a new browser context with console and network monitoring enabled.
+     * Use this helper when tests need multiple user contexts (e.g., facilitator + participants).
+     *
+     * @return A new BrowserContext with monitoring enabled
+     */
+    protected BrowserContext createMonitoredContext() {
+        BrowserContext newContext = browser.newContext();
+
+        // Set default timeouts to prevent indefinite waits
+        newContext.setDefaultTimeout(DEFAULT_TIMEOUT_MS);
+        newContext.setDefaultNavigationTimeout(DEFAULT_TIMEOUT_MS);
+
+        setupConsoleAndNetworkMonitoring(newContext);
+        return newContext;
+    }
+
     @BeforeEach
-    void setUp() {
+    void setUp(TestInfo testInfo) {
+        // Store test info for later use (tracing, error reporting)
+        currentTestInfo = testInfo;
+
+        // Clear activity trail for clean state at start of each test
+        clearActivityTrail();
+
         baseUrl = "http://localhost:" + port;
         playwright = Playwright.create();
-        
+
         // Enable visual debugging: set PLAYWRIGHT_DEBUG=true for headful mode + slow motion
         boolean debugMode = Boolean.parseBoolean(System.getenv("PLAYWRIGHT_DEBUG"));
         BrowserType.LaunchOptions launchOptions = new BrowserType.LaunchOptions()
             .setHeadless(!debugMode);
-        
+
         if (debugMode) {
             launchOptions.setSlowMo(1000); // 1 second delay between actions
             log.info("🐛 PLAYWRIGHT DEBUG MODE ENABLED");
-            log.info("   - Headful browser (you can see what's happening)");  
+            log.info("   - Headful browser (you can see what's happening)");
             log.info("   - 1 second delay between actions");
             log.info("   - Screenshots will be saved on failures");
         }
-        
+
         browser = playwright.chromium().launch(launchOptions);
+
+        // Create browser context and set up monitoring
+        context = browser.newContext();
+
+        // Set default timeout to prevent indefinite waits (Playwright's default is 30s, but we want faster failures)
+        context.setDefaultTimeout(DEFAULT_TIMEOUT_MS);
+        context.setDefaultNavigationTimeout(DEFAULT_TIMEOUT_MS);
+
+        // Set up console and network monitoring (Playwright native listeners)
+        setupConsoleAndNetworkMonitoring(context);
+
+        // Enable Playwright tracing in debug mode for local debugging
+        if (debugMode) {
+            context.tracing().start(new Tracing.StartOptions()
+                .setScreenshots(true)
+                .setSnapshots(true)
+                .setSources(true));
+            log.info("📊 Playwright tracing enabled");
+        }
     }
 
     @AfterEach
-    void tearDown() {
+    void tearDown(TestInfo testInfo) {
+        boolean debugMode = Boolean.parseBoolean(System.getenv("PLAYWRIGHT_DEBUG"));
+
+        // Save Playwright trace on failure (debug mode only)
+        // Note: We save trace for all tests in debug mode since JUnit 5 doesn't provide
+        // easy failure detection in @AfterEach without custom extensions
+        if (debugMode && context != null) {
+            try {
+                String testName = testInfo.getDisplayName().replaceAll("[^a-zA-Z0-9]", "_");
+                Path tracePath = Paths.get("target/traces/" + testName + ".zip");
+                Files.createDirectories(tracePath.getParent());
+
+                context.tracing().stop(new Tracing.StopOptions().setPath(tracePath));
+
+                log.info("📊 Playwright trace saved: {}", tracePath);
+                log.info("   View with: mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args='show-trace {}'", tracePath);
+            } catch (Exception e) {
+                log.warn("Failed to save Playwright trace: {}", e.getMessage());
+            }
+        }
+
+        // Close Playwright resources first (before database cleanup)
+        if (context != null) context.close();
         if (browser != null) browser.close();
         if (playwright != null) playwright.close();
+
+        // Clean database state between tests
+        // Use @DirtiesContext instead of manual cleanup to avoid connection pool issues
+        clearActivityTrail();
     }
 
     // ==================== AUTHENTICATION HELPERS ====================
 
     /**
-     * Authenticates a user as a guest using the UI authentication flow.
+     * Authenticates a user as a guest using Playwright's native API request.
      * Each browser context maintains its own session cookies, allowing multiple
      * simultaneous authenticated users.
      */
     protected void authenticateAsGuest(Page page, String displayName) {
+        recordActivity("authenticateAsGuest: " + displayName);
         try {
-            // Navigate to login page
+            // Clear cookies for clean state
+            page.context().clearCookies();
+
+            // Navigate to login page to get CSRF token
             page.navigate(baseUrl + "/login");
             page.waitForLoadState(LoadState.NETWORKIDLE);
-            
-            // Submit guest authentication using the real UI flow to /auth/guest
-            page.evaluate(String.format("""
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = '%s/auth/guest';
-                
-                const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content') ||
-                                  document.querySelector('input[name="_csrf"]')?.value ||
-                                  'test-csrf-token';
-                
-                const csrfInput = document.createElement('input');
-                csrfInput.type = 'hidden';
-                csrfInput.name = '_csrf';
-                csrfInput.value = csrfToken;
-                form.appendChild(csrfInput);
-                
-                const displayNameInput = document.createElement('input');
-                displayNameInput.type = 'hidden';
-                displayNameInput.name = 'displayName';
-                displayNameInput.value = '%s';
-                form.appendChild(displayNameInput);
-                
-                document.body.appendChild(form);
-                form.submit();
-            """, baseUrl, displayName));
-            
-            // Wait for redirect to home page (/) after guest authentication
-            try {
-                page.waitForURL(url -> url.equals(baseUrl + "/") || url.contains("/home"), 
-                    new Page.WaitForURLOptions().setTimeout(15000));
-                log.info("✅ Guest authentication successful, redirected to: {}", page.url());
-            } catch (Exception e) {
-                log.error("❌ Guest authentication redirect failed for user '{}'. Final URL: {}", displayName, page.url());
-                throw new RuntimeException("Timeout waiting for guest authentication redirect for user '" + displayName + "'. URL: " + page.url());
+
+            // Extract CSRF token from the page using native Playwright locator
+            String csrfToken = page.locator("input[name='_csrf']").getAttribute("value");
+            if (csrfToken == null || csrfToken.isEmpty()) {
+                throw new RuntimeException("CSRF token not found on login page");
             }
-            
+
+            // Use Playwright's native API request (shares session with page)
+            page.request().post(baseUrl + "/auth/guest",
+                RequestOptions.create()
+                    .setForm(FormData.create()
+                        .set("displayName", displayName)
+                        .set("_csrf", csrfToken)));
+
+            // Navigate to home page after authentication
+            page.navigate(baseUrl + "/");
+            page.waitForLoadState(LoadState.NETWORKIDLE,
+                new Page.WaitForLoadStateOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+
+            // Verify authentication succeeded
+            if (page.url().contains("/login")) {
+                throw new RuntimeException("Guest authentication failed - still on login page");
+            }
+
+            log.info("✅ Guest authentication successful for '{}', URL: {}", displayName, page.url());
+
         } catch (Exception e) {
+            reportTestFailure(page, "Guest Authentication for " + displayName, e);
             throw new RuntimeException("Failed to authenticate guest user '" + displayName + "': " + e.getMessage(), e);
         }
     }
@@ -169,38 +472,42 @@ public abstract class BaseIntegrationTest {
      * Uses a simpler approach that navigates to a test page first to establish session context.
      */
     protected void authenticateAsOAuth2User(Page page, String username, String displayName, String email) {
+        recordActivity("authenticateAsOAuth2User: " + username + " (" + displayName + ")");
         try {
+            // Clear cookies first
+            page.context().clearCookies();
+
             log.debug("Starting OAuth2 authentication for user: {}", username);
-            
+
             // Create GET URL for the test auth endpoint (now supports GET)
-            String authUrl = String.format("%s/test/login-oauth-user?username=%s&displayName=%s&email=%s", 
-                baseUrl, 
+            String authUrl = String.format("%s/test/login-oauth-user?username=%s&displayName=%s&email=%s",
+                baseUrl,
                 java.net.URLEncoder.encode(username, "UTF-8"),
-                java.net.URLEncoder.encode(displayName, "UTF-8"), 
+                java.net.URLEncoder.encode(displayName, "UTF-8"),
                 java.net.URLEncoder.encode(email, "UTF-8"));
-                
+
             log.debug("Navigating to OAuth2 auth URL: {}", authUrl);
-            
+
             // Navigate directly to the auth endpoint - it will redirect to home page
             page.navigate(authUrl);
-            
+
             // Wait for authentication and redirect to complete
             try {
                 // The endpoint should redirect to home page ("/") after authentication
-                page.waitForURL(url -> url.equals(baseUrl + "/") || url.contains("/home"), 
-                    new Page.WaitForURLOptions().setTimeout(10000));
-                
+                page.waitForURL(url -> url.equals(baseUrl + "/") || url.contains("/home"),
+                    new Page.WaitForURLOptions().setTimeout(SHORT_TIMEOUT_MS));
+
                 log.debug("OAuth2 authentication completed, current URL: {}", page.url());
-                
+
             } catch (Exception e) {
                 log.warn("OAuth2 authentication redirect timeout for user '{}': {}", username, e.getMessage());
                 log.debug("Current URL after timeout: {}", page.url());
-                
+
                 // If redirect didn't work, try manual navigation
                 if (!page.url().contains(baseUrl + "/") && !page.url().contains("/login")) {
                     log.debug("Manually navigating to home page to complete authentication");
                     page.navigate(baseUrl + "/");
-                    page.waitForLoadState(LoadState.NETWORKIDLE, new Page.WaitForLoadStateOptions().setTimeout(5000));
+                    page.waitForLoadState(LoadState.NETWORKIDLE, new Page.WaitForLoadStateOptions().setTimeout(SHORT_TIMEOUT_MS));
                 }
             }
             
@@ -215,9 +522,10 @@ public abstract class BaseIntegrationTest {
                 log.info("✅ OAuth2 authentication completed successfully, final URL: {}", finalUrl);
                 debugPageState(page, "OAuth2 authentication success");
             }
-            
+
         } catch (Exception e) {
             log.error("❌ OAuth2 authentication error for user '{}': {}", username, e.getMessage());
+            reportTestFailure(page, "OAuth2 Authentication for " + username + " (" + displayName + ")", e);
             throw new RuntimeException("Failed to authenticate OAuth2 user '" + username + "': " + e.getMessage(), e);
         }
     }
@@ -228,15 +536,21 @@ public abstract class BaseIntegrationTest {
      * Creates a new retrospective session and returns the session ID
      */
     protected String createRetroSession(Page facilitatorPage, String sessionName) {
+        recordActivity("createRetroSession: " + sessionName);
         log.debug("Starting session creation for: {}", sessionName);
-        
+
         // Navigate to home page first (should be authenticated already)
         facilitatorPage.navigate(baseUrl + "/");
         
         // Wait for session creation form
-        facilitatorPage.waitForSelector("input[name='sessionName']", new Page.WaitForSelectorOptions().setTimeout(10000));
+        facilitatorPage.waitForSelector("input[name='sessionName']", new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
         log.debug("Session creation form found");
-        
+
+        // CRITICAL: Wait for HTMX to fully initialize before interacting with forms
+        // Without this, clicking the button races with HTMX attaching event handlers
+        facilitatorPage.waitForFunction("() => typeof htmx !== 'undefined'");
+        log.debug("HTMX initialized and ready");
+
         // Set up response monitoring to capture the HX-Redirect header
         final String[] redirectUrl = {null};
         
@@ -261,10 +575,10 @@ public abstract class BaseIntegrationTest {
         facilitatorPage.click("button:has-text('Create Session')");
         
         // Wait for HTMX redirect to retro page (instead of network idle due to SSE)
-        facilitatorPage.waitForURL(url -> url.contains("/retro/"), new Page.WaitForURLOptions().setTimeout(10000));
+        facilitatorPage.waitForURL(url -> url.contains("/retro/"), new Page.WaitForURLOptions().setTimeout(DEFAULT_TIMEOUT_MS));
         
         // Wait for essential page elements to load instead of fixed delay
-        facilitatorPage.waitForSelector("body", new Page.WaitForSelectorOptions().setTimeout(2000));
+        facilitatorPage.waitForSelector("body", new Page.WaitForSelectorOptions().setTimeout(SHORT_TIMEOUT_MS));
 
         String sessionUrl = facilitatorPage.url();
         log.debug("Facilitator URL after session creation: {}", sessionUrl);
@@ -286,19 +600,21 @@ public abstract class BaseIntegrationTest {
      * Joins an existing retrospective session
      */
     protected void joinRetroSession(Page participantPage, String sessionId) {
+        recordActivity("joinRetroSession: " + sessionId);
         try {
             log.debug("Starting join session process - session ID: {}, current URL: {}", sessionId, participantPage.url());
-            
+
             // Navigate to home page first (should be authenticated already)
+            // SSE connections auto-disconnect on navigation
             participantPage.navigate(baseUrl + "/");
             
             // Wait for join session form
             log.info("Waiting for join session form input[name='retroId']...");
             try {
-                participantPage.waitForSelector("input[name='retroId']", new Page.WaitForSelectorOptions().setTimeout(10000));
+                participantPage.waitForSelector("input[name='retroId']", new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
                 log.info("✅ Join session form found");
             } catch (Exception e) {
-                log.error("❌ Failed to find join session form after 10 seconds");
+                log.error("❌ Failed to find join session form after 3 seconds");
                 log.error("Current URL: {}", participantPage.url());
                 log.error("Page title: {}", participantPage.title());
                 
@@ -336,7 +652,12 @@ public abstract class BaseIntegrationTest {
             if (!sessionId.equals(filledValue)) {
                 log.error("❌ Form fill failed! Expected: {}, Actual: {}", sessionId, filledValue);
             }
-            
+
+            // CRITICAL: Wait for HTMX to fully initialize before interacting with forms
+            // Without this, clicking the button races with HTMX attaching event handlers
+            participantPage.waitForFunction("() => typeof htmx !== 'undefined'");
+            log.debug("HTMX initialized and ready for join");
+
             // Set up response monitoring to track HTMX redirect headers
             final String[] redirectUrl = {null};
             final boolean[] requestSent = {false};
@@ -384,7 +705,7 @@ public abstract class BaseIntegrationTest {
             // Instead of fixed 3s delay, wait for URL change or specific response elements
             try {
                 participantPage.waitForURL(url -> url.contains("/retro/") || url.contains("error="), 
-                    new Page.WaitForURLOptions().setTimeout(5000));
+                    new Page.WaitForURLOptions().setTimeout(DEFAULT_TIMEOUT_MS));
             } catch (Exception e) {
                 // If URL doesn't change quickly, allow time for HTMX response
                 participantPage.waitForTimeout(500);
@@ -467,45 +788,147 @@ public abstract class BaseIntegrationTest {
      * Starts the retrospective session (facilitator only)
      */
     protected void startRetroSession(Page facilitatorPage) {
+        recordActivity("startRetroSession");
         log.debug("Starting retro session...");
-        
-        // Set up response monitoring to detect session start completion
-        final boolean[] sessionStarted = {false};
-        
+
+        // Best practice for SSE testing: Monitor SSE responses, then verify UI updates
+        // Reference: Playwright SSE testing guide (2024-2025)
+
+        // Set up SSE response monitoring to verify messages are being received
+        AtomicBoolean sessionStartedEventReceived = new AtomicBoolean(false);
         facilitatorPage.onResponse(response -> {
-            if (response.url().contains("/start") && response.status() == 302) {
-                sessionStarted[0] = true;
-                log.debug("Session start response received: {}", response.status());
+            if (response.url().contains("/events")) {
+                try {
+                    // SSE responses are text/event-stream with data lines
+                    String body = response.text();
+                    log.debug("SSE response received: {}", body);
+
+                    if (body.contains("session_started")) {
+                        sessionStartedEventReceived.set(true);
+                        log.debug("SESSION_STARTED event detected in SSE stream");
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to read SSE response body: {}", e.getMessage());
+                }
             }
         });
-        
-        facilitatorPage.click("button:has-text('Start Retrospective')");
-        
-        // Wait for HTMX redirect to complete and page to reload with active session state
+
+        // Click start button and wait for POST to complete
+        Response startResponse = facilitatorPage.waitForResponse(
+            response -> response.url().contains("/start") && response.request().method().equals("POST"),
+            () -> facilitatorPage.click("button:has-text('Start Retrospective')")
+        );
+
+        log.debug("Start session request completed with status: {}", startResponse.status());
+
+        log.debug("SSE monitoring - session_started event received: {}", sessionStartedEventReceived.get());
+
+        // Wait for HTMX to receive SSE event, fetch new content, and complete DOM swap
+        // Evidence: "Session Lobby" text disappears when HTMX swaps in active retro content
+        facilitatorPage.waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
+            null, new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+
+        log.debug("HTMX content swap completed - lobby text disappeared");
+
+        // Now the Next button should be present in the DOM
+        facilitatorPage.waitForSelector("button:has-text('Next')",
+            new Page.WaitForSelectorOptions().setTimeout(SHORT_TIMEOUT_MS));
+
+        log.debug("Session started - Next button visible");
+    }
+
+    /**
+     * Click Next button and wait for HTMX content swap on ALL pages using event-driven waiting.
+     * Returns true if successful, false if button not found or timeout.
+     *
+     * @param facilitatorPage The facilitator's page (clicks Next here)
+     * @param timeoutMs Maximum time to wait for all pages to refresh
+     * @param participantPages Additional participant pages that should also receive the SSE update
+     */
+    protected boolean clickNextAndWait(Page facilitatorPage, int timeoutMs, Page... participantPages) {
         try {
-            // First wait for the network request to complete
-            facilitatorPage.waitForLoadState(LoadState.NETWORKIDLE, new Page.WaitForLoadStateOptions().setTimeout(5000));
-            
-            // Then wait for SSE connection to be established (which happens in active phases)
-            facilitatorPage.waitForFunction("() => {" +
-                "const eventSource = window.eventSource;" +
-                "return eventSource && eventSource.readyState === 1;" + // OPEN state
-            "}", new Page.WaitForFunctionOptions().setTimeout(5000));
-            
-            log.debug("Session started with SSE connection established");
-        } catch (Exception e) {
-            log.warn("SSE connection not established immediately after session start, using fallback wait: {}", e.getMessage());
-            // Fallback: wait for session start indicators and give time for SSE
-            try {
-                facilitatorPage.waitForSelector(".retro-step, .step-content, .participants-list", 
-                    new Page.WaitForSelectorOptions().setTimeout(3000));
-            } catch (Exception selectorException) {
-                // Final fallback
-                facilitatorPage.waitForTimeout(1000);
+            // Check if Next button exists
+            if (facilitatorPage.locator("button:has-text('Next')").count() == 0) {
+                log.debug("Next button not found, assuming end of flow");
+                return false;
             }
+
+            // Build list of all pages to track
+            List<Page> allPages = new ArrayList<>();
+            allPages.add(facilitatorPage);
+            for (Page p : participantPages) {
+                allPages.add(p);
+            }
+            int totalPages = allPages.size();
+            log.debug("Clicking Next and waiting for {} page(s) to refresh...", totalPages);
+
+            // Use waitForResponse with CompletableFuture for each page
+            // waitForResponse is blocking, so we start them in separate threads BEFORE clicking
+            ExecutorService executor = Executors.newFixedThreadPool(totalPages);
+            List<CompletableFuture<String>> futures = new ArrayList<>();
+
+            for (int i = 0; i < allPages.size(); i++) {
+                final int pageIndex = i;
+                final Page page = allPages.get(i);
+                final String pageName = (pageIndex == 0) ? "facilitator" : "participant-" + pageIndex;
+
+                CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+                    try {
+                        // Wait for GET /content response with 200 status
+                        Response response = page.waitForResponse(
+                            resp -> resp.url().contains("/content")
+                                    && resp.request().method().equals("GET")
+                                    && resp.status() == 200,
+                            new Page.WaitForResponseOptions().setTimeout(timeoutMs)
+                        );
+                        log.debug("✓ Page {} refreshed via /content response: {}", pageName, response.url());
+                        return pageName;
+                    } catch (Exception e) {
+                        log.warn("Page {} did not receive /content response: {}", pageName, e.getMessage());
+                        throw new RuntimeException("Page " + pageName + " timeout", e);
+                    }
+                }, executor);
+
+                futures.add(future);
+            }
+
+            // Click Next button with force to avoid actionability hangs with active SSE
+            facilitatorPage.click("button:has-text('Next')", new Page.ClickOptions()
+                .setForce(true)
+                .setNoWaitAfter(true)
+                .setTimeout(DEFAULT_TIMEOUT_MS));
+            log.debug("Next button clicked, waiting for all pages to refresh...");
+
+            // Wait for ALL futures to complete
+            try {
+                CompletableFuture<Void> allFutures = CompletableFuture.allOf(
+                    futures.toArray(new CompletableFuture[0])
+                );
+                allFutures.get(timeoutMs, TimeUnit.MILLISECONDS);
+                log.debug("All {} page(s) refreshed successfully", totalPages);
+            } catch (Exception e) {
+                // Some pages didn't refresh - log which ones
+                List<String> completed = new ArrayList<>();
+                List<String> failed = new ArrayList<>();
+                for (int i = 0; i < futures.size(); i++) {
+                    String pageName = (i == 0) ? "facilitator" : "participant-" + i;
+                    if (futures.get(i).isDone() && !futures.get(i).isCompletedExceptionally()) {
+                        completed.add(pageName);
+                    } else {
+                        failed.add(pageName + " (" + allPages.get(i).url() + ")");
+                    }
+                }
+                log.warn("Timeout: {}/{} pages refreshed. Completed: {}, Failed: {}",
+                    completed.size(), totalPages, completed, failed);
+            } finally {
+                executor.shutdownNow();
+            }
+
+            return true;
+        } catch (Exception e) {
+            log.warn("clickNextAndWait failed: {}", e.getMessage());
+            return false;
         }
-        
-        log.debug("Session start process completed");
     }
 
     // ==================== MULTI-USER SESSION SETUP ====================
@@ -560,7 +983,25 @@ public abstract class BaseIntegrationTest {
 
         // Start the session
         log.debug("Starting retro session...");
-        startRetroSession(facilitatorPage);
+        Response startResponse = facilitatorPage.waitForResponse(
+            response -> response.url().contains("/start") && response.request().method().equals("POST"),
+            () -> clickElement(facilitatorPage, "button:has-text('Start Retrospective')"));
+
+        log.debug("Start session request completed with status: {}", startResponse.status());
+
+        // Wait for ALL pages (facilitator + participants) to transition from lobby → retro
+        // Check that "Session Lobby" disappears on all pages
+        log.debug("Waiting for all pages to leave lobby...");
+        for (UserPage userPage : participants) {
+            userPage.page().waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
+                null, new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+            log.debug("✅ Participant {} left lobby", userPage.displayName());
+        }
+
+        // Verify facilitator also left lobby
+        facilitatorPage.waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
+            null, new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+        log.debug("✅ Facilitator left lobby");
 
         return sessionId;
     }
@@ -568,9 +1009,13 @@ public abstract class BaseIntegrationTest {
     // ==================== NAVIGATION HELPERS ====================
 
     /**
-     * Navigates through steps until finding the desired step type
+     * Navigates through steps until finding the desired step type on ALL pages.
+     *
+     * @param facilitatorPage Facilitator page (clicks Next button)
+     * @param stepType Target step type (CATEGORICAL, RATING)
+     * @param observerPages Additional pages to verify (participants)
      */
-    protected void navigateToStepType(Page facilitatorPage, String stepType) {
+    protected void navigateToStepType(Page facilitatorPage, String stepType, Page... observerPages) {
         log.info("🎯 Navigating to step type: {}", stepType);
         
         // Skip through steps until we find the desired step type
@@ -581,24 +1026,16 @@ public abstract class BaseIntegrationTest {
             // Check if we're at the desired step type by looking for specific content
             boolean foundTargetStep = false;
             if (stepType.equals("CATEGORICAL")) {
-                // For categorical steps, look for category titles like "Mad", "Sad", "Glad"
-                foundTargetStep = facilitatorPage.locator("text=Mad").isVisible() || 
-                    facilitatorPage.locator("[data-category]").count() > 0;
+                // For categorical steps, look for data-column attributes (avoids strict mode violation)
+                foundTargetStep = facilitatorPage.locator("[data-column]").count() > 0;
                 if (foundTargetStep) {
-                    log.info("✅ Found CATEGORICAL step with Mad-Sad-Glad interface");
+                    log.info("✅ Found CATEGORICAL step with data-column interface");
                 }
             } else if (stepType.equals("RATING")) {
-                // For rating steps, look for rating inputs or scale
-                foundTargetStep = facilitatorPage.locator("input[name='rating']").isVisible() ||
-                    facilitatorPage.locator("text=Rate").isVisible();
+                // For rating steps, look for rating inputs (use count to avoid strict mode violation with multiple radio buttons)
+                foundTargetStep = facilitatorPage.locator("input[name='rating']").count() > 0;
                 if (foundTargetStep) {
                     log.info("✅ Found RATING step with rating inputs");
-                }
-            } else if (stepType.equals("FREEFORM")) {
-                // For freeform steps, look for content textarea
-                foundTargetStep = facilitatorPage.locator("textarea[name='content']").isVisible();
-                if (foundTargetStep) {
-                    log.info("✅ Found FREEFORM step with content textarea");
                 }
             } else {
                 // Generic check for step type text
@@ -609,46 +1046,47 @@ public abstract class BaseIntegrationTest {
             }
             
             if (foundTargetStep) {
-                break;
+                // Determine expected selector based on step type
+                String expectedSelector;
+                switch (stepType) {
+                    case "CATEGORICAL" -> expectedSelector = "[data-column]";
+                    case "RATING" -> expectedSelector = "input[name='rating'][value='1']"; // Check for first radio button to avoid strict mode violation
+                    default -> throw new IllegalArgumentException("Unknown step type: " + stepType);
+                }
+
+                // Verify all observer pages also show the target step
+                if (observerPages.length > 0) {
+                    log.info("✅ Facilitator found {} step, verifying {} observer pages...", stepType, observerPages.length);
+                    waitForAllPagesElement(expectedSelector, observerPages);
+                }
+                return;
             }
-            
+
             // Try to advance to next step if available
-            if (facilitatorPage.locator("button:has-text('Next Step')").isVisible()) {
-                log.debug("🔄 Clicking 'Next Step' button (iteration {})", i);
-                facilitatorPage.click("button:has-text('Next Step')");
-                
+            if (facilitatorPage.locator("button:has-text('Next')").count() > 0) {
+                log.debug("🔄 Clicking 'Next' button (iteration {})", i);
+                clickElement(facilitatorPage, "button:has-text('Next')");
+
                 // Wait for step content to load with better error handling
                 try {
-                    facilitatorPage.waitForLoadState(LoadState.NETWORKIDLE, new Page.WaitForLoadStateOptions().setTimeout(3000));
+                    facilitatorPage.waitForLoadState(LoadState.NETWORKIDLE,
+                        new Page.WaitForLoadStateOptions().setTimeout(DEFAULT_TIMEOUT_MS));
                 } catch (Exception e) {
                     // If network idle fails, just wait for basic content
                     facilitatorPage.waitForTimeout(1000);
                 }
             } else {
-                log.warn("❌ No 'Next Step' button found after {} iterations. Current page content snippet: {}", 
-                    i, facilitatorPage.textContent("body").substring(0, Math.min(200, facilitatorPage.textContent("body").length())));
+                log.error("❌ No 'Next' button found after {} iterations", i);
                 break;
             }
         }
         
-        // Final check - log what we ended up with
-        boolean finalCheck = false;
-        if (stepType.equals("CATEGORICAL")) {
-            finalCheck = facilitatorPage.locator("text=Mad").isVisible() || facilitatorPage.locator("[data-category]").count() > 0;
-        } else if (stepType.equals("RATING")) {
-            finalCheck = facilitatorPage.locator("input[name='rating']").isVisible();
-        } else if (stepType.equals("FREEFORM")) {
-            finalCheck = facilitatorPage.locator("textarea[name='content']").isVisible();
-        }
-        
-        log.info("🏁 Navigation completed. Found target step type '{}': {}", stepType, finalCheck);
-        if (!finalCheck) {
-            log.error("❌ Failed to find step type '{}'. Final page title: {}", stepType, facilitatorPage.title());
-            // Dump some debug info about current page state
-            String bodyText = facilitatorPage.textContent("body");
-            log.error("Page content (first 500 chars): {}", 
-                bodyText.substring(0, Math.min(500, bodyText.length())));
-        }
+        // If we got here, we didn't find the target step
+        log.error("❌ Failed to find step type '{}' after {} iterations", stepType, maxSteps);
+        debugPageState(facilitatorPage, "navigateToStepType failed");
+        throw new AssertionError(String.format(
+            "Failed to find step type '%s' after %d iterations. Page URL: %s",
+            stepType, maxSteps, facilitatorPage.url()));
     }
 
     // ==================== DEBUGGING HELPERS ====================
@@ -683,8 +1121,88 @@ public abstract class BaseIntegrationTest {
         void execute(Page page) throws Exception;
     }
 
+    // ==================== COMPREHENSIVE ERROR REPORTING ====================
+
+    /**
+     * Log progress for multi-step tests.
+     * Shows which step is executing (e.g., "[3/24] RATING - Submitting happiness ratings").
+     * Integrates with activity breadcrumb trail for complete traceability.
+     *
+     * @param phase Short phase name (e.g., "SETUP", "RATING", "HISTOGRAM")
+     * @param currentStep Current step number (1-based)
+     * @param totalSteps Total number of steps in the test
+     * @param description Brief description of what this step does
+     */
+    protected void logTestProgress(String phase, int currentStep, int totalSteps, String description) {
+        String progress = String.format("[%d/%d]", currentStep, totalSteps);
+        String message = String.format("%-8s %s - %s", progress, phase, description);
+
+        log.info("▶ {}", message);
+        recordActivity(message);
+    }
+
+    /**
+     * Comprehensive error reporter that combines all diagnostic tools.
+     * Call this from catch blocks to provide complete failure context.
+     *
+     * Generates a complete failure report including:
+     * 1. Activity breadcrumb trail (sequence of operations)
+     * 2. Browser console errors (JavaScript/HTMX errors)
+     * 3. Network failures (HTTP errors, connection failures)
+     * 4. Page state (URL, title, elements, visible errors)
+     * 5. Form state (input field values)
+     * 6. Screenshot (visual state at failure)
+     *
+     * All output prefixed with [TEST_FAILURE_REPORT] for grep-ability.
+     *
+     * @param page Page where failure occurred
+     * @param context Description of what was being attempted (e.g., "Guest Authentication for TestUser")
+     * @param error The exception that triggered this report
+     */
+    protected void reportTestFailure(Page page, String context, Throwable error) {
+        log.error("");
+        log.error("[TEST_FAILURE_REPORT] ╔═══════════════════════════════════════════════════════════════════════════");
+        log.error("[TEST_FAILURE_REPORT] ║");
+        log.error("[TEST_FAILURE_REPORT] ║  TEST FAILURE: {}", context);
+        log.error("[TEST_FAILURE_REPORT] ║  Error: {}", error.getMessage());
+        log.error("[TEST_FAILURE_REPORT] ║");
+        log.error("[TEST_FAILURE_REPORT] ╠═══════════════════════════════════════════════════════════════════════════");
+        log.error("");
+
+        // 1. Activity Trail - shows sequence of operations leading to failure
+        logActivityTrail();
+        log.error("");
+
+        // 2. Browser Console Errors - JavaScript/HTMX errors
+        logBrowserConsoleErrors();
+        if (!consoleErrors.isEmpty()) {
+            log.error("");
+        }
+
+        // 3. Network Failures - HTTP errors and connection failures
+        logNetworkFailures();
+        if (!networkFailures.isEmpty()) {
+            log.error("");
+        }
+
+        // 4. Page State - URL, title, elements, visible errors
+        debugPageState(page, context);
+        log.error("");
+
+        // 5. Form State - input field values at time of failure
+        logFormState(page, context);
+        log.error("");
+
+        // 6. Screenshot - visual state at failure
+        debugScreenshot(page, "failure", context);
+
+        log.error("");
+        log.error("[TEST_FAILURE_REPORT] ╚═══════════════════════════════════════════════════════════════════════════");
+        log.error("");
+    }
+
     // ==================== ADVANCED DEBUGGING HELPERS ====================
-    
+
     /**
      * Captures a detailed screenshot with test context for debugging
      */
@@ -704,32 +1222,43 @@ public abstract class BaseIntegrationTest {
                 }
             }
             
-            String timestamp = java.time.LocalDateTime.now().format(
-                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss-SSS"));
-            
+            String timestamp = LocalDateTime.now().format(
+                DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss-SSS"));
+
             // Create descriptive filename
-            String filename = String.format("%s_%s_%s_%s.png", 
+            String filename = String.format("%s_%s_%s_%s.png",
                 testClass,
-                testMethod, 
+                testMethod,
                 step.replaceAll("[^a-zA-Z0-9]", "_"),
                 timestamp);
+
+            Path screenshotDir = Paths.get("target", "debug-screenshots");
+            Files.createDirectories(screenshotDir);
             
-            java.nio.file.Path screenshotDir = java.nio.file.Paths.get("target", "debug-screenshots");
-            java.nio.file.Files.createDirectories(screenshotDir);
-            
+            // Use timeout to prevent hanging on error pages (chrome-error://, network errors, etc.)
             page.screenshot(new Page.ScreenshotOptions()
                 .setPath(screenshotDir.resolve(filename))
-                .setFullPage(true));
-            
-            log.info("📸 DEBUG SCREENSHOT: {}", filename);
-            log.info("   Test: {}.{}", testClass, testMethod);
-            log.info("   Step: {}", step);
-            log.info("   URL: {}", page.url());
-            log.info("   Title: {}", page.title());
-            if (additionalInfo != null) {
-                log.info("   Info: {}", additionalInfo);
+                .setFullPage(true)
+                .setTimeout(SHORT_TIMEOUT_MS));
+
+            log.error("[TEST_FAILURE_REPORT] ╔═══════════════════════════════════════════════════════════");
+            log.error("[TEST_FAILURE_REPORT] ║ SCREENSHOT CAPTURED");
+            log.error("[TEST_FAILURE_REPORT] ╠═══════════════════════════════════════════════════════════");
+            log.error("[TEST_FAILURE_REPORT] ║ File: {}", filename);
+            log.error("[TEST_FAILURE_REPORT] ║ Test: {}.{}", testClass, testMethod);
+            log.error("[TEST_FAILURE_REPORT] ║ Step: {}", step);
+            log.error("[TEST_FAILURE_REPORT] ║ URL: {}", page.url());
+            // page.title() can hang on error pages, so wrap in try-catch
+            try {
+                log.error("[TEST_FAILURE_REPORT] ║ Title: {}", page.title());
+            } catch (Exception e) {
+                log.error("[TEST_FAILURE_REPORT] ║ Title: [unavailable - {}]", e.getMessage());
             }
-            
+            if (additionalInfo != null) {
+                log.error("[TEST_FAILURE_REPORT] ║ Info: {}", additionalInfo);
+            }
+            log.error("[TEST_FAILURE_REPORT] ╚═══════════════════════════════════════════════════════════");
+
         } catch (Exception e) {
             log.warn("Failed to capture debug screenshot: {}", e.getMessage());
         }
@@ -747,56 +1276,83 @@ public abstract class BaseIntegrationTest {
      */
     protected void debugPageState(Page page, String context) {
         try {
-            log.info("🔍 DEBUG PAGE STATE - {}", context);
-            log.info("   URL: {}", page.url());
-            log.info("   Title: {}", page.title());
-            
-            // Count key elements
-            int formCount = page.locator("form").count();
-            int buttonCount = page.locator("button").count();
-            int inputCount = page.locator("input").count();
-            
-            log.info("   Elements: {} forms, {} buttons, {} inputs", formCount, buttonCount, inputCount);
-            
+            log.error("[TEST_FAILURE_REPORT] ╔═══════════════════════════════════════════════════════════");
+            log.error("[TEST_FAILURE_REPORT] ║ PAGE STATE - {}", context);
+            log.error("[TEST_FAILURE_REPORT] ╠═══════════════════════════════════════════════════════════");
+            log.error("[TEST_FAILURE_REPORT] ║ URL: {}", page.url());
+
+            // page.title() can hang on error pages, so wrap in try-catch
+            try {
+                log.error("[TEST_FAILURE_REPORT] ║ Title: {}", page.title());
+            } catch (Exception e) {
+                log.error("[TEST_FAILURE_REPORT] ║ Title: [unavailable - {}]", e.getMessage());
+            }
+
+            // Count key elements with timeout to prevent hanging on error pages
+            try {
+                int formCount = page.locator("form").count();
+                int buttonCount = page.locator("button").count();
+                int inputCount = page.locator("input").count();
+                log.error("[TEST_FAILURE_REPORT] ║ Elements: {} forms, {} buttons, {} inputs", formCount, buttonCount, inputCount);
+            } catch (Exception e) {
+                log.error("[TEST_FAILURE_REPORT] ║ Elements: [count failed - {}]", e.getMessage());
+            }
+
             // Check for visible error indicators using JavaScript
-            Object errorResult = page.evaluate("""
-                () => {
-                    const errorSelectors = ['.error', '.bg-red-100', '[class*="error"]'];
-                    for (const selector of errorSelectors) {
-                        const elements = document.querySelectorAll(selector);
-                        for (const element of elements) {
-                            // Check if element is actually visible (not just in DOM)
-                            const style = getComputedStyle(element);
-                            const isVisible = element.offsetParent !== null && 
-                                            style.display !== 'none' && 
-                                            style.visibility !== 'hidden' &&
-                                            !element.classList.contains('hidden');
-                            if (isVisible && element.textContent.trim()) {
-                                return element.textContent.trim();
+            // Try-catch prevents indefinite hangs by using Playwright's default timeout
+            try {
+                Object errorResult = page.evaluate("""
+                    () => {
+                        const errorSelectors = ['.error', '.bg-red-100', '[class*="error"]'];
+                        for (const selector of errorSelectors) {
+                            const elements = document.querySelectorAll(selector);
+                            for (const element of elements) {
+                                // Check if element is actually visible (not just in DOM)
+                                const style = getComputedStyle(element);
+                                const isVisible = element.offsetParent !== null &&
+                                                style.display !== 'none' &&
+                                                style.visibility !== 'hidden' &&
+                                                !element.classList.contains('hidden');
+                                if (isVisible && element.textContent.trim()) {
+                                    return element.textContent.trim();
+                                }
                             }
                         }
+                        return null;
                     }
-                    return null;
+                """);
+                if (errorResult != null) {
+                    log.error("[TEST_FAILURE_REPORT] ║ ⚠️ ERROR detected: {}", errorResult);
                 }
-            """);
-            if (errorResult != null) {
-                log.warn("   ⚠️ ERROR detected: {}", errorResult);
+            } catch (Exception e) {
+                log.error("[TEST_FAILURE_REPORT] ║ Error detection: [failed - {}]", e.getMessage());
             }
-            
-            // Check authentication state
-            boolean isLoginPage = page.url().contains("/login") || 
-                page.locator("text=Sign in with GitHub").count() > 0;
-            boolean hasWelcome = page.locator("text=Welcome").count() > 0;
-            
-            log.info("   Auth state: login page={}, has welcome={}", isLoginPage, hasWelcome);
-            
-            // Sample page content for debugging
-            String bodyText = page.textContent("body");
-            if (bodyText.length() > 200) {
-                bodyText = bodyText.substring(0, 200) + "...";
+
+            // Check authentication state with timeout
+            try {
+                boolean isLoginPage = page.url().contains("/login") ||
+                    page.locator("text=Sign in with GitHub").count() > 0;
+                boolean hasWelcome = page.locator("text=Welcome").count() > 0;
+                log.error("[TEST_FAILURE_REPORT] ║ Auth state: login page={}, has welcome={}", isLoginPage, hasWelcome);
+            } catch (Exception e) {
+                log.error("[TEST_FAILURE_REPORT] ║ Auth state: [check failed - {}]", e.getMessage());
             }
-            log.debug("   Body preview: {}", bodyText.replaceAll("\\s+", " "));
-            
+
+            // Sample page content for debugging with timeout
+            try {
+                String bodyText = page.textContent("body", new Page.TextContentOptions().setTimeout(SHORT_TIMEOUT_MS));
+                if (bodyText != null) {
+                    if (bodyText.length() > 200) {
+                        bodyText = bodyText.substring(0, 200) + "...";
+                    }
+                    log.error("[TEST_FAILURE_REPORT] ║ Body preview: {}", bodyText.replaceAll("\\s+", " "));
+                }
+            } catch (Exception e) {
+                log.error("[TEST_FAILURE_REPORT] ║ Body preview: [unavailable - {}]", e.getMessage());
+            }
+
+            log.error("[TEST_FAILURE_REPORT] ╚═══════════════════════════════════════════════════════════");
+
         } catch (Exception e) {
             log.warn("Failed to log debug page state: {}", e.getMessage());
         }
@@ -804,71 +1360,368 @@ public abstract class BaseIntegrationTest {
 
     // ==================== UTILITY HELPERS ====================
 
+    // ==================== CORE PLAYWRIGHT HELPERS ====================
+
     /**
-     * Waits for SSE synchronization across multiple pages
+     * Waits for an element to appear with default timeout.
+     * Use this before interacting with elements.
      */
-    /**
-     * Waits for SSE events to propagate across pages by listening for actual SSE events
-     * instead of using fixed delays. Much faster and more reliable.
-     */
-    protected void waitForSSESync(Page... pages) {
-        // For SSE synchronization, we need to wait for the actual SSE events to be processed
-        // by the pages. We do this by waiting for the EventSource to receive and process messages.
-        
-        for (Page page : pages) {
-            try {
-                // Wait for SSE connection to be established and events to be processed
-                page.waitForFunction("() => {" +
-                    "const eventSource = window.eventSource;" +
-                    "return eventSource && eventSource.readyState === 1;" + // OPEN state
-                "}", new Page.WaitForFunctionOptions().setTimeout(2000));
-                
-                // Give a brief moment for any pending SSE events to be processed
-                page.waitForTimeout(150);
-                
-            } catch (Exception e) {
-                // Fallback: if SSE detection fails, use minimal delay
-                page.waitForTimeout(300);
-            }
+    protected void waitForElement(Page page, String selector) {
+        waitForElement(page, selector, DEFAULT_TIMEOUT_MS);
+    }
+
+    protected void waitForElement(Page page, String selector, int timeoutMs) {
+        recordActivity("waitForElement: " + selector + " (timeout: " + timeoutMs + "ms)");
+        try {
+            log.debug("Waiting for element '{}' (timeout: {}ms)", selector, timeoutMs);
+            page.locator(selector).first().waitFor(
+                new Locator.WaitForOptions().setTimeout(timeoutMs));
+            log.debug("✅ Element '{}' found", selector);
+            recordActivity("✓ Element found: " + selector);
+        } catch (Exception e) {
+            log.error("❌ Element '{}' not found after {}ms on page {}",
+                selector, timeoutMs, page.url());
+            debugPageState(page, "waitForElement timeout");
+            logActivityTrail(); // Show what led to this failure
+            throw new AssertionError(String.format(
+                "Element '%s' not found after %dms. Page URL: %s",
+                selector, timeoutMs, page.url()), e);
         }
     }
-    
+
     /**
-     * Waits for a specific SSE event to arrive and update the page content.
-     * Uses HTMX SSE event format and includes debugging.
+     * Fills an input element, waiting for it to appear first.
+     * Encapsulates wait + fill + error handling.
+     */
+    protected void fillElement(Page page, String selector, String value) {
+        fillElement(page, selector, value, DEFAULT_TIMEOUT_MS);
+    }
+
+    protected void fillElement(Page page, String selector, String value, int timeoutMs) {
+        recordActivity("fillElement: " + selector + " = '" + value + "'");
+        try {
+            log.debug("Filling element '{}' with value '{}'", selector, value);
+            waitForElement(page, selector, timeoutMs);
+            page.fill(selector, value);
+            log.debug("✅ Element '{}' filled successfully", selector);
+            recordActivity("✓ Element filled: " + selector);
+        } catch (Exception e) {
+            log.error("❌ Failed to fill element '{}'", selector);
+            logActivityTrail(); // Show what led to this failure
+            throw new AssertionError(String.format(
+                "Failed to fill element '%s' with value '%s'", selector, value), e);
+        }
+    }
+
+    /**
+     * Clicks an element, waiting for it to appear first.
+     * Encapsulates wait + click + error handling.
+     */
+    protected void clickElement(Page page, String selector) {
+        clickElement(page, selector, DEFAULT_TIMEOUT_MS);
+    }
+
+    protected void clickElement(Page page, String selector, int timeoutMs) {
+        recordActivity("clickElement: " + selector);
+        try {
+            log.debug("Clicking element '{}'", selector);
+            waitForElement(page, selector, timeoutMs);
+            page.click(selector);
+            log.debug("✅ Element '{}' clicked successfully", selector);
+            recordActivity("✓ Element clicked: " + selector);
+        } catch (Exception e) {
+            log.error("❌ Failed to click element '{}'", selector);
+            logActivityTrail(); // Show what led to this failure
+            throw new AssertionError(String.format(
+                "Failed to click element '%s'", selector), e);
+        }
+    }
+
+    // ==================== SSE SYNCHRONIZATION HELPERS ====================
+
+    /**
+     * Waits for SSE event to update page content via HTMX.
+     * Use this after actions that trigger SSE events (like clicking Next button).
+     *
+     * This waits for:
+     * 1. SSE connection to be open
+     * 2. HTMX to receive SSE event and complete content swap
+     * 3. Expected element to appear (confirms update completed)
+     *
+     * @param page The page to wait on
+     * @param expectedSelector Element that should appear after SSE update (required)
+     */
+    protected void waitForSSEContentUpdate(Page page, String expectedSelector) {
+        try {
+            log.debug("Waiting for SSE content update on {}", page.url());
+
+            // Verify SSE connection is open
+            page.waitForFunction("() => {" +
+                "const eventSource = window.eventSource;" +
+                "return eventSource && eventSource.readyState === 1;" +
+            "}", new Page.WaitForFunctionOptions().setTimeout(SHORT_TIMEOUT_MS));
+
+            // Give brief time for HTMX to process pending SSE events
+            page.waitForTimeout(200);
+
+            // Wait for expected element - confirms HTMX swap completed
+            waitForElement(page, expectedSelector, DEFAULT_TIMEOUT_MS);
+
+            log.debug("✅ SSE content update completed");
+        } catch (Exception e) {
+            log.error("❌ SSE content update failed on {}", page.url());
+            debugPageState(page, "SSE content update timeout");
+            throw new AssertionError("SSE content update failed: " + e.getMessage(), e);
+        }
+    }
+
+    // ==================== MULTI-PAGE COORDINATION HELPERS ====================
+
+    /**
+     * Waits for an element to appear on ALL pages.
+     * Use this to ensure all participants see the same content after SSE events.
+     *
+     * @param selector Element selector to wait for
+     * @param pages All pages that should show the element
+     */
+    protected void waitForAllPagesElement(String selector, Page... pages) {
+        waitForAllPagesElement(selector, DEFAULT_TIMEOUT_MS, pages);
+    }
+
+    protected void waitForAllPagesElement(String selector, int timeoutMs, Page... pages) {
+        log.debug("Waiting for all {} pages to show element '{}'", pages.length, selector);
+
+        for (int i = 0; i < pages.length; i++) {
+            Page page = pages[i];
+            try {
+                waitForElement(page, selector, timeoutMs);
+                log.debug("✅ Page {}/{} shows element '{}'", i + 1, pages.length, selector);
+            } catch (AssertionError e) {
+                log.error("❌ Page {}/{} failed to show element '{}'", i + 1, pages.length, selector);
+                throw new AssertionError(String.format(
+                    "Page %d/%d failed to show element '%s' after %dms",
+                    i + 1, pages.length, selector, timeoutMs), e);
+            }
+        }
+
+        log.debug("✅ All {} pages show element '{}'", pages.length, selector);
+    }
+
+    /**
+     * Waits for all pages to transition away from old content to new content.
+     * Use this for major transitions like lobby → retro.
+     *
+     * @param oldContent Text that should disappear (e.g., "Session Lobby")
+     * @param newSelector Element that should appear (e.g., "button:has-text('Next')")
+     * @param pages All pages that should transition
+     */
+    protected void waitForAllPagesTransition(String oldContent, String newSelector, Page... pages) {
+        waitForAllPagesTransition(oldContent, newSelector, DEFAULT_TIMEOUT_MS, pages);
+    }
+
+    protected void waitForAllPagesTransition(String oldContent, String newSelector, int timeoutMs, Page... pages) {
+        log.debug("Waiting for all {} pages to transition from '{}' to '{}'",
+            pages.length, oldContent, newSelector);
+
+        for (int i = 0; i < pages.length; i++) {
+            Page page = pages[i];
+            try {
+                // Wait for old content to disappear
+                page.waitForFunction(
+                    "(oldText) => !document.body.textContent.includes(oldText)",
+                    oldContent,
+                    new Page.WaitForFunctionOptions().setTimeout(timeoutMs));
+
+                // Wait for new element to appear
+                waitForElement(page, newSelector, timeoutMs);
+
+                log.debug("✅ Page {}/{} transitioned successfully", i + 1, pages.length);
+            } catch (Exception e) {
+                log.error("❌ Page {}/{} failed to transition", i + 1, pages.length);
+                debugPageState(page, "transition timeout");
+                throw new AssertionError(String.format(
+                    "Page %d/%d failed to transition after %dms",
+                    i + 1, pages.length, timeoutMs), e);
+            }
+        }
+
+        log.debug("✅ All {} pages transitioned successfully", pages.length);
+    }
+
+    // ==================== PARTICIPANT VERIFICATION HELPERS ====================
+
+    /**
+     * Waits for participant list to contain exactly the expected participants.
+     *
+     * Use this after participant join/leave actions to verify the participant list
+     * updated correctly via SSE events.
+     *
+     * @param page Page to check
+     * @param expectedParticipants Exact list of expected participant names (order doesn't matter)
+     */
+    protected void waitForParticipantList(Page page, String... expectedParticipants) {
+        waitForParticipantList(page, DEFAULT_TIMEOUT_MS, expectedParticipants);
+    }
+
+    protected void waitForParticipantList(Page page, int timeoutMs, String... expectedParticipants) {
+        try {
+            log.debug("Waiting for participant list: {}", Arrays.toString(expectedParticipants));
+
+            // Wait for participant list to match expected participants
+            page.waitForFunction(
+                "(expectedParticipants) => {" +
+                "  const participantElements = document.querySelectorAll('ul#participants-list li');" +
+                "  const actualParticipants = Array.from(participantElements)" +
+                "    .map(li => li.querySelector('span:first-child').textContent.trim())" +
+                "    .sort();" +
+                "  const expected = expectedParticipants.slice().sort();" +
+                "  return JSON.stringify(actualParticipants) === JSON.stringify(expected);" +
+                "}",
+                expectedParticipants,
+                new Page.WaitForFunctionOptions().setTimeout(timeoutMs));
+
+            log.debug("✅ Participant list matches expected: {}", Arrays.toString(expectedParticipants));
+
+        } catch (Exception e) {
+            log.error("❌ Participant list verification failed");
+
+            // Debug: show actual vs expected
+            try {
+                List<String> actualParticipants = getParticipantNames(page);
+                log.error("Expected participants: {}", Arrays.toString(expectedParticipants));
+                log.error("Actual participants: {}", actualParticipants);
+            } catch (Exception debugError) {
+                log.error("Failed to get actual participant names: {}", debugError.getMessage());
+            }
+
+            throw new AssertionError(String.format(
+                "Participant list verification failed. Expected: %s. Check logs for actual list.",
+                Arrays.toString(expectedParticipants)), e);
+        }
+    }
+
+    /**
+     * Gets current participant names from the participant list.
+     * Helper method for debugging test failures.
+     *
+     * @param page Page to extract participant names from
+     * @return List of participant display names
+     */
+    protected List<String> getParticipantNames(Page page) {
+        // Use Playwright's native locator API instead of JS evaluation
+        return page.locator("ul#participants-list li span:first-child").allTextContents()
+            .stream()
+            .map(String::trim)
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Waits for SSE connection to be established for a specific retro session.
+     * Checks for the presence of sse-connect attribute, which indicates HTMX has set up SSE.
+     *
+     * @param page Page to wait for SSE connection on
+     * @param retroId Retro session ID
+     */
+    protected void waitForSseConnection(Page page, UUID retroId) {
+        recordActivity("waitForSseConnection: " + retroId);
+        page.waitForSelector(
+            "[sse-connect*='/api/retro/" + retroId + "/events']",
+            new Page.WaitForSelectorOptions()
+                .setState(WaitForSelectorState.ATTACHED)
+                .setTimeout(DEFAULT_TIMEOUT_MS)
+        );
+
+        // Give HTMX a moment to establish the actual EventSource connection
+        try {
+            Thread.sleep(SHORT_TIMEOUT_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        log.info("SSE connection established for retro: {}", retroId);
+        recordActivity("✓ SSE connection established: " + retroId);
+    }
+
+    /**
+     * Navigates to home page and waits for network idle.
+     * Common pattern used after creating sessions or switching contexts.
+     *
+     * @param page Page to navigate
+     */
+    protected void navigateToHome(Page page) {
+        recordActivity("navigateToHome");
+        page.navigate(baseUrl + "/");
+        page.waitForLoadState(LoadState.NETWORKIDLE);
+        log.debug("Navigated to home page: {}", page.url());
+        recordActivity("✓ Home page loaded");
+    }
+
+    /**
+     * Waits for ALL pages to show exactly the expected participants.
+     * Use this to ensure all participants see consistent participant list after SSE events.
+     *
+     * @param expectedParticipants Exact list of expected participant names
+     * @param pages All pages that should show the same participant list
+     */
+    protected void waitForAllPagesParticipantList(String[] expectedParticipants, Page... pages) {
+        waitForAllPagesParticipantList(expectedParticipants, DEFAULT_TIMEOUT_MS, pages);
+    }
+
+    protected void waitForAllPagesParticipantList(String[] expectedParticipants, int timeoutMs, Page... pages) {
+        log.debug("Waiting for all {} pages to show participants: {}",
+            pages.length, Arrays.toString(expectedParticipants));
+
+        for (int i = 0; i < pages.length; i++) {
+            Page page = pages[i];
+            try {
+                waitForParticipantList(page, timeoutMs, expectedParticipants);
+                log.debug("✅ Page {}/{} shows correct participant list", i + 1, pages.length);
+            } catch (AssertionError e) {
+                log.error("❌ Page {}/{} has wrong participant list", i + 1, pages.length);
+                throw new AssertionError(String.format(
+                    "Page %d/%d has wrong participant list. Expected: %s",
+                    i + 1, pages.length, Arrays.toString(expectedParticipants)), e);
+            }
+        }
+
+        log.debug("✅ All {} pages show correct participant list", pages.length);
+    }
+
+    /**
+     * Waits for SSE-triggered content update by monitoring for element changes.
+     * Uses Playwright's native response monitoring instead of JS event listeners.
      */
     protected void waitForSSEEvent(Page page, String eventType, int timeoutMs) {
-        try {
-            log.debug("Waiting for SSE event '{}' on page {}", eventType, page.url());
-            
-            // First, set up a flag to track when the event arrives
-            page.evaluate("() => { window.sseEventReceived = false; window.sseEventType = null; }");
-            
-            // Add a listener for the specific HTMX SSE event
-            page.evaluate("(eventType) => {" +
-                "document.body.addEventListener('sse:' + eventType, function(evt) {" +
-                "  console.log('SSE Event received:', eventType, evt);" +
-                "  window.sseEventReceived = true;" +
-                "  window.sseEventType = eventType;" +
-                "});" +
-            "}", eventType);
-            
-            // Wait for the event to be received
-            page.waitForFunction("() => window.sseEventReceived === true",
-                new Page.WaitForFunctionOptions().setTimeout(timeoutMs));
-            
-            log.debug("✅ SSE event '{}' received successfully", eventType);
-            
-        } catch (Exception e) {
-            log.warn("⚠️ SSE event '{}' not detected within {}ms, falling back", eventType, timeoutMs);
-            // If we can't detect the specific event, wait for general SSE activity
-            try {
-                page.waitForFunction("() => document.querySelector('[hx-sse]') !== null",
-                    new Page.WaitForFunctionOptions().setTimeout(timeoutMs / 3));
-                page.waitForTimeout(300);
-            } catch (Exception fallbackException) {
-                page.waitForTimeout(800);
+        log.debug("Waiting for SSE event '{}' on page {}", eventType, page.url());
+
+        // Monitor SSE responses for the event type
+        AtomicBoolean eventReceived = new AtomicBoolean(false);
+        page.onResponse(response -> {
+            if (response.url().contains("/events")) {
+                try {
+                    String body = response.text();
+                    if (body.contains(eventType)) {
+                        eventReceived.set(true);
+                        log.debug("SSE event '{}' detected in response", eventType);
+                    }
+                } catch (Exception ignored) {
+                    // SSE streaming responses may not have readable body
+                }
             }
+        });
+
+        // Wait for the event or timeout
+        long startTime = System.currentTimeMillis();
+        while (!eventReceived.get() && (System.currentTimeMillis() - startTime) < timeoutMs) {
+            page.waitForTimeout(100);
+        }
+
+        if (eventReceived.get()) {
+            log.debug("✅ SSE event '{}' received successfully", eventType);
+            // Give HTMX time to process the event and swap content
+            page.waitForTimeout(200);
+        } else {
+            log.warn("⚠️ SSE event '{}' not detected within {}ms", eventType, timeoutMs);
         }
     }
 

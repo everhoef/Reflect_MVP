@@ -15,12 +15,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
-import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
+import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
+import org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import direct.reflect.facilitator.facilitation.RetroSession;
 import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.facilitation.Participant;
+import direct.reflect.facilitator.facilitation.ParticipantRole;
 import direct.reflect.facilitator.facilitation.RetroPhase;
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.facilitation.RetroSessionService;
@@ -40,7 +41,7 @@ import direct.reflect.facilitator.web.RetroViewController;
 @EnableAutoConfiguration(exclude = {
     DataSourceAutoConfiguration.class,
     HibernateJpaAutoConfiguration.class,
-    RedisAutoConfiguration.class
+    DataRedisAutoConfiguration.class
 })
 class RetroViewControllerTest {
 
@@ -232,6 +233,7 @@ class RetroViewControllerTest {
         Participant facilitator = createMockParticipant();
         facilitator.setUsername("facilitatoruser");
         facilitator.setDisplayName("Facilitator User");
+        facilitator.setRole(ParticipantRole.FACILITATOR);
 
         // Mock the service calls - this time as facilitator
         when(retroService.getSessionById(retroId)).thenReturn(session);
@@ -327,6 +329,7 @@ class RetroViewControllerTest {
         participant.setParticipantId(UUID.randomUUID());
         participant.setDisplayName("Test User");
         participant.setUsername("testuser");
+        participant.setRole(ParticipantRole.PARTICIPANT);
         return participant;
     }
 }

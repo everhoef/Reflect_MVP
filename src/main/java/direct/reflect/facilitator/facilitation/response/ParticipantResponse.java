@@ -6,7 +6,6 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import direct.reflect.facilitator.facilitation.Participant;
 import direct.reflect.facilitator.configurator.RetroStep;
-import direct.reflect.facilitator.configurator.DataPattern;
 import direct.reflect.facilitator.common.entity.GeneratedUuidV7;
 
 import java.time.LocalDateTime;
@@ -15,19 +14,19 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Base class for all participant responses using JSON column storage.
+ * Simplified ParticipantResponse entity using pure JSON storage.
  *
- * Design rationale:
- * - PostgreSQL JSONB column for type-specific fields (flexible, indexable)
- * - Single table for easier data analysis and cross-pattern queries (POC requirement)
- * - DataPattern enum identifies response type
- * - No NULL constraint conflicts - each response has its own JSON structure
+ * Design rationale (Wizard Pattern):
+ * - PostgreSQL JSONB column for all response data (flexible, indexable)
+ * - Response structure determined by RetroStep's componentType (no need for separate enum)
+ * - Single table for easier data analysis and cross-pattern queries
+ * - Visibility control for privacy (PRIVATE by default, facilitator reveals)
  * - Easy schema evolution - add fields without migrations
  *
- * Response patterns stored in responseData JSON:
- * - CATEGORICAL: {category, content, color}
- * - RATING: {rating, minRating, maxRating, comment}
- * - FREEFORM: {content, tags, isMultiLine}
+ * Response data examples by component type:
+ * - MULTI_COLUMN_BOARD: {category: "Mad", content: "text"}
+ * - RATING_SCALE: {rating: 8, comment: "text"}
+ * - Other components can define their own structure
  */
 @Entity
 @Table(name = "participant_responses")
@@ -56,58 +55,30 @@ public class ParticipantResponse {
     @Column
     private LocalDateTime editedAt;
 
-    @Column(nullable = false)
-    private Boolean isVisible = false; // PRIVATE by default, facilitator reveals
-
-    @Column(nullable = false)
-    private Integer displayOrder = 0; // Order within category/cluster
-
     /**
-     * Response type pattern (CATEGORICAL, RATING, FREEFORM)
+     * Visibility control for privacy.
+     * PRIVATE (false) by default - facilitator can reveal all responses with single click.
      */
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private DataPattern dataPattern;
+    @Column(nullable = false)
+    private Boolean isVisible = false;
 
     /**
-     * Type-specific response data stored as JSON.
-     * Structure depends on dataPattern:
-     * - CATEGORICAL: {category: "Mad", content: "text", color: "#FF5733"}
-     * - RATING: {rating: 8, minRating: 1, maxRating: 10, comment: "text"}
-     * - FREEFORM: {content: "text", tags: "tag1,tag2", isMultiLine: false}
+     * Display order within category/cluster (for sorting, drag-drop positioning).
+     */
+    @Column(nullable = false)
+    private Integer displayOrder = 0;
+
+    /**
+     * Response data stored as PostgreSQL JSONB.
+     * Structure is flexible and determined by the RetroStep's componentType configuration.
+     *
+     * Common fields:
+     * - MULTI_COLUMN_BOARD: category, content
+     * - RATING_SCALE: rating, comment
+     *
+     * Hibernate 6 handles serialization automatically.
      */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)
     private Map<String, Object> responseData = new HashMap<>();
-
-    /**
-     * Get a display-friendly summary of this response.
-     */
-    @Transient
-    public String getDisplaySummary() {
-        return switch (dataPattern) {
-            case RATING -> {
-                Integer rating = (Integer) responseData.get("rating");
-                String comment = (String) responseData.get("comment");
-                String summary = "Rating: " + rating;
-                if (comment != null && !comment.trim().isEmpty()) {
-                    summary += " - " + (comment.length() > 30 ? comment.substring(0, 27) + "..." : comment);
-                }
-                yield summary;
-            }
-            case CATEGORICAL -> {
-                String category = (String) responseData.get("category");
-                String content = (String) responseData.get("content");
-                yield String.format("[%s] %s", category,
-                    content.length() > 50 ? content.substring(0, 47) + "..." : content);
-            }
-            case FREEFORM -> {
-                String content = (String) responseData.get("content");
-                if (content.length() > 100) {
-                    yield content.substring(0, 97) + "...";
-                }
-                yield content;
-            }
-        };
-    }
 }

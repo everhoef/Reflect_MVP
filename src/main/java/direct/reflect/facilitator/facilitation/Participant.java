@@ -47,10 +47,21 @@ public class Participant {
     
     /**
      * Last seen timestamp for the user in this specific session.
+     * Also serves as "when did user leave?" when status = LEFT.
      */
     @Column(name = "last_seen")
     private LocalDateTime lastSeen;
-    
+
+    /**
+     * Participation status in this session.
+     * Tracks lifecycle without deleting data - responses remain when user leaves.
+     * SSE disconnections do NOT change status (auto-reconnect expected).
+     * Use lastSeen timestamp to determine when status changed.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private ParticipantStatus status = ParticipantStatus.ACTIVE;
+
     /**
      * Custom toString to avoid LazyInitializationException.
      */
@@ -63,6 +74,7 @@ public class Participant {
             ", username='" + username + '\'' +
             ", displayName='" + displayName + '\'' +
             ", role=" + role +
+            ", status=" + status +
             ", lastSeen=" + lastSeen +
             '}';
     }

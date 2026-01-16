@@ -6,9 +6,9 @@ import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.facilitation.ParticipantRole;
 import direct.reflect.facilitator.facilitation.ParticipantRepository;
 import direct.reflect.facilitator.facilitation.ParticipantService;
-import direct.reflect.facilitator.facilitation.RetroSessionService;
 import direct.reflect.facilitator.facilitation.RetroPhase;
 import direct.reflect.facilitator.auth.AuthService;
+import direct.reflect.facilitator.eventing.EventService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +24,7 @@ import jakarta.servlet.http.HttpSession;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -37,8 +38,8 @@ class ParticipantServiceTest {
     private ParticipantRepository participantRepository;
 
     @Mock
-    private RetroSessionService retroSessionService;
-    
+    private EventService eventService;
+
     @Mock
     private AuthService authHelper;
 
@@ -55,136 +56,6 @@ class ParticipantServiceTest {
     }
 
     @Test
-    void createSession_AnonymousUserWithDisplayName_Success() {
-        // Arrange
-        String sessionName = "Test Session";
-        String displayName = "John Doe";
-        UUID guestParticipantId = UUID.randomUUID();
-        
-        RetroTemplate template = new RetroTemplate();
-        template.setId(1L);
-        RetroSession session = new RetroSession();
-        session.setId(UUID.randomUUID());
-        session.setName(sessionName);
-        
-        // Mock AuthService for guest user
-        when(authHelper.getParticipantId(mockRequest)).thenReturn(guestParticipantId);
-        when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
-        when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guests don't have usernames
-        
-        when(retroSessionService.createNewSession(sessionName)).thenReturn(session);
-        when(participantRepository.findByParticipantIdWithSession(any(UUID.class))).thenReturn(Collections.emptyList());
-        when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        // Act
-        Participant result = participantService.createAndAssignFacilitatorForSession(sessionName, mockRequest);
-        
-        // Assert
-        assertEquals(displayName, result.getDisplayName());
-        assertNull(result.getUsername());
-        assertEquals(ParticipantRole.FACILITATOR, result.getRole());
-        assertEquals(session, result.getSession());
-        assertEquals(guestParticipantId, result.getParticipantId());
-    }
-
-    @Test
-    void createSession_AuthenticatedUserWithoutDisplayName_UsesUsername() {
-        // Arrange
-        String sessionName = "Test Session";
-        String username = "testuser";
-        String displayName = "Test User"; // OIDC users have display names from claims
-        UUID userParticipantId = UUID.nameUUIDFromBytes(("6ba7b810-9dad-11d1-80b4-00c04fd430c8" + username).getBytes());
-        
-        RetroTemplate template = new RetroTemplate();
-        template.setId(1L);
-        RetroSession session = new RetroSession();
-        session.setId(UUID.randomUUID());
-        session.setName(sessionName);
-        
-        // Mock AuthService for OIDC user
-        when(authHelper.getParticipantId(mockRequest)).thenReturn(userParticipantId);
-        when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
-        when(authHelper.getUsername(mockRequest)).thenReturn(username);
-        
-        when(retroSessionService.createNewSession(sessionName)).thenReturn(session);
-        when(participantRepository.findByParticipantIdWithSession(any(UUID.class))).thenReturn(Collections.emptyList());
-        when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        // Act
-        Participant result = participantService.createAndAssignFacilitatorForSession(sessionName, mockRequest);
-        
-        // Assert
-        assertEquals(displayName, result.getDisplayName());
-        assertEquals(username, result.getUsername());
-        assertEquals(ParticipantRole.FACILITATOR, result.getRole());
-        assertEquals(userParticipantId, result.getParticipantId());
-    }
-
-    @Test
-    void createSession_AnonymousUserWithoutDisplayName_Fails() {
-        // Arrange
-        String sessionName = "Test Session";
-        UUID guestParticipantId = UUID.randomUUID();
-        
-        // Mock AuthService to throw exception when display name is missing
-        when(authHelper.getParticipantId(mockRequest)).thenReturn(guestParticipantId);
-        when(authHelper.getDisplayName(mockRequest)).thenThrow(new IllegalStateException("Guest session missing guestDisplayName - call initializeGuestSession first"));
-
-        // Act & Assert
-        assertThrows(IllegalStateException.class, 
-            () -> participantService.createAndAssignFacilitatorForSession(sessionName, mockRequest));
-    }
-
-    @Test
-    void createSession_UserAlreadyInActiveSession_TerminatesOldSession() {
-        // Arrange
-        String sessionName = "New Session";
-        String displayName = "John Doe";
-        UUID participantId = UUID.randomUUID();
-        
-        RetroTemplate template = new RetroTemplate();
-        template.setId(1L);
-        RetroSession newSession = new RetroSession();
-        newSession.setId(UUID.randomUUID());
-        newSession.setName(sessionName);
-        
-        RetroSession activeSession = new RetroSession();
-        activeSession.setId(UUID.randomUUID());
-        activeSession.setPhase(RetroPhase.GATHER_DATA); // Active
-        activeSession.setName("Old Session");
-        
-        Participant existingParticipant = new Participant();
-        existingParticipant.setParticipantId(participantId);
-        existingParticipant.setSession(activeSession);
-        existingParticipant.setDisplayName(displayName);
-        existingParticipant.setRole(ParticipantRole.FACILITATOR);
-        
-        // Mock AuthService for guest user
-        when(authHelper.getParticipantId(mockRequest)).thenReturn(participantId);
-        when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
-        when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guest user
-        
-        when(retroSessionService.createNewSession(sessionName)).thenReturn(newSession);
-        when(participantRepository.findByParticipantIdWithSession(participantId))
-            .thenReturn(List.of(existingParticipant));
-        when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        // Act
-        Participant result = participantService.createAndAssignFacilitatorForSession(sessionName, mockRequest);
-        
-        // Assert
-        assertNotNull(result);
-        assertEquals(displayName, result.getDisplayName());
-        assertEquals(ParticipantRole.FACILITATOR, result.getRole());
-        assertEquals(newSession, result.getSession());
-        assertEquals(participantId, result.getParticipantId());
-        
-        // Verify old session participant was deleted
-        verify(participantRepository).delete(existingParticipant);
-        verify(participantRepository).save(any(Participant.class));
-    }
-
-    @Test
     void addParticipantToSession_Success() {
         // Arrange
         String displayName = "Jane Doe";
@@ -196,18 +67,22 @@ class ParticipantServiceTest {
         when(authHelper.getParticipantId(mockRequest)).thenReturn(participantId);
         when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
         when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guest user
-        
-        when(participantRepository.findByParticipantIdWithSession(any(UUID.class))).thenReturn(Collections.emptyList());
+
+        when(participantRepository.findByParticipantIdAndStatusWithSession(participantId, ParticipantStatus.ACTIVE))
+            .thenReturn(Collections.emptyList()); // No active sessions
+        when(participantRepository.findById(any(ParticipantId.class)))
+            .thenReturn(Optional.empty()); // No existing participant in this session
         when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
         Participant result = participantService.addParticipantToSession(mockRequest, session, ParticipantRole.PARTICIPANT);
-        
+
         // Assert
         assertEquals(displayName, result.getDisplayName());
         assertEquals(ParticipantRole.PARTICIPANT, result.getRole());
         assertEquals(session, result.getSession());
         assertEquals(participantId, result.getParticipantId());
+        verify(eventService).publish(any()); // PARTICIPANT_JOINED event
     }
 
 
@@ -234,23 +109,28 @@ class ParticipantServiceTest {
         when(authHelper.getParticipantId(mockRequest)).thenReturn(participantId);
         when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
         when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guest user
-        
-        when(participantRepository.findByParticipantIdWithSession(participantId))
+
+        when(participantRepository.findByParticipantIdAndStatusWithSession(participantId, ParticipantStatus.ACTIVE))
             .thenReturn(List.of(existingParticipant));
+        ParticipantId pk = new ParticipantId(participantId, sessionId);
+        when(participantRepository.findById(pk))
+            .thenReturn(Optional.of(existingParticipant)); // Already exists in this session
         when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
         Participant result = participantService.addParticipantToSession(mockRequest, session, ParticipantRole.PARTICIPANT);
-        
+
         // Assert
         assertNotNull(result);
         assertEquals(displayName, result.getDisplayName());
         assertEquals(ParticipantRole.PARTICIPANT, result.getRole());
         assertEquals(sessionId, result.getSession().getId());
-        
-        // Verify no deletion occurred (same session rejoin)
-        verify(participantRepository, never()).delete(any(Participant.class));
-        verify(participantRepository).save(any(Participant.class));
+
+        // Verify participant was updated (not deleted, no LEFT status)
+        verify(participantRepository).save(argThat(p ->
+            p.getStatus() != ParticipantStatus.LEFT
+        ));
+        verify(eventService).publish(any()); // PARTICIPANT_JOINED event
     }
 
     @Test
@@ -281,24 +161,29 @@ class ParticipantServiceTest {
         when(authHelper.getParticipantId(mockRequest)).thenReturn(participantId);
         when(authHelper.getDisplayName(mockRequest)).thenReturn(displayName);
         when(authHelper.getUsername(mockRequest)).thenReturn(null); // Guest user
-        
-        when(participantRepository.findByParticipantIdWithSession(participantId))
+
+        when(participantRepository.findByParticipantIdAndStatusWithSession(participantId, ParticipantStatus.ACTIVE))
             .thenReturn(List.of(existingParticipant));
+        when(participantRepository.findById(any(ParticipantId.class)))
+            .thenReturn(Optional.empty()); // No existing participant in new session
         when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
         Participant result = participantService.addParticipantToSession(mockRequest, newSession, ParticipantRole.PARTICIPANT);
-        
+
         // Assert
         assertNotNull(result);
         assertEquals(displayName, result.getDisplayName());
         assertEquals(ParticipantRole.PARTICIPANT, result.getRole());
         assertEquals(newSessionId, result.getSession().getId());
         assertEquals(participantId, result.getParticipantId());
-        
-        // Verify old session participant was deleted and new one created
-        verify(participantRepository).delete(existingParticipant);
-        verify(participantRepository).save(any(Participant.class));
+
+        // Verify old session participant was marked as LEFT and new one created
+        verify(participantRepository, times(2)).save(argThat(p -> {
+            // Either LEFT status (old participant) or ACTIVE status (new participant)
+            return p.getStatus() == ParticipantStatus.LEFT || p.getStatus() == ParticipantStatus.ACTIVE;
+        }));
+        verify(eventService, times(2)).publish(any()); // PARTICIPANT_LEFT + PARTICIPANT_JOINED events
     }
 
     @Test
@@ -335,17 +220,20 @@ class ParticipantServiceTest {
         
         // Mock AuthService for guest user
         when(authHelper.getParticipantId(mockRequest)).thenReturn(participantId);
-        
-        when(participantRepository.findByParticipantIdWithSession(participantId))
+
+        when(participantRepository.findByParticipantIdAndStatusWithSession(participantId, ParticipantStatus.ACTIVE))
             .thenReturn(List.of(participant1, participant2));
+        when(participantRepository.save(any(Participant.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
         participantService.leaveAllActiveSessions(mockRequest);
-        
-        // Assert
-        verify(participantRepository).delete(participant1);
-        verify(participantRepository).delete(participant2);
-        
+
+        // Assert - Verify participants were marked as LEFT (not deleted)
+        verify(participantRepository, times(2)).save(argThat(p ->
+            p.getStatus() == ParticipantStatus.LEFT
+        ));
+        verify(eventService, times(2)).publish(any()); // PARTICIPANT_LEFT events
+
         // Verify session attributes were cleared
         assertNull(mockRequest.getSession().getAttribute("retroId"));
         assertNull(mockRequest.getSession().getAttribute("participantRole"));
@@ -368,18 +256,20 @@ class ParticipantServiceTest {
         Participant activeParticipant = new Participant();
         activeParticipant.setParticipantId(participantId);
         activeParticipant.setSession(activeSession);
-        
+        activeParticipant.setStatus(ParticipantStatus.ACTIVE);
+
         Participant finishedParticipant = new Participant();
         finishedParticipant.setParticipantId(participantId);
         finishedParticipant.setSession(finishedSession);
-        
-        when(participantRepository.findByParticipantIdWithSession(participantId))
+        finishedParticipant.setStatus(ParticipantStatus.ACTIVE);
+
+        when(participantRepository.findByParticipantIdAndStatusWithSession(participantId, ParticipantStatus.ACTIVE))
             .thenReturn(List.of(activeParticipant, finishedParticipant));
 
         // Act
         List<Participant> result = participantService.getActiveSessionsForParticipant(participantId);
-        
-        // Assert
+
+        // Assert - Only active session (not finished session)
         assertEquals(1, result.size());
         assertEquals(activeSession.getId(), result.get(0).getSession().getId());
         assertFalse(result.get(0).getSession().isFinished());

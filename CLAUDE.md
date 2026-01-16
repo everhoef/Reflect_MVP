@@ -225,6 +225,79 @@ When a participant submits a response (categorical/rating/freeform), **ALL parti
 
 **Key Principle**: Use HTMX's built-in SSE support to minimize JavaScript. SSE events trigger HTMX to fetch fresh HTML fragments, ensuring all participants see the same state simultaneously.
 
+### Transactional Event Publishing
+
+The application uses **transaction-aware event publishing** to prevent race conditions where SSE clients receive events before database changes are visible.
+
+**The Problem**: When events are published directly to Redis within a `@Transactional` method, they broadcast immediately - before the transaction commits. This causes clients to query stale database state:
+
+```java
+@Transactional
+public void removeParticipantFromSession(Participant participant) {
+    participantRepository.save(participant);      // 1. DB write (not committed yet)
+    eventService.publish(event);                  // 2. Redis broadcast (immediate!)
+}                                                // 3. Transaction commits HERE (too late!)
+```
+
+**The Solution**: EventService uses Spring's `@TransactionalEventListener` to automatically delay event broadcasting until AFTER the transaction commits:
+
+**How It Works**:
+1. Service calls `eventService.publish(retroEvent)` within a `@Transactional` method
+2. EventService delegates to Spring's `ApplicationEventPublisher`
+3. Spring queues the event until the transaction commits
+4. Transaction commits → database changes are visible
+5. `@TransactionalEventListener(AFTER_COMMIT)` fires in EventService
+6. EventService broadcasts event to Redis → SSE clients receive it
+7. Clients query database and see consistent data ✅
+
+**Implementation** (in EventService.java):
+```java
+@Service
+public class EventService {
+    private final ApplicationEventPublisher applicationEventPublisher;
+
+    // Public API - automatically transaction-aware
+    public void publish(RetroEvent<?> event) {
+        applicationEventPublisher.publishEvent(event);
+    }
+
+    // Listener fires AFTER transaction commits
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onRetroEventAfterCommit(RetroEvent<?> event) {
+        broadcastToRedis(event);  // Now safe to broadcast
+    }
+
+    // Internal Redis broadcasting
+    private void broadcastToRedis(RetroEvent<?> event) {
+        redisTemplate.convertAndSend("retro:" + event.retroId(), event);
+    }
+}
+```
+
+**Multi-Instance (K8s) Compatibility**:
+- `ApplicationEvent` is JVM-local (not distributed across pods)
+- Each pod's `@TransactionalEventListener` publishes to Redis after ITS transaction commits
+- Redis broadcasts to ALL pods' SSE clients
+- Database consistency guaranteed: clients always query after commit
+
+**Usage** (service code remains unchanged):
+```java
+@Transactional
+public void removeParticipantFromSession(Participant participant) {
+    participant.setStatus(ParticipantStatus.LEFT);
+    participantRepository.save(participant);  // DB write
+
+    // Same API as always - automatically transaction-aware
+    eventService.publish(RetroEvent.participantLeft(sessionId, displayName));
+}  // Transaction commits → listener fires → Redis broadcasts
+```
+
+**Benefits**:
+- Zero race conditions - events always published after database changes are visible
+- Works seamlessly with multi-instance Kubernetes deployments
+- No service code changes needed - same `eventService.publish()` API
+- Consistent database state across all SSE clients
+
 ### Design Principles
 
 The application follows **function-oriented modular architecture** organized around business capabilities:
@@ -250,11 +323,12 @@ The application follows **function-oriented modular architecture** organized aro
 - **RetroSession**: Main entity representing a retrospective session with phases (CREATED → LOBBY → SET_THE_STAGE → GATHER_DATA → GENERATE_INSIGHTS → DECIDE_ACTIONS → CLOSE_RETRO → COMPLETED)
 - **Participant**: Users participating in sessions with composite primary key (participantId + sessionId)
 - **RetroTemplate/RetroStage/RetroStep**: Template system defining retrospective flow and activities
-- **ParticipantResponse**: Flexible entity storing user inputs with pattern-specific fields
+  - **RetroStep** is the core navigation unit - each step represents one page in the wizard flow
+  - Steps use declarative configuration with ComponentType and pure JSON config (see Simplified Wizard Pattern Architecture below)
+- **ParticipantResponse**: Flexible entity storing user inputs as JSON (responseData field)
 - **RetroPhase**: Enum defining the lifecycle states of a retrospective
-- **DataPattern**: Enum for retrospective data patterns (CATEGORICAL, RATING, FREEFORM)
-- **StepType**: Enum for step types (INSTRUCTION, ACTIVITY, DISCUSSION)
-- **LaneType**: Enum for lane interaction types (SINGLE_CHOICE, MULTI_TEXT, etc.)
+- **ComponentType**: Enum for UI components (MULTI_COLUMN_BOARD, RATING_SCALE, HISTOGRAM_CHART, GUIDANCE_MESSAGE, VISUAL_LAYOUT)
+- **AdvancementTrigger**: Enum for when to allow advancement (FACILITATOR_CLICK, ALL_RESPONDED, TIMER_EXPIRES, AUTO)
 
 ### Controller Separation
 
@@ -297,32 +371,237 @@ Custom cookie-based authentication supporting two modes:
 - Facilitator has control over retrospective flow progression
 - Only facilitator can advance participants to next phases/steps
 
-### 3-Pattern Retrospective Data System
+### Simplified Wizard Pattern Architecture
 
-The system implements retrospective formats using 3 core data patterns that cover 80%+ of retrospective types:
+The system follows a **Wizard/Multi-Step Form pattern** where each RetroStep represents one page in a linear flow. This approach is declarative and configuration-driven, supporting any retrospective format through pure JSON configuration.
 
-#### 1. CATEGORICAL Pattern
-**Use cases**: Mad/Sad/Glad, Start/Stop/Continue, ESVP, Worked Well/Do Differently
-- **UI Layout**: Multi-column grid with category headers
-- **Data Storage**: `category` + `content` fields in ParticipantResponse
-- **Interaction**: Participants add sticky notes to specific columns
-- **Results View**: Grouped by category, supports clustering and voting
+#### Core RetroStep Entity
 
-#### 2. RATING Pattern
-**Use cases**: Happiness Histogram, ROTI (Return on Time Invested), Satisfaction scales
-- **UI Layout**: Scale selector + histogram visualization
-- **Data Storage**: `rating` + `comment` fields in ParticipantResponse
-- **Interaction**: Participants select numeric rating (1-5, 1-10, etc.) with optional comment
-- **Results View**: Histogram chart with distribution and comments
+```java
+@Entity
+class RetroStep {
+    Long id;
+    RetroStage retroStage;      // Which of 5 phases (SET_THE_STAGE, GATHER_DATA, etc.)
+    Integer orderIndex;          // Sequence within stage
 
-#### 3. FREEFORM Pattern
-**Use cases**: One Word, Closing Statements, Kudos Cards, Open Questions
-- **UI Layout**: Text input areas or list display
-- **Data Storage**: `content` field only in ParticipantResponse
-- **Interaction**: Participants enter free text (single or multiple responses)
-- **Results View**: Word cloud, list, or card layout depending on configuration
+    // What to display
+    ComponentType componentType;  // MULTI_COLUMN_BOARD, RATING_SCALE, HISTOGRAM_CHART, GUIDANCE_MESSAGE
 
-**Why this works**: These 3 patterns are extensible - complex formats can be built as combinations, and new patterns (e.g., SPATIAL for positioning-based activities) can be added later without breaking existing functionality.
+    @Type(JsonType.class)
+    Map<String, Object> componentConfig;  // All UI configuration as JSON
+
+    // When to advance
+    AdvancementTrigger advancementTrigger;  // FACILITATOR_CLICK, ALL_RESPONDED, TIMER_EXPIRES, AUTO
+    Integer durationSeconds;
+
+    // Facilitator guidance (shown in left sidebar)
+    String guidance;
+}
+```
+
+#### ParticipantResponse Entity (Simplified)
+
+```java
+@Entity
+class ParticipantResponse {
+    UUID id;
+    UUID participantId;
+    UUID sessionId;
+    Long stepId;                 // References RetroStep
+
+    @Type(JsonType.class)
+    Map<String, Object> responseData;  // All response data as JSON
+
+    Boolean isVisible;
+    LocalDateTime submittedAt;
+}
+```
+
+**Response data examples:**
+- **Rating**: `{"rating": 8, "comment": "Great sprint!"}`
+- **Categorical**: `{"category": "mad", "content": "Slow deployments"}`
+- **Freeform**: `{"content": "Celebrate more wins"}`
+
+#### Two Core Enums
+
+**ComponentType** - Defines which UI component to render:
+```java
+public enum ComponentType {
+    MULTI_COLUMN_BOARD,  // Card-based columns (Mad/Sad/Glad, Start/Stop/Continue)
+    RATING_SCALE,        // Numeric rating input (Happiness Histogram, ROTI)
+    HISTOGRAM_CHART,     // Rating distribution visualization
+    GUIDANCE_MESSAGE,    // Text instructions/explanations
+    VISUAL_LAYOUT        // Metaphorical layouts (Sailboat, Tree, etc.) - Phase 2
+}
+```
+
+**AdvancementTrigger** - Defines when the step can advance:
+```java
+public enum AdvancementTrigger {
+    FACILITATOR_CLICK,   // Facilitator decides when to proceed
+    ALL_RESPONDED,       // Wait for all participants to submit responses
+    TIMER_EXPIRES,       // Auto-advance after durationSeconds
+    AUTO                 // Advance immediately (system steps, no user action)
+}
+```
+
+#### Component Configuration Examples
+
+All configuration is stored as pure JSON in the `componentConfig` field. No Java config classes needed.
+
+**Multi-Column Board (Mad/Sad/Glad):**
+```json
+{
+  "columns": [
+    {"id": "mad", "title": "Mad", "emoji": "😠", "color": "#EF4444"},
+    {"id": "sad", "title": "Sad", "emoji": "😢", "color": "#3B82F6"},
+    {"id": "glad", "title": "Glad", "emoji": "😊", "color": "#10B981"}
+  ],
+  "capabilities": {
+    "allowInput": true,
+    "allowVoting": false,
+    "allowMerging": false
+  },
+  "display": {
+    "showVotes": false,
+    "showAuthor": false
+  },
+  "cardConfig": {
+    "maxLength": 500,
+    "placeholder": "What made you feel this way?"
+  }
+}
+```
+
+**Rating Scale (Happiness Histogram):**
+```json
+{
+  "min": 1,
+  "max": 10,
+  "step": 1,
+  "labels": ["Unhappy", "Very Happy"],
+  "inputType": "radio",
+  "allowComment": true,
+  "commentMaxLength": 500
+}
+```
+
+**Histogram Chart (Display Results):**
+```json
+{
+  "min": 1,
+  "max": 10,
+  "showComments": true,
+  "groupBy": "rating"
+}
+```
+
+**Templates access JSON directly via Thymeleaf:**
+```html
+<div th:each="column : ${config.columns}">
+    <h3 th:text="${column.title}">Mad</h3>
+    <form th:if="${config.capabilities.allowInput}">
+        <textarea th:maxlength="${config.cardConfig.maxLength}"></textarea>
+    </form>
+</div>
+```
+
+#### Participation Tracking
+
+**Reuse existing ParticipantResponse table** - no separate tracking needed:
+
+```java
+// Check if all participants responded
+public boolean allParticipantsResponded(UUID sessionId, Long stepId) {
+    int activeParticipants = participantRepository.countBySessionIdAndStatus(sessionId, ACTIVE);
+    int respondedCount = responseRepository.countDistinctParticipantsBySessionAndStep(sessionId, stepId);
+    return respondedCount >= activeParticipants;
+}
+```
+
+#### Step Advancement Logic
+
+**RetroSessionService** manages all advancement logic:
+
+```java
+@Service
+public class RetroSessionService {
+
+    // Check if current step can advance based on AdvancementTrigger
+    public boolean canAdvanceCurrentStep(UUID sessionId) {
+        RetroStep currentStep = getCurrentStep(sessionId);
+
+        return switch(currentStep.getAdvancementTrigger()) {
+            case FACILITATOR_CLICK -> true;
+            case ALL_RESPONDED -> allParticipantsResponded(sessionId, currentStep.getId());
+            case TIMER_EXPIRES -> timerHasExpired(sessionId, currentStep);
+            case AUTO -> true;
+        };
+    }
+
+    // Advance to next step (facilitator can ALWAYS override)
+    public void advanceStep(UUID sessionId, boolean isFacilitator) {
+        if (isFacilitator || canAdvanceCurrentStep(sessionId)) {
+            advanceToNextStep(sessionId);
+            eventService.publish(RetroEvent.stepAdvanced(sessionId));
+        }
+    }
+}
+```
+
+**Facilitator Override Principle:**
+
+Facilitators can ALWAYS advance - the system shows warnings but never blocks:
+
+```html
+<!-- Next button ALWAYS enabled for facilitator -->
+<button th:if="${isFacilitator}"
+        hx-post="/api/retro/{retroId}/next"
+        class="btn-primary">
+    Next
+</button>
+
+<!-- Warning shown if blocking condition not met -->
+<div th:if="${!canAdvance}" class="warning">
+    ⚠️ Only 3 of 5 participants responded.
+    You can still proceed if needed.
+</div>
+```
+
+**Why this matters**: Trust facilitator judgment over rigid system rules. Prevents bugs from blocking the entire team.
+
+#### Facilitator Controls in Layout
+
+Facilitator-specific controls (Next button, progress tracker) are defined in the **layout template**, not in step configuration. They are the same for every step.
+
+```html
+<div class="retro-layout">
+  <!-- Main activity area (everyone sees this) -->
+  <div class="activity-area">
+    <div th:replace="~{fragments/components/${componentType} :: content}"></div>
+  </div>
+
+  <!-- Facilitator controls (only facilitator sees this) -->
+  <div th:if="${isFacilitator}" class="facilitator-controls">
+    <!-- Progress tracker -->
+    <div class="progress">
+      <span th:text="${participantsResponded} + ' of ' + ${totalParticipants} + ' responded'">
+        3 of 5 responded
+      </span>
+    </div>
+
+    <!-- Next button (always enabled) -->
+    <button hx-post="/api/retro/{retroId}/next">Next</button>
+
+    <!-- Optional warning -->
+    <div th:if="${!canAdvance}" class="warning">
+      ⚠️ Not all participants responded. You can still proceed if needed.
+    </div>
+  </div>
+</div>
+```
+
+**Why this works**: Configuration drives behavior through pure JSON, components are reusable, and new retrospective formats can be added without code changes - just new CSV configurations and JSON config.
 
 ### UI/UX Design Philosophy
 
@@ -389,12 +668,14 @@ The `system-ui/` folder contains UI design screenshots with mock data that illus
 ### Java Coding Standards
 - Use Lombok annotations (`@Data`, `@RequiredArgsConstructor`, `@Slf4j`) to reduce boilerplate
 - Use `@Slf4j` for logging in all classes
+- **Logging Policy**: DO NOT add INFO/WARN logs to production code for debugging purposes. Instead, use DEBUG or TRACE level logs and temporarily adjust the logging configuration in `application.yaml` (test or main) to enable them. Only use INFO/WARN for genuinely important production events (e.g., session created, user joined, major state transitions). Reserve ERROR for actual error conditions.
 - Prefer constructor injection over field injection
 - Use `@Service` for all business function implementations
 - Keep business logic independent of Spring Boot framework code
 - Use `@Transactional` for service methods that modify data
 - Implement global exception handling with `@ControllerAdvice`
 - Use UUID v7 for primary keys via custom `@GeneratedUuidV7` annotation
+- **Always use imports for class types** - Never use fully-qualified class names like `direct.reflect.facilitator.configurator.ComponentType` or `direct.reflect.facilitator.configurator.RetroStage` in code. Exception: classes in the same package don't need imports.
 
 ### Controller Separation Standards
 - **Strict separation** between View, API, and Event controllers
@@ -408,6 +689,13 @@ The `system-ui/` folder contains UI design screenshots with mock data that illus
 - Mock external dependencies in unit tests
 - Use `@SpringBootTest` with appropriate test slices
 - Handle both authenticated users and guest participants in tests
+- **CRITICAL - DO NOT HIDE PROBLEMS WITH TIMEOUTS**: When tests fail with timeouts, DO NOT simply increase the timeout duration. Increasing timeouts only masks the underlying problem and makes tests slower. Instead:
+  1. Investigate WHY the expected behavior isn't happening
+  2. Check server logs to confirm the server-side behavior is correct
+  3. Debug the client-side to understand what's actually being rendered/received
+  4. Fix the root cause (e.g., missing event listeners, incorrect selectors, race conditions)
+  5. Only increase timeouts if you've confirmed the behavior is correct but legitimately needs more time
+- **Test failures are feedback** - they tell you something is wrong with the implementation, not the test
 
 ### Security Considerations
 - Always validate user permissions before operations

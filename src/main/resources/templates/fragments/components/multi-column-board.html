@@ -1,0 +1,192 @@
+<div th:fragment="content"
+     th:with="config=${currentStep.componentConfig},
+              columns=${config.columns},
+              capabilities=${config.capabilities}">
+
+    <!-- Column Lanes Board - Prominent Side-by-Side Layout -->
+    <div class="grid gap-4"
+         th:classappend="${#lists.size(columns) == 1 ? 'grid-cols-1' : #lists.size(columns) == 2 ? 'grid-cols-2' : #lists.size(columns) == 3 ? 'grid-cols-3' : 'grid-cols-4'}">
+        <div th:each="column : ${columns}"
+             th:attr="data-column=${column['title']}"
+             class="bg-gray-100 rounded-lg border-2 border-gray-300 flex flex-col"
+             style="min-height: 500px;">
+            <!-- Column Header -->
+            <div class="bg-gradient-to-b from-gray-200 to-gray-100 p-3 rounded-t-lg border-b-2 border-gray-300">
+                <h4 class="font-bold text-xl text-center text-gray-800">
+                    <span th:text="${column['title']}">Column</span>
+                </h4>
+            </div>
+            <!-- Column Content Area -->
+            <div class="flex-1 p-3 overflow-y-auto flex flex-col gap-3">
+                <!-- Inline Add Card Form (only if allowInput is true) -->
+                <div th:if="${capabilities.allowInput}">
+                    <form th:attr="hx-post=@{/api/retro/{retroId}/step/{stepId}/response/column(retroId=${retroSession.id}, stepId=${currentStep.id})}"
+                          hx-swap="none"
+                          hx-trigger="submit"
+                          hx-on::after-request="this.reset()"
+                          class="bg-white p-2 rounded-lg border border-gray-300 hover:border-blue-400 hover:shadow-md transition-all">
+                        <!-- Hidden columnId field -->
+                        <input type="hidden"
+                               name="columnId"
+                               th:value="${column['title']}">
+
+                        <!-- Card Content -->
+                        <textarea name="content"
+                                  class="w-full p-2 border-0 rounded-md resize-none focus:ring-0 focus:outline-none text-sm"
+                                  rows="2"
+                                  th:maxlength="${capabilities.maxLength}"
+                                  th:placeholder="${column['placeholder']}"
+                                  onfocus="this.rows=3"
+                                  onblur="if(this.value==''){this.rows=2}"></textarea>
+
+                        <div class="flex justify-end pt-1">
+                            <button type="submit"
+                                    class="text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-full p-1.5 transition-colors"
+                                    title="Add card">
+                                ➕
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Cards List -->
+                <div th:id="'column-lane-' + ${column['title']}"
+                     th:attr="hx-get=@{/retro/{r}/step/{s}/responses/column(r=${retroSession.id}, s=${currentStep.id}, columnId=${column['title']})}"
+                     hx-trigger="load, sse:note_added from:body, sse:responses_revealed from:body"
+                     hx-swap="innerHTML"
+                     hx-target="this"
+                     class="space-y-3">
+                    <p class="text-center text-gray-400 text-sm py-8">Loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Card Lane Content Fragment (loaded via HTMX) -->
+<div th:fragment="lane-content" class="space-y-2 min-h-[200px]">
+    <div th:if="${responses.empty}" class="text-center text-gray-400 text-sm py-8">
+        <p>💭</p>
+        <p class="mt-2">Notes will appear here...</p>
+    </div>
+
+    <div th:unless="${responses.empty}" class="space-y-2">
+        <div th:each="response : ${responses}"
+             th:with="isMyResponse=${response.participantId().toString() == currentParticipantId.toString()},
+                      canSeeContent=${isMyResponse or capabilities.showContent}">
+
+            <!-- Card -->
+            <div th:id="'card-' + ${response.id()}"
+                 th:data-response-id="${response.id()}"
+                 class="bg-white border-2 rounded-lg p-3 shadow-sm transition-shadow"
+                 th:classappend="${isMyResponse} ? 'border-blue-400 bg-blue-50 hover:shadow-md cursor-pointer' : 'border-gray-200'">
+
+                <!-- Display Mode -->
+                <div th:id="'card-display-' + ${response.id()}"
+                     th:if="${isMyResponse}"
+                     onclick="
+                         const cardId = this.closest('[data-response-id]').dataset.responseId;
+                         document.getElementById('card-display-' + cardId).style.display='none';
+                         document.getElementById('card-edit-' + cardId).style.display='block';
+                         document.getElementById('edit-textarea-' + cardId).focus();
+                     "
+                     class="cursor-pointer">
+                    <!-- Content (show if mine or visible) -->
+                    <p th:if="${canSeeContent}"
+                       class="text-sm text-gray-800 mb-2 whitespace-pre-wrap"
+                       th:text="${response.content()}">
+                        Note content
+                    </p>
+
+                    <p th:unless="${canSeeContent}"
+                       class="text-sm text-gray-400 italic mb-2">
+                        [Hidden until revealed]
+                    </p>
+
+                    <!-- Footer: Name + Vote Button -->
+                    <div class="flex items-center justify-between text-xs mt-2 pt-2 border-t border-gray-200">
+                        <div class="flex items-center gap-2">
+                            <span th:if="${showAuthor}" class="text-gray-600 font-medium" th:text="${response.participantName()}">User</span>
+                            <span th:if="${isMyResponse and !showAuthor}" class="text-blue-600 font-semibold">👤 You</span>
+                        </div>
+                        <!-- Vote Button (only if voting enabled) -->
+                        <button th:if="${capabilities.allowVoting}"
+                                type="button"
+                                th:attr="hx-post=@{/api/retro/{retroId}/response/{responseId}/vote(retroId=${retroSession.id}, responseId=${response.id()})}"
+                                hx-swap="none"
+                                class="flex items-center gap-1 px-2 py-1 rounded-full hover:bg-blue-50 transition-colors">
+                            <span class="text-blue-600">👍</span>
+                            <span th:if="${capabilities.showVotes}" class="text-gray-600 font-medium" th:text="${response.voteCount() ?: 0}">0</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Display Mode (non-editable for other users) -->
+                <div th:id="'card-display-' + ${response.id()}"
+                     th:unless="${isMyResponse}">
+                    <!-- Content (show if mine or visible) -->
+                    <p th:if="${canSeeContent}"
+                       class="text-sm text-gray-800 mb-2 whitespace-pre-wrap"
+                       th:text="${response.content()}">
+                        Note content
+                    </p>
+
+                    <p th:unless="${canSeeContent}"
+                       class="text-sm text-gray-400 italic mb-2">
+                        [Hidden until revealed]
+                    </p>
+
+                    <!-- Footer: Name + Vote Button -->
+                    <div class="flex items-center justify-between text-xs mt-2 pt-2 border-t border-gray-200">
+                        <div class="flex items-center gap-2">
+                            <span th:if="${showAuthor}" class="text-gray-600 font-medium" th:text="${response.participantName()}">User</span>
+                            <span th:if="${isMyResponse and !showAuthor}" class="text-blue-600 font-semibold">👤 You</span>
+                        </div>
+                        <!-- Vote Button (only if voting enabled) -->
+                        <button th:if="${capabilities.allowVoting}"
+                                type="button"
+                                th:attr="hx-post=@{/api/retro/{retroId}/response/{responseId}/vote(retroId=${retroSession.id}, responseId=${response.id()})}"
+                                hx-swap="none"
+                                class="flex items-center gap-1 px-2 py-1 rounded-full hover:bg-blue-50 transition-colors">
+                            <span class="text-blue-600">👍</span>
+                            <span th:if="${capabilities.showVotes}" class="text-gray-600 font-medium" th:text="${response.voteCount() ?: 0}">0</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Edit Mode (hidden by default) -->
+                <div th:if="${isMyResponse}"
+                     th:id="'card-edit-' + ${response.id()}"
+                     style="display: none;">
+                    <form th:attr="hx-put=@{/api/retro/{retroId}/response/{responseId}(retroId=${retroSession.id}, responseId=${response.id()})}"
+                          hx-swap="none"
+                          hx-trigger="submit"
+                          hx-on::after-request="document.getElementById('card-display-[[${response.id()}]]').style.display='block'; document.getElementById('card-edit-[[${response.id()}]]').style.display='none';">
+                        <textarea th:id="'edit-textarea-' + ${response.id()}"
+                                  name="content"
+                                  class="w-full p-2 border border-gray-300 rounded-md resize-none focus:ring-2 focus:ring-blue-400 focus:outline-none text-sm"
+                                  rows="3"
+                                  th:text="${response.content()}">Note content</textarea>
+                        <div class="flex justify-end gap-2 mt-2">
+                            <button type="button"
+                                    onclick="
+                                        const cardId = this.closest('[data-response-id]').dataset.responseId;
+                                        document.getElementById('card-display-' + cardId).style.display='block';
+                                        document.getElementById('card-edit-' + cardId).style.display='none';
+                                    "
+                                    class="text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded-full p-1.5 transition-colors text-sm"
+                                    title="Cancel">
+                                ✕
+                            </button>
+                            <button type="submit"
+                                    class="text-green-600 hover:text-green-700 hover:bg-green-50 rounded-full p-1.5 transition-colors"
+                                    title="Save">
+                                ✓
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

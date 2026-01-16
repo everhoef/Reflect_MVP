@@ -1,7 +1,7 @@
 <div th:fragment="content(retroSession)" class="max-w-full mx-auto"
      id="retro-content"
      th:attr="hx-get=@{/retro/{retroId}/content(retroId=${retroSession.id})}"
-     hx-trigger="sse:step_advanced from:body"
+     hx-trigger="sse:session_started from:body, sse:step_advanced from:body"
      hx-swap="innerHTML"
      hx-target="this">
 
@@ -51,51 +51,42 @@
     <!-- Main Three-Column Layout -->
     <div class="flex h-full" style="height: calc(100vh - 180px);">
         
-        <!-- Left Sidebar: Guidance Video/Text Area -->
-        <div class="w-80 bg-gray-900 relative overflow-hidden">
-            <!-- Video/Image Placeholder -->
-            <div class="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900">
-                <div class="flex items-center justify-center h-full">
-                    <div class="text-white text-center">
-                        <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M8 5v14l11-7z"/>
-                            </svg>
-                        </div>
-                        <p class="text-sm opacity-75">Guidance content</p>
+        <!-- Left Sidebar: Virtual Facilitator Chatbox -->
+        <div class="w-80 bg-gray-900 flex flex-col">
+            <!-- Chatbox Header -->
+            <div class="bg-gray-800 px-4 py-3 border-b border-gray-700">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center mr-3">
+                        <span class="text-2xl">🤖</span>
+                    </div>
+                    <div>
+                        <h3 class="text-white font-semibold text-sm">Virtual Facilitator</h3>
+                        <p class="text-gray-400 text-xs">Guiding your retrospective</p>
                     </div>
                 </div>
             </div>
-            
-            <!-- Guidance Overlay Tooltip -->
-            <div class="absolute bottom-4 left-4 right-4 bg-black bg-opacity-90 text-white p-4 rounded-lg border border-gray-600">
-                <div class="flex items-start">
-                    <div class="w-7 h-7 bg-yellow-500 rounded-full flex items-center justify-center mr-3 mt-0.5 flex-shrink-0">
-                        <span th:switch="${currentStep != null ? currentStep.stepType?.name() : 'NONE'}" class="text-black text-sm font-bold">
-                            <span th:case="INSTRUCTION">📋</span>
-                            <span th:case="ACTIVITY">✏️</span>
-                            <span th:case="DISCUSSION">💬</span>
-                            <span th:case="*">ℹ️</span>
-                        </span>
+
+            <!-- Chat Messages Area -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-3">
+                <!-- Loop through instruction history -->
+                <div th:each="instruction, iterStat : ${instructionHistory}" class="flex items-start">
+                    <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center mr-2 flex-shrink-0">
+                        <span class="text-lg">🤖</span>
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <h4 class="font-medium text-sm mb-2 text-yellow-400" th:text="${currentStep != null ? currentStep.title : 'No Step'}">Current Step</h4>
-                        
-                        <!-- Clean step guidance from service layer -->
-                        <div class="text-xs text-gray-300 leading-relaxed mb-2">
-                            <p th:text="${currentStep != null ? currentStep.parsedContent : 'No guidance available'}">Step guidance processed by service layer</p>
-                        </div>
-                        
-                        <!-- Facilitator-specific actions (not guidance, just actions) -->
-                        <div th:if="${isFacilitator}" class="text-xs text-yellow-300">
-                            <div th:switch="${currentStep != null ? currentStep.stepType?.name() : 'NONE'}">
-                                <p th:case="INSTRUCTION">💡 <strong>Click "Next"</strong> when everyone is ready</p>
-                                <p th:case="ACTIVITY">💡 <strong>Click "Reveal"</strong> when actions are ready, then <strong>"Next"</strong></p>
-                                <p th:case="DISCUSSION">💡 <strong>Click "Next"</strong> when discussion feels complete</p>
-                            </div>
-                        </div>
+                    <div class="flex-1 bg-gray-800 rounded-lg p-3 text-white text-sm leading-relaxed">
+                        <p th:text="${instruction}" class="whitespace-pre-line">Instruction message here</p>
                     </div>
                 </div>
+
+                <!-- Empty state when no instructions -->
+                <div th:if="${#lists.isEmpty(instructionHistory)}" class="text-center text-gray-400 py-8">
+                    <p class="text-sm">Waiting for retrospective to start...</p>
+                </div>
+            </div>
+
+            <!-- Facilitator hint at bottom -->
+            <div th:if="${isFacilitator and currentStep != null}" class="bg-gray-800 px-4 py-3 border-t border-gray-700">
+                <p class="text-yellow-300 text-xs">💡 <strong>Click "Next"</strong> when ready to advance</p>
             </div>
         </div>
         
@@ -116,83 +107,30 @@
                     </div>
                 </div>
 
-                <!-- Pattern-specific Content -->
-                <div th:switch="${currentStep != null ? currentStep.stepType?.name() : 'NONE'}">
-            <!-- INSTRUCTION Steps -->
-            <div th:case="INSTRUCTION">
-                <div th:replace="~{fragments/retro-instruction :: content}">
-                    <!-- Fallback content -->
-                    <div class="bg-blue-50 p-6 rounded-lg">
-                        <p class="text-gray-700" th:utext="${currentStep.configuration}">Step instructions...</p>
+                <!-- Component-based Content -->
+                <div th:switch="${currentStep != null ? currentStep.componentType?.name() : 'NONE'}">
+                    <!-- Multi-Column Board Component -->
+                    <div th:case="MULTI_COLUMN_BOARD">
+                        <div th:replace="~{fragments/components/multi-column-board :: content}"></div>
                     </div>
-                </div>
-            </div>
-            
-            <!-- ACTIVITY Steps (pattern-specific) -->
-            <div th:case="ACTIVITY">
-                <div th:switch="${currentStep != null ? currentStep.dataPattern?.name() : 'NONE'}">
-                <!-- CATEGORICAL Pattern (Mad Sad Glad) -->
-                <div th:case="CATEGORICAL">
-                    <div th:replace="~{fragments/retro-categorical :: content}">
-                        <!-- Fallback content -->
-                        <div class="bg-green-50 p-6 rounded-lg">
-                            <p class="mb-4">CATEGORICAL Activity: <span th:text="${currentStep.title}">Activity Title</span></p>
-                            <p class="text-sm text-gray-600" th:text="${currentStep.configuration}">Configuration...</p>
+
+                    <!-- Rating Scale Component -->
+                    <div th:case="RATING_SCALE">
+                        <div th:replace="~{fragments/components/rating-scale :: content}"></div>
+                    </div>
+
+                    <!-- Histogram Chart Component -->
+                    <div th:case="HISTOGRAM_CHART">
+                        <div th:replace="~{fragments/components/histogram-chart :: content}"></div>
+                    </div>
+
+                    <!-- Unknown Component Type -->
+                    <div th:case="*">
+                        <div class="bg-red-50 p-6 rounded-lg border-l-4 border-red-500">
+                            <p class="text-red-600 font-semibold">Unknown component type: <span th:text="${currentStep != null ? currentStep.componentType?.name() : 'Unknown'}">Unknown</span></p>
                         </div>
                     </div>
                 </div>
-                
-                <!-- RATING Pattern (Happiness Histogram) -->
-                <div th:case="RATING">
-                    <div th:replace="~{fragments/retro-rating :: content}">
-                        <!-- Fallback content -->
-                        <div class="bg-yellow-50 p-6 rounded-lg">
-                            <p class="mb-4">RATING Activity: <span th:text="${currentStep.title}">Activity Title</span></p>
-                            <p class="text-sm text-gray-600" th:text="${currentStep.configuration}">Configuration...</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- FREEFORM Pattern (One Word) -->
-                <div th:case="FREEFORM">
-                    <div th:replace="~{fragments/retro-freeform :: content}">
-                        <!-- Fallback content -->
-                        <div class="bg-purple-50 p-6 rounded-lg">
-                            <p class="mb-4">FREEFORM Activity: <span th:text="${currentStep.title}">Activity Title</span></p>
-                            <p class="text-sm text-gray-600" th:text="${currentStep.configuration}">Configuration...</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Unknown Pattern -->
-                <div th:case="*">
-                    <div class="bg-gray-50 p-6 rounded-lg">
-                        <p class="text-red-600">Unknown activity pattern: <span th:text="${currentStep != null ? currentStep.dataPattern?.name() : 'Unknown'}">Unknown</span></p>
-                    </div>
-                </div>
-                </div>
-            </div>
-            
-            <!-- DISCUSSION Steps -->
-            <div th:case="DISCUSSION">
-                <div th:replace="~{fragments/retro-discussion :: content}">
-                    <!-- Fallback content -->
-                    <div class="bg-orange-50 p-6 rounded-lg">
-                        <p class="text-gray-700" th:utext="${currentStep.configuration}">Discussion prompt...</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Unknown Step Type -->
-            <div th:case="*">
-                <div class="bg-gray-50 p-6 rounded-lg">
-                    <p class="text-red-600">Unknown step type: <span th:text="${currentStep != null ? currentStep.stepType?.name() : 'Unknown'}">Unknown</span></p>
-                    <p class="text-sm text-gray-600">Debug - Step Type: <span th:text="${currentStep?.stepType}">null</span></p>
-                    <p class="text-sm text-gray-600">Debug - Data Pattern: <span th:text="${currentStep?.dataPattern}">null</span></p>
-                    <p class="text-sm text-gray-600">Debug - Current Step: <span th:text="${currentStep != null ? 'not null' : 'null'}">null</span></p>
-                </div>
-            </div>
-        </div>
                 
                 <!-- Action Buttons -->
                 <div class="mt-8 flex justify-center space-x-4">
@@ -235,7 +173,7 @@
                                 <h3 class="text-xl font-dosis mb-4">Participants</h3>
                                 <ul id="participants-list" class="space-y-2"
                                     th:attr="hx-get=@{/retro/{retroId}/participants(retroId=${retroSession.id})}"
-                                    hx-trigger="sse:participant_joined from:body, sse:participant_left from:body"
+                                    hx-trigger="sse:participant_joined, sse:participant_left"
                                     hx-swap="innerHTML">
                                     <li th:each="participant : ${participants}" class="px-4 py-2 bg-gray-50 rounded-md flex justify-between items-center">
                                         <span th:text="${participant.displayName}"></span>
@@ -292,7 +230,7 @@
                                 </div>
                                 <span class="text-sm font-medium" th:text="${participant.displayName}">Alice</span>
                             </div>
-                            <div th:if="${participant.role == T(direct.reflect.facilitator.facilitation.ParticipantRole).FACILITATOR}"
+                            <div th:if="${participant.role.name() == 'FACILITATOR'}"
                                  class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
                                 Facilitator
                             </div>
@@ -300,34 +238,16 @@
                     </div>
                 </div>
                 
-                <!-- Results/Insights Section (show when available) -->
-                <div th:if="${currentStep != null and currentStep.stepType?.name() == 'ACTIVITY'}" class="mb-8">
+                <!-- Results/Insights Section (show for interactive components) -->
+                <div th:if="${currentStep != null and (currentStep.componentType?.name() == 'MULTI_COLUMN_BOARD' or currentStep.componentType?.name() == 'RATING_SCALE')}" class="mb-8">
                     <h3 class="text-lg font-semibold text-gray-900 mb-4">Insights</h3>
                     <div class="bg-white p-4 rounded-lg border">
                         <p class="text-sm text-gray-600 text-center">
                             Results will appear here when responses are revealed
                         </p>
-                        <!-- TODO: Add actual results display based on data pattern -->
                     </div>
                 </div>
                 
-                <!-- Facilitator Controls -->
-                <div th:if="${isFacilitator}" class="mb-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Facilitator Actions</h3>
-                    <div class="space-y-3">
-                        <div th:if="${currentStep != null and currentStep.stepType?.name() == 'ACTIVITY'}" 
-                             class="bg-white p-4 rounded-lg border">
-                            <button class="w-full bg-blue-600 text-white py-2 px-3 rounded hover:bg-blue-700 transition-colors text-sm"
-                                    th:attr="hx-post=@{/api/retro/{retroId}/step/{stepId}/reveal(retroId=${retroSession.id}, stepId=${currentStep.id})}"
-                                    hx-swap="none">
-                                👁️ Reveal All Responses
-                            </button>
-                            <p class="text-xs text-gray-500 text-center mt-2">
-                                Reveal responses when participants are ready
-                            </p>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>

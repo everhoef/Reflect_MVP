@@ -44,23 +44,30 @@ public class RetroEventController {
         response.setHeader("Connection", "keep-alive");
 
         try {
+            log.debug("[SSE] Connection request - retroId: {}, httpSessionId: {}",
+                retroId, request.getSession(false) != null ? request.getSession(false).getId() : "none");
+
             // Validate participant access using session attributes (will throw exception if not authorized)
             Participant participant = participantService.getParticipantForSession(request, retroId);
 
-            String httpSessionId = request.getSession(false) != null ? request.getSession(false).getId() : "none";
-            log.debug("SSE connection established - participantId: {}, role: {}, retroId: {}, httpSessionId: {}",
-                participant.getParticipantId(), participant.getRole(), retroId, httpSessionId);
+            log.debug("[SSE] Participant validated - participantId: {}, name: {}, role: {}",
+                participant.getParticipantId(), participant.getDisplayName(), participant.getRole());
 
             // Update last seen
             participantService.updateLastSeen(request, retroId);
 
             // Create and return SseEmitter for this participant
-            return eventService.createSseEmitter(retroId, request, participant.getDisplayName(), participant.getParticipantId());
+            SseEmitter emitter = eventService.createSseEmitter(
+                retroId, participant.getParticipantId(), participant.getDisplayName());
+
+            log.debug("[SSE] Connection created successfully for participant {} in retro {}",
+                participant.getDisplayName(), retroId);
+
+            return emitter;
 
         } catch (Exception e) {
-            String httpSessionId = request.getSession(false) != null ? request.getSession(false).getId() : "none";
-            log.error("SSE connection failed - retroId: {}, httpSessionId: {}, error: {}",
-                retroId, httpSessionId, e.getMessage());
+            log.error("[SSE] Connection failed - retroId: {}, error: {}",
+                retroId, e.getMessage(), e);
             throw e;
         }
     }

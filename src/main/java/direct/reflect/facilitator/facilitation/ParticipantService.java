@@ -18,6 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.auth.AuthService;
+import direct.reflect.facilitator.eventing.EventService;
+import direct.reflect.facilitator.eventing.RetroEvent;
 
 /**
  * Service responsible for managing {@link Participant} entities.
@@ -35,36 +37,9 @@ import direct.reflect.facilitator.auth.AuthService;
 @Slf4j
 public class ParticipantService {
     private final ParticipantRepository participantRepository;
-    private final RetroSessionService retroSessionService;
+    private final EventService eventService;
     private final AuthService authHelper;
 
-
-    /**
-     * Creates a new retro session with the current user as facilitator.
-     * Works for both OIDC users and anonymous guests.
-     */
-    @Transactional
-    public Participant createAndAssignFacilitatorForSession(String sessionName, HttpServletRequest request) {
-        
-        // For session creation, we automatically terminate old sessions
-        UUID participantId = authHelper.getParticipantId(request);
-        List<Participant> activeSessions = getActiveSessionsForParticipant(participantId);
-        if (!activeSessions.isEmpty()) {
-            log.info("Participant {} creating new session - terminating {} existing session(s)", 
-                participantId, activeSessions.size());
-                
-            for (Participant activeParticipant : activeSessions) {
-                removeParticipantFromSession(activeParticipant);
-            }
-            
-            log.info("Terminated {} old session(s) for new session creation", activeSessions.size());
-        }
-        
-        // Create session and add user as facilitator
-        RetroSession newSession = retroSessionService.createNewSession(sessionName);
-        return createParticipantForSession(newSession, ParticipantRole.FACILITATOR, request);
-    }
-    
     
 
 
@@ -83,13 +58,22 @@ public class ParticipantService {
         // Get current user identity (throws if session not properly initialized)
         UUID participantId = authHelper.getParticipantId(request);
         authHelper.getDisplayName(request); // Validate display name is set
-        
+
         checkForActiveSession(participantId, session.getId());
         Participant participant = createParticipantForSession(session, role, request);
-        
-        // Notify RetroSessionService to handle the event publishing
-        retroSessionService.onParticipantJoining(participant);
-        
+
+        // Publish PARTICIPANT_JOINED event
+        try {
+            eventService.publish(RetroEvent.participantJoined(
+                session.getId(),
+                participant.getDisplayName()
+            ));
+            log.info("Published PARTICIPANT_JOINED event for '{}'", participant.getDisplayName());
+        } catch (Exception eventError) {
+            log.error("Failed to publish PARTICIPANT_JOINED event: {}", eventError.getMessage());
+            // Continue anyway - event publishing failure shouldn't block user flow
+        }
+
         return participant;
     }
 
@@ -133,7 +117,8 @@ public class ParticipantService {
      * Gets all participants in a session.
      */
     public List<Participant> getSessionParticipants(UUID sessionId) {
-        return participantRepository.findBySession_Id(sessionId);
+        // Only return ACTIVE participants (excludes LEFT/INACTIVE)
+        return participantRepository.findBySession_IdAndStatus(sessionId, ParticipantStatus.ACTIVE);
     }
 
     /**
@@ -207,22 +192,25 @@ public class ParticipantService {
     
     /**
      * Gets all active sessions for a participant.
+     * Returns only sessions where participant status is ACTIVE and session is not finished.
      */
     public List<Participant> getActiveSessionsForParticipant(UUID participantId) {
         log.debug("Checking for active sessions for participant: {}", participantId);
-            
-        List<Participant> existing = participantRepository.findByParticipantIdWithSession(participantId);
-        
-        log.debug("Found {} existing participations for participant {}", existing.size(), participantId);
-        
-        List<Participant> activeSessions = existing.stream()
+
+        // Use repository query to filter by status = ACTIVE (more efficient)
+        List<Participant> activeParticipants = participantRepository.findByParticipantIdAndStatusWithSession(participantId, ParticipantStatus.ACTIVE);
+
+        log.debug("Found {} ACTIVE participations for participant {}", activeParticipants.size(), participantId);
+
+        // Further filter by session not finished
+        List<Participant> activeSessions = activeParticipants.stream()
             .filter(p -> {
                 boolean isFinished = p.getSession().isFinished();
                 log.debug("Session {} is finished: {}", p.getSession().getId(), isFinished);
                 return !isFinished;
             })
             .toList();
-        
+
         log.debug("Participant {} has {} active sessions", participantId, activeSessions.size());
         return activeSessions;
     }
@@ -234,7 +222,7 @@ public class ParticipantService {
     public void leaveAllActiveSessions(HttpServletRequest request) {
         UUID participantId = authHelper.getParticipantId(request);
         List<Participant> activeSessions = getActiveSessionsForParticipant(participantId);
-        
+
         for (Participant activeParticipant : activeSessions) {
             removeParticipantFromSession(activeParticipant);
         }
@@ -323,23 +311,35 @@ public class ParticipantService {
     }
     
     /**
-     * Removes a participant from their session with proper event handling.
+     * Marks a participant as LEFT from their session with proper event handling.
+     * Does not delete the participant - preserves data for audit/history.
      */
     @Transactional
     public void removeParticipantFromSession(Participant participant) {
-        log.info("=== REMOVING PARTICIPANT === {} from session {} ({})",
-            participant.getParticipantId(),
-            participant.getSession().getId(),
-            participant.getSession().getName());
+        log.debug("Marking participant {} as LEFT from session {}",
+            participant.getParticipantId(), participant.getSession().getId());
 
-        // Notify RetroSessionService to handle the event publishing
-        log.info("About to call retroSessionService.onParticipantLeaving for participant: {}", participant.getDisplayName());
-        retroSessionService.onParticipantLeaving(participant);
+        // Mark participant as LEFT (preserves responses and history)
+        participant.setStatus(ParticipantStatus.LEFT);
+        participant.setLastSeen(LocalDateTime.now());
+        participantRepository.save(participant);
 
-        // Remove the participant from the database
-        log.info("About to delete participant {} from database", participant.getDisplayName());
-        participantRepository.delete(participant);
-        log.info("Successfully deleted participant {} from database", participant.getDisplayName());
+        log.info("Participant {} left session {}",
+            participant.getDisplayName(), participant.getSession().getId());
+
+        // Publish PARTICIPANT_LEFT event AFTER database update
+        // This ensures that when clients receive the event and refresh participant lists,
+        // the database correctly shows the participant as LEFT (not ACTIVE)
+        try {
+            eventService.publish(RetroEvent.participantLeft(
+                participant.getSession().getId(),
+                participant.getDisplayName()
+            ));
+            log.info("Published PARTICIPANT_LEFT event for '{}'", participant.getDisplayName());
+        } catch (Exception eventError) {
+            log.error("Failed to publish PARTICIPANT_LEFT event: {}", eventError.getMessage());
+            // Don't throw - event publishing failure shouldn't block user flow
+        }
     }
 
     // ========== AUTHORIZATION METHODS (for Spring Security @PreAuthorize) ==========

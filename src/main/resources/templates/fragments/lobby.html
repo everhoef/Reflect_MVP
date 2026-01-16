@@ -18,7 +18,7 @@
     <h3 class="text-xl font-dosis mb-4">Participants</h3>
     <ul id="participants-list" class="space-y-2"
         th:attr="hx-get=@{/retro/{retroId}/participants(retroId=${retroSession.id})}"
-        hx-trigger="sse:participant_joined from:body, sse:participant_left from:body"
+        hx-trigger="sse:participant_joined, sse:participant_left"
         hx-swap="innerHTML">
       <li th:each="participant : ${participants}" class="px-4 py-2 bg-gray-50 rounded-md flex justify-between items-center">
         <span th:text="${participant.displayName}"></span>
@@ -32,7 +32,8 @@
 
   <!-- Start button (facilitator only) -->
   <div th:if="${isFacilitator}" class="mt-8">
-    <form th:attr="hx-post=@{/api/retro/{retroId}/start(retroId=${retroSession.id})}">
+    <form th:attr="hx-post=@{/api/retro/{retroId}/start(retroId=${retroSession.id})}"
+          hx-swap="none">
       <button type="submit"
         class="w-full bg-ocher-yellow text-white py-3 px-6 rounded-md hover:bg-ocher-yellow-dark transition-colors">
         Start Retrospective

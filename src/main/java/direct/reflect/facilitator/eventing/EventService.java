@@ -3,11 +3,13 @@ package direct.reflect.facilitator.eventing;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
-import jakarta.servlet.http.HttpServletRequest;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -23,37 +25,42 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class EventService {
     private final RedisTemplate<String, Object> redisTemplate;
+    private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher applicationEventPublisher;
     private final AtomicInteger activeConnections = new AtomicInteger(0);
-    
+
+    // Record to store SSE emitter with participant info
+    private record EmitterConnection(SseEmitter emitter, String participantName) {}
+
     // Local SSE connections for this pod instance
-    private final ConcurrentHashMap<String, SseEmitter> localEmitters = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, EmitterConnection> localEmitters = new ConcurrentHashMap<>();
     private final ScheduledExecutorService keepAliveExecutor = Executors.newScheduledThreadPool(2);
-    
-    private static final String STREAM_KEY_PREFIX = "retro:stream:";
+
     private static final long SSE_TIMEOUT = 3600000L; // 1 hour
     
     @PostConstruct
     public void init() {
-        // Initialize Redis Streams consumer groups for each retro
-        // This will be called per retro when first accessed
-        log.info("EventService initialized with Redis Streams support");
-        
-        // Start keep-alive scheduler
+        log.info("EventService initializing with Redis Pub/Sub");
+
+        // Start keep-alive scheduler for SSE connections
         keepAliveExecutor.scheduleAtFixedRate(this::sendKeepAlive, 30, 30, TimeUnit.SECONDS);
+
+        log.info("EventService initialized - SSE keep-alive scheduled every 30s");
     }
     
     @PreDestroy
     public void cleanup() {
         // Close all local SSE connections
-        localEmitters.values().forEach(emitter -> {
+        localEmitters.values().forEach(connection -> {
             try {
-                emitter.complete();
+                connection.emitter().complete();
             } catch (Exception e) {
                 log.warn("Error closing SSE emitter: {}", e.getMessage());
             }
@@ -62,49 +69,68 @@ public class EventService {
     }
     
     /**
-     * Publish event to Redis Stream (blocking).
+     * Publishes RetroEvent with transaction awareness.
+     *
+     * When called within @Transactional methods, events are automatically
+     * delayed until AFTER transaction commits via @TransactionalEventListener.
+     * This prevents race conditions where SSE clients query stale database state.
+     *
+     * For direct Redis publishing without transaction awareness (rare),
+     * use broadcastToRedis() directly.
      */
-    public String publish(RetroEvent<?> event) {
-        log.debug("Publishing {} event for retro {}", event.type(), event.retroId());
+    public void publish(RetroEvent<?> event) {
+        log.debug("[{}] Publishing {} event for retro {} (will be broadcast after commit if in transaction)",
+            event.correlationId(), event.type(), event.retroId());
 
-        String streamKey = STREAM_KEY_PREFIX + event.retroId();
-
-        // Create stream record
-        Map<String, Object> eventData = Map.of(
-            "type", event.type().name(),
-            "retroId", event.retroId().toString(),
-            "payload", event.payload() != null ? event.payload() : "",
-            "timestamp", LocalDateTime.now().toString()
-        );
-
-        // Add to Redis Stream (blocking)
-        RecordId recordId = redisTemplate.opsForStream().add(streamKey, eventData);
-
-        // Send to all local SSE connections for this retro
-        sendToLocalEmitters(event.retroId(), event);
-
-        return recordId.getValue();
+        // Delegate to Spring's event system - will be queued if in transaction
+        applicationEventPublisher.publishEvent(event);
     }
-    
+
+    /**
+     * Handles events received from Redis Pub/Sub.
+     * Called by MessageListenerAdapter for ALL events published by ANY pod (broadcast).
+     * Forwards events to local SSE connections for this retro.
+     */
+    public void onPubSubMessage(Object message, String channel) {
+        try {
+            // Deserialize JSON string message to RetroEvent
+            String jsonMessage = message.toString();
+            RetroEvent<?> event = objectMapper.readValue(jsonMessage, RetroEvent.class);
+            UUID retroId = event.retroId();
+
+            log.debug("[{}] Received from Redis Pub/Sub: {} event for retro {} on channel {}",
+                event.correlationId(), event.type(), retroId, channel);
+
+            // Forward to local SSE connections only
+            sendToLocalEmitters(retroId, event);
+
+        } catch (Exception e) {
+            log.error("Failed to process Pub/Sub message from channel {}: {}",
+                channel, e.getMessage(), e);
+        }
+    }
+
     /**
      * Create SSE emitter (simple blocking approach).
      * Ensures only one connection per user per retro.
+     * Uses participantId for connection keying to prevent stale connections.
      */
-    public SseEmitter createSseEmitter(UUID retroId, HttpServletRequest request, String participantName, UUID participantId) {
-        String connectionId = retroId + ":" + request.getSession().getId();
+    public SseEmitter createSseEmitter(UUID retroId, UUID participantId, String participantName) {
+        String connectionId = retroId + ":" + participantId;
         String participantInfo = participantName + " (" + participantId + ")";
-        
+
         // Check if connection already exists - close the old one first
-        SseEmitter existingEmitter = localEmitters.get(connectionId);
-        if (existingEmitter != null) {
-            log.debug("Replacing existing SSE connection for participant {} in retro {}", participantInfo, retroId);
-            cleanupConnection(connectionId, existingEmitter, participantInfo, retroId);
+        EmitterConnection existingConnection = localEmitters.get(connectionId);
+        if (existingConnection != null) {
+            log.debug("[SSE] Replacing existing connection for {} in retro {}",
+                participantInfo, retroId);
+            cleanupConnection(connectionId, existingConnection.emitter(), participantInfo, retroId);
         }
 
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
 
-        // Store locally
-        localEmitters.put(connectionId, emitter);
+        // Store locally with participant name
+        localEmitters.put(connectionId, new EmitterConnection(emitter, participantName));
         int currentConnections = activeConnections.incrementAndGet();
 
         // Cleanup on close/error/timeout - use a single cleanup method to avoid race conditions
@@ -134,16 +160,18 @@ public class EventService {
             cleanupConnection(connectionId, emitter, participantInfo, retroId);
         });
 
-        log.debug("SSE emitter created for participant {} in retro {} (total active: {})", participantInfo, retroId, currentConnections);
+        log.debug("[SSE] Connection established: {} in retro {} (total active: {})",
+            participantInfo, retroId, currentConnections);
 
         // Send initial comment to establish the SSE connection
         // This prevents browsers from closing the connection immediately due to no initial data
         try {
             emitter.send(SseEmitter.event()
                 .comment("SSE connection established"));
-            log.trace("Sent initial SSE connection comment for participant {} in retro {}", participantInfo, retroId);
+            log.trace("[SSE] Sent initial connection comment to {}", participantInfo);
         } catch (IOException e) {
-            log.warn("Failed to send initial SSE comment for participant {} in retro {}: {}", participantInfo, retroId, e.getMessage());
+            log.error("[SSE] Failed to establish connection for {}: {}",
+                participantInfo, e.getMessage());
             cleanupConnection(connectionId, emitter, participantInfo, retroId);
             throw new RuntimeException("Failed to establish SSE connection", e);
         }
@@ -176,29 +204,46 @@ public class EventService {
         String connectionId = retroId + ":";
 
         // Take a snapshot of matching emitters to avoid concurrent modification
-        List<Map.Entry<String, SseEmitter>> matchingEmitters = localEmitters.entrySet().stream()
+        List<Map.Entry<String, EmitterConnection>> matchingEmitters = localEmitters.entrySet().stream()
             .filter(entry -> entry.getKey().startsWith(connectionId))
             .toList();
 
-        log.debug("Sending {} event to {} connection(s) for retro {}",
-            event.type(), matchingEmitters.size(), retroId);
+        // Build recipient list for logging
+        String recipients = matchingEmitters.stream()
+            .map(entry -> entry.getValue().participantName())
+            .collect(Collectors.joining(", "));
 
-        matchingEmitters.forEach(entry -> {
+        log.debug("[{}] Broadcasting {} to {} recipient(s): [{}]",
+            event.correlationId(), event.type(), matchingEmitters.size(), recipients);
+
+        int successCount = 0;
+        int failureCount = 0;
+
+        for (Map.Entry<String, EmitterConnection> entry : matchingEmitters) {
             try {
                 // Send properly formatted SSE event using SseEmitter.event() builder
                 // Use the event type as the SSE event name, and pass the actual payload as data
                 String eventData = event.payload() != null ? event.payload().toString() : "refresh";
-                entry.getValue().send(SseEmitter.event()
+                entry.getValue().emitter().send(SseEmitter.event()
+                    .id(event.correlationId())  // Include correlation ID in SSE message
                     .name(event.type().name().toLowerCase())
                     .data(eventData));
 
-                log.trace("Sent {} event to connection: {}", event.type(), entry.getKey());
+                log.trace("[{}] Delivered to {}",
+                    event.correlationId(), entry.getValue().participantName());
+                successCount++;
+
             } catch (IOException e) {
-                log.warn("Failed to send {} event to connection: {} - {}", event.type(), entry.getKey(), e.getMessage());
+                log.warn("[{}] Failed to deliver to {}: {}",
+                    event.correlationId(), entry.getValue().participantName(), e.getMessage());
+                failureCount++;
                 // Don't manually cleanup here - let the emitter's error handler deal with it
                 // This prevents double-cleanup and negative connection counts
             }
-        });
+        }
+
+        log.debug("[{}] Broadcast completed: {} succeeded, {} failed",
+            event.correlationId(), successCount, failureCount);
     }
     
     /**
@@ -208,13 +253,13 @@ public class EventService {
         if (localEmitters.isEmpty()) {
             return;
         }
-        
+
         // Take a snapshot to avoid concurrent modification
-        List<Map.Entry<String, SseEmitter>> currentEmitters = new ArrayList<>(localEmitters.entrySet());
-        
+        List<Map.Entry<String, EmitterConnection>> currentEmitters = new ArrayList<>(localEmitters.entrySet());
+
         currentEmitters.forEach(entry -> {
             try {
-                entry.getValue().send(SseEmitter.event()
+                entry.getValue().emitter().send(SseEmitter.event()
                     .name("keep-alive")
                     .data("heartbeat")
                     .comment("Keep connection alive"));
@@ -225,5 +270,78 @@ public class EventService {
             }
         });
     }
-    
+
+    /**
+     * Publishes RetroEvent to Redis Pub/Sub AFTER PostgreSQL transaction commits.
+     *
+     * This listener is triggered automatically when services call eventService.publish()
+     * within @Transactional methods. The @TransactionalEventListener annotation ensures
+     * events are only broadcast to SSE clients AFTER the transaction commits, preventing
+     * race conditions where clients query stale database state.
+     *
+     * Pattern:
+     * 1. Service calls: eventService.publish(retroEvent)
+     * 2. EventService.publish() delegates to ApplicationEventPublisher
+     * 3. Spring queues event until transaction commits
+     * 4. Transaction commits (database changes now visible)
+     * 5. This listener receives event (@TransactionalEventListener AFTER_COMMIT)
+     * 6. Calls broadcastToRedis() → Redis Pub/Sub → SSE clients
+     *
+     * Multi-Instance (K8s) Behavior:
+     * - ApplicationEvent is JVM-local (not distributed across pods)
+     * - Each pod's listener publishes to Redis after ITS transaction commits
+     * - Redis broadcasts to ALL pods' SSE clients
+     * - Database consistency guaranteed: clients query AFTER commit
+     *
+     * Usage example:
+     * <pre>
+     * {@code
+     * @Transactional
+     * public void removeParticipantFromSession(Participant participant) {
+     *     participantRepository.save(participant);  // DB write
+     *
+     *     // Publish event - automatically delayed until transaction commits
+     *     eventService.publish(
+     *         RetroEvent.participantLeft(sessionId, displayName)
+     *     );
+     * }  // Transaction commits → this listener fires → Redis publishes
+     * }
+     * </pre>
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onRetroEventAfterCommit(RetroEvent<?> event) {
+        log.debug("[{}] Transaction committed - broadcasting {} event to Redis (retroId: {})",
+            event.correlationId(), event.type(), event.retroId());
+
+        try {
+            broadcastToRedis(event);  // Call internal broadcasting method
+            log.info("[{}] Broadcast {} event to Redis for retro {} (participants notified via SSE)",
+                event.correlationId(), event.type(), event.retroId());
+        } catch (Exception e) {
+            log.error("[{}] Failed to broadcast {} event to Redis: {}",
+                event.correlationId(), event.type(), e.getMessage(), e);
+            // Don't throw - SSE event failure shouldn't crash the application
+            // Database changes are already committed and visible to queries
+        }
+    }
+
+    /**
+     * Internal method that broadcasts directly to Redis Pub/Sub.
+     *
+     * This method contains the actual Redis broadcasting logic. It's kept private
+     * for rare cases where non-transactional broadcasting is needed.
+     *
+     * Most code should call publish() instead, which provides transaction awareness.
+     */
+    private void broadcastToRedis(RetroEvent<?> event) {
+        String channel = "retro:" + event.retroId();
+
+        // Broadcast to Redis Pub/Sub (all pods will receive)
+        // RedisTemplate handles JSON serialization automatically
+        redisTemplate.convertAndSend(channel, event);
+
+        log.debug("[{}] Broadcast to Redis channel: {}",
+            event.correlationId(), channel);
+    }
+
 }

@@ -4,8 +4,8 @@ import direct.reflect.facilitator.eventing.EventService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.ComponentScan;
@@ -120,115 +120,53 @@ class CsvImporterServiceTest {
     void testImportRetroStepsOrderedByStage() {
         List<RetroStage> stages = retroStageRepository.findAll();
         assertEquals(26, stages.size());
-        
+
         long totalSteps = retroStepRepository.count();
         log.info("Total steps found: {}", totalSteps);
-        
-        // Count by step type to understand what we have
-        long instructionSteps = retroStepRepository.findAll().stream()
-                .filter(step -> step.getStepType() == StepType.INSTRUCTION).count();
-        long activitySteps = retroStepRepository.findAll().stream()
-                .filter(step -> step.getStepType() == StepType.ACTIVITY).count();
-        long discussionSteps = retroStepRepository.findAll().stream()
-                .filter(step -> step.getStepType() == StepType.DISCUSSION).count();
-                
-        log.info("Step distribution - Instruction: {}, Activity: {}, Discussion: {}", 
-                instructionSteps, activitySteps, discussionSteps);
-        
+
+        // Count by component type to understand what we have
+        long boardSteps = retroStepRepository.findAll().stream()
+                .filter(step -> step.getComponentType() == ComponentType.MULTI_COLUMN_BOARD).count();
+        long ratingSteps = retroStepRepository.findAll().stream()
+                .filter(step -> step.getComponentType() == ComponentType.RATING_SCALE).count();
+        long histogramSteps = retroStepRepository.findAll().stream()
+                .filter(step -> step.getComponentType() == ComponentType.HISTOGRAM_CHART).count();
+
+        log.info("Component distribution - Board: {}, Rating: {}, Histogram: {}",
+                boardSteps, ratingSteps, histogramSteps);
+
         // For debugging, let's verify the expected total matches what we imported
         assertTrue(totalSteps > 0, "Should have imported some steps");
-        assertEquals(81, totalSteps, "Should have imported all 81 steps from CSV");
-        
+        assertEquals(24, totalSteps, "Should have imported all 24 steps from CSV");
+        assertEquals(22, boardSteps, "Should have 22 MULTI_COLUMN_BOARD steps");
+        assertEquals(1, ratingSteps, "Should have 1 RATING_SCALE step");
+        assertEquals(1, histogramSteps, "Should have 1 HISTOGRAM_CHART step");
+
         // Test RetroSteps for each RetroStage, ensuring they are properly ordered
         for (RetroStage stage : stages) {
             List<RetroStep> stepsForStage = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(stage);
-            
-            // Verify each stage has at least one step and steps are properly ordered
-            assertTrue(stepsForStage.size() > 0, 
-                "Stage " + stage.getName() + " should have at least one step");
-            
+
+            // Skip stages with no steps (many stages from old data won't have steps yet)
+            if (stepsForStage.isEmpty()) {
+                continue;
+            }
+
             log.debug("Stage '{}' has {} steps", stage.getName(), stepsForStage.size());
-            
+
             // Verify steps are properly ordered by orderIndex (steps are sorted by orderIndex ascending)
             Integer previousOrderIndex = null;
             for (RetroStep step : stepsForStage) {
                 if (previousOrderIndex != null) {
-                    assertTrue(step.getOrderIndex() > previousOrderIndex, 
+                    assertTrue(step.getOrderIndex() > previousOrderIndex,
                         "Step order should be ascending in stage " + stage.getName());
                 }
                 previousOrderIndex = step.getOrderIndex();
                 assertEquals(stage, step.getRetroStage());
-                assertNotNull(step.getStepType(), "Step should have a step type");
-                assertNotNull(step.getTitle(), "Step should have a title");
-            }
-            
-            // Verify only ACTIVITY steps have dataPattern set (if any exist)
-            for (RetroStep step : stepsForStage) {
-                if (step.getStepType() == StepType.ACTIVITY) {
-                    assertNotNull(step.getDataPattern(), 
-                        "ACTIVITY step should have dataPattern in stage " + stage.getName());
-                } else {
-                    assertNull(step.getDataPattern(), 
-                        step.getStepType() + " step should not have dataPattern in stage " + stage.getName());
-                }
+                assertNotNull(step.getComponentType(), "Step should have a component type");
+                assertNotNull(step.getComponentConfig(), "Step should have component config");
+                assertNotNull(step.getAdvancementTrigger(), "Step should have advancement trigger");
             }
         }
     }
 
-    @Test
-    @Transactional
-    void testDataPatternDistribution() {
-        List<RetroStep> activitySteps = retroStepRepository.findAll().stream()
-                .filter(step -> step.getStepType() == StepType.ACTIVITY)
-                .toList();
-        
-        long categoricalCount = activitySteps.stream()
-                .filter(step -> step.getDataPattern() == DataPattern.CATEGORICAL)
-                .count();
-        long ratingCount = activitySteps.stream()
-                .filter(step -> step.getDataPattern() == DataPattern.RATING)
-                .count();  
-        long freeformCount = activitySteps.stream()
-                .filter(step -> step.getDataPattern() == DataPattern.FREEFORM)
-                .count();
-        
-        // Verify we have a good distribution of patterns
-        assertTrue(categoricalCount > 0, "Should have CATEGORICAL patterns");
-        assertTrue(ratingCount > 0, "Should have RATING patterns");
-        assertTrue(freeformCount > 0, "Should have FREEFORM patterns");
-        
-        log.info("Pattern distribution - CATEGORICAL: {}, RATING: {}, FREEFORM: {}", 
-                categoricalCount, ratingCount, freeformCount);
-        
-        // Total should equal number of ACTIVITY steps imported (33 based on CSV data)
-        assertEquals(33, categoricalCount + ratingCount + freeformCount);
-    }
-
-    @Test
-    @Transactional  
-    void testSpecificStageConfiguration() {
-        // Test Mad Sad Glad configuration
-        RetroStage madSadGlad = retroStageRepository.findAll().stream()
-                .filter(s -> s.getName().equals("Mad Sad Glad"))
-                .findFirst().orElse(null);
-        assertNotNull(madSadGlad);
-        
-        List<RetroStep> steps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(madSadGlad);
-        RetroStep activityStep = steps.get(1);
-        assertEquals(DataPattern.CATEGORICAL, activityStep.getDataPattern());
-        assertTrue(activityStep.getConfiguration().contains("Mad"));
-        assertTrue(activityStep.getConfiguration().contains("Sad"));  
-        assertTrue(activityStep.getConfiguration().contains("Glad"));
-        
-        // Test Happiness Histogram configuration
-        RetroStage happinessHistogram = retroStageRepository.findAll().stream()
-                .filter(s -> s.getName().equals("Happiness Histogram"))
-                .findFirst().orElse(null);
-        assertNotNull(happinessHistogram);
-        
-        List<RetroStep> happinessSteps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(happinessHistogram);
-        RetroStep happinessActivity = happinessSteps.get(1);
-        assertEquals(DataPattern.RATING, happinessActivity.getDataPattern());
-        assertTrue(happinessActivity.getConfiguration().contains("scale"));
-    }
 }

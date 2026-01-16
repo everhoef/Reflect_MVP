@@ -22,11 +22,12 @@ import direct.reflect.facilitator.facilitation.ParticipantService;
 import direct.reflect.facilitator.facilitation.Participant;
 import direct.reflect.facilitator.facilitation.response.ResponseService;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponse;
-import direct.reflect.facilitator.facilitation.dto.RatingDto;
-import direct.reflect.facilitator.configurator.DataPattern;
+import direct.reflect.facilitator.facilitation.dto.RatingResponseDto;
+import direct.reflect.facilitator.facilitation.dto.ColumnResponseDto;
 import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.configurator.RetroStep;
+import direct.reflect.facilitator.configurator.ComponentType;
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -100,11 +101,13 @@ public class RetroViewController {
             // Get current step if in retro phase
             RetroStep currentStep = null;
             Integer stepDurationMinutes = null;
+            List<String> instructionHistory = List.of();
             if (session.getPhase() != RetroPhase.CREATED && session.getPhase() != RetroPhase.LOBBY) {
                 currentStep = retroService.getCurrentStep(retroId);
                 if (currentStep != null && currentStep.getDurationSeconds() != null) {
                     stepDurationMinutes = (int) java.time.Duration.ofSeconds(currentStep.getDurationSeconds()).toMinutes();
                 }
+                instructionHistory = retroService.getInstructionHistory(retroId);
             }
 
             // Add data to model
@@ -113,6 +116,7 @@ public class RetroViewController {
             model.addAttribute("retroSession", session);
             model.addAttribute("currentStep", currentStep);
             model.addAttribute("stepDurationMinutes", stepDurationMinutes);
+            model.addAttribute("instructionHistory", instructionHistory);
             model.addAttribute("participant", participant);
             model.addAttribute("participants", participants);
             model.addAttribute("isFacilitator", isFacilitator);
@@ -160,11 +164,13 @@ public class RetroViewController {
             // Get current step if in retro phase
             RetroStep currentStep = null;
             Integer stepDurationMinutes = null;
+            List<String> instructionHistory = List.of();
             if (session.getPhase() != RetroPhase.CREATED && session.getPhase() != RetroPhase.LOBBY) {
                 currentStep = retroService.getCurrentStep(retroId);
                 if (currentStep != null && currentStep.getDurationSeconds() != null) {
                     stepDurationMinutes = (int) java.time.Duration.ofSeconds(currentStep.getDurationSeconds()).toMinutes();
                 }
+                instructionHistory = retroService.getInstructionHistory(retroId);
             }
 
             // Add data to model
@@ -172,6 +178,7 @@ public class RetroViewController {
             model.addAttribute("retroSession", session);
             model.addAttribute("currentStep", currentStep);
             model.addAttribute("stepDurationMinutes", stepDurationMinutes);
+            model.addAttribute("instructionHistory", instructionHistory);
             model.addAttribute("participant", participant);
             model.addAttribute("participants", participants);
             model.addAttribute("isFacilitator", isFacilitator);
@@ -208,18 +215,20 @@ public class RetroViewController {
     }
 
     /**
-     * Get HTML fragment for categorical responses in a specific category lane.
-     * Called by HTMX when SSE events trigger (note_added, note_updated).
+     * Get HTML fragment for responses in a specific column of a multi-column board.
+     * Used by MULTI_COLUMN_BOARD component for any number of columns (1-N).
+     * Called by HTMX when SSE events trigger (response_submitted, responses_revealed).
      */
-    @GetMapping("/retro/{retroId}/step/{stepId}/responses/categorical")
+    @GetMapping("/retro/{retroId}/step/{stepId}/responses/column")
     @PreAuthorize("@participantService.canAccessRetro(#retroId)")
-    public String getCategoricalResponses(
+    public String getColumnResponses(
             @PathVariable UUID retroId,
             @PathVariable Long stepId,
-            @RequestParam String category,
-            Model model) {
+            @RequestParam String columnId,
+            Model model,
+            HttpServletRequest request) {
 
-        log.debug("Getting categorical responses for retro: {}, step: {}, category: {}", retroId, stepId, category);
+        log.debug("Getting column responses for retro: {}, step: {}, columnId: {}", retroId, stepId, columnId);
 
         try {
             RetroSession session = retroService.getSessionById(retroId);
@@ -227,33 +236,52 @@ public class RetroViewController {
 
             if (step == null || !step.getId().equals(stepId)) {
                 log.warn("Step mismatch - requested: {}, current: {}", stepId, step != null ? step.getId() : "null");
-                return "fragments/response-fragments :: error";
+                return "fragments/common-fragments :: error";
             }
 
-            List<ParticipantResponse> allResponses = responseService.getResponsesForStep(session, step);
-
-            List<ParticipantResponse> categoryResponses = allResponses.stream()
-                .filter(r -> r.getDataPattern() == DataPattern.CATEGORICAL)
-                .filter(r -> category.equals(r.getResponseData().get("category")))
+            // Get ALL responses for MULTI_COLUMN_BOARD within this stage
+            // (not just current step - clustering/voting steps need to show input step responses)
+            List<ParticipantResponse> allResponses = responseService.getResponsesForStageComponentType(
+                session,
+                step.getRetroStage(),
+                ComponentType.MULTI_COLUMN_BOARD
+            );
+            List<ParticipantResponse> columnResponses = allResponses.stream()
+                .filter(r -> columnId.equals(r.getResponseData().get("columnId")))
                 .toList();
 
-            model.addAttribute("responses", categoryResponses);
-            model.addAttribute("category", category);
+            // Convert to DTOs for clean template rendering
+            List<ColumnResponseDto> responseDtos = columnResponses.stream()
+                .map(ColumnResponseDto::from)
+                .toList();
 
-            return "fragments/response-fragments :: categorical-lane-content";
+            // Get current participant ID for self-view logic in template
+            UUID currentParticipantId = authenticationHelper.getParticipantId(request);
+
+            // Get capabilities config from step
+            Map<String, Object> capabilities = (Map<String, Object>) step.getComponentConfig().get("capabilities");
+            boolean showAuthor = capabilities != null && Boolean.TRUE.equals(capabilities.get("showAuthor"));
+
+            model.addAttribute("retroSession", session);
+            model.addAttribute("responses", responseDtos);
+            model.addAttribute("currentParticipantId", currentParticipantId);
+            model.addAttribute("showAuthor", showAuthor);
+            model.addAttribute("capabilities", capabilities != null ? capabilities : Map.of());
+
+            return "fragments/components/multi-column-board :: lane-content";
 
         } catch (Exception e) {
-            log.error("Error fetching categorical responses: ", e);
-            return "fragments/response-fragments :: error";
+            log.error("Error fetching column responses: ", e);
+            return "fragments/common-fragments :: error";
         }
     }
 
     /**
-     * Get HTML fragment for all rating responses.
-     * Called by HTMX when SSE events trigger (note_added, note_updated).
+     * Get HTML fragment for all rating responses in a histogram chart.
+     * Called by HTMX when SSE events trigger (response_submitted, responses_revealed).
      */
     @GetMapping("/retro/{retroId}/step/{stepId}/histogram")
-    // @PreAuthorize("@participantService.canAccessRetro(#retroId)") // Temporarily disabled for debugging
+    @PreAuthorize("@participantService.canAccessRetro(#retroId)")
     public String getRatingHistogram(
             @PathVariable UUID retroId,
             @PathVariable Long stepId,
@@ -261,93 +289,59 @@ public class RetroViewController {
             HttpServletRequest request) {
 
         log.debug("Getting rating histogram for retro: {}, step: {}", retroId, stepId);
-        log.trace("Method entry - about to fetch session");
 
         try {
             RetroSession session = retroService.getSessionById(retroId);
-            log.trace("Fetched session: {}", session != null ? session.getId() : "null");
-
             RetroStep step = retroService.getCurrentStep(retroId);
-            log.trace("Fetched current step: {}", step != null ? step.getId() : "null");
 
             if (step == null || !step.getId().equals(stepId)) {
-                return "fragments/retro-rating :: histogram-error";
+                return "fragments/common-fragments :: error";
             }
 
-            List<ParticipantResponse> allResponses = responseService.getResponsesForStep(session, step);
+            // HISTOGRAM_CHART displays RATING_SCALE responses from the same stage
+            List<ParticipantResponse> allResponses = responseService.getResponsesForStageComponentType(
+                session,
+                step.getRetroStage(),
+                ComponentType.RATING_SCALE
+            );
 
-            // Convert entities to DTOs for clean Thymeleaf rendering
-            List<RatingDto> ratingDtos = allResponses.stream()
-                .filter(r -> r.getDataPattern() == DataPattern.RATING)
-                .map(RatingDto::from)
+            List<RatingResponseDto> ratingDtos = allResponses.stream()
+                .filter(r -> r.getResponseData().containsKey("rating"))
+                .map(RatingResponseDto::from)
                 .toList();
 
             log.debug("Converted {} responses to RatingDtos", ratingDtos.size());
-            ratingDtos.forEach(dto -> log.debug("RatingDto: id={}, rating={}, visible={}", dto.id(), dto.rating(), dto.visible()));
 
             // Get current participant to check visibility
             boolean isFacilitator = participantService.isFacilitator(request, retroId);
-            log.debug("isFacilitator={}, will show {} of {} responses", isFacilitator, isFacilitator ? ratingDtos.size() : ratingDtos.stream().filter(RatingDto::visible).count(), ratingDtos.size());
+            log.debug("isFacilitator={}, will show {} of {} responses", isFacilitator,
+                isFacilitator ? ratingDtos.size() : ratingDtos.stream().filter(RatingResponseDto::visible).count(),
+                ratingDtos.size());
 
             // Filter visible responses (facilitator sees all, others see only visible)
-            List<RatingDto> visibleResponses = isFacilitator
+            List<RatingResponseDto> visibleResponses = isFacilitator
                 ? ratingDtos
-                : ratingDtos.stream().filter(RatingDto::visible).toList();
+                : ratingDtos.stream().filter(RatingResponseDto::visible).toList();
 
-            // Get scale configuration
-            Map<String, Object> config = step.getConfig();
-            Map<String, Object> scaleConfig = config != null ? (Map<String, Object>) config.get("scale") : null;
-            int minRating = scaleConfig != null && scaleConfig.get("min") != null ? ((Number) scaleConfig.get("min")).intValue() : 1;
-            int maxRating = scaleConfig != null && scaleConfig.get("max") != null ? ((Number) scaleConfig.get("max")).intValue() : 10;
+            // Get scale configuration from componentConfig
+            Map<String, Object> config = step.getComponentConfig();
+            int minRating = config.get("min") != null ? ((Number) config.get("min")).intValue() : 1;
+            int maxRating = config.get("max") != null ? ((Number) config.get("max")).intValue() : 10;
+            boolean showComments = Boolean.TRUE.equals(config.get("showComments"));
 
             model.addAttribute("totalResponses", ratingDtos.size());
             model.addAttribute("responses", visibleResponses);
             model.addAttribute("minRating", minRating);
             model.addAttribute("maxRating", maxRating);
+            model.addAttribute("showComments", showComments);
             model.addAttribute("isFacilitator", isFacilitator);
 
-            return "fragments/retro-rating :: histogram";
+            return "fragments/components/histogram-chart :: histogram-data";
 
         } catch (Exception e) {
             log.error("Error fetching rating histogram: ", e);
-            return "fragments/retro-rating :: histogram-error";
+            return "fragments/common-fragments :: error";
         }
     }
 
-    /**
-     * Get HTML fragment for all freeform responses.
-     * Called by HTMX when SSE events trigger (note_added, note_updated).
-     */
-    @GetMapping("/retro/{retroId}/step/{stepId}/responses/freeform")
-    @PreAuthorize("@participantService.canAccessRetro(#retroId)")
-    public String getFreeformResponses(
-            @PathVariable UUID retroId,
-            @PathVariable Long stepId,
-            Model model) {
-
-        log.debug("Getting freeform responses for retro: {}, step: {}", retroId, stepId);
-
-        try {
-            RetroSession session = retroService.getSessionById(retroId);
-            RetroStep step = retroService.getCurrentStep(retroId);
-
-            if (step == null || !step.getId().equals(stepId)) {
-                return "fragments/response-fragments :: error";
-            }
-
-            List<ParticipantResponse> allResponses = responseService.getResponsesForStep(session, step);
-
-            List<ParticipantResponse> freeformResponses = allResponses.stream()
-                .filter(r -> r.getDataPattern() == DataPattern.FREEFORM)
-                .toList();
-
-            model.addAttribute("responses", freeformResponses);
-
-            return "fragments/response-fragments :: freeform-list";
-
-        } catch (Exception e) {
-            log.error("Error fetching freeform responses: ", e);
-            return "fragments/response-fragments :: error";
-        }
-    }
 }

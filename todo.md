@@ -1,981 +1,1080 @@
-# TODO: Fix Retrospective UI and Implement Core Functionality
+# Facilitator - Development Roadmap
 
-**Created**: 2025-10-22
-**Status**: Sprint 1 in progress
-
----
-
-## Current State Analysis
-- ✅ **Working**: SSE connections, lobby phase, authentication, session creation
-- ❌ **Broken**: Active retrospective layout is messy, missing components, doesn't match mockups
-- 🎯 **Target**: Clean 3-column layout from system-ui mockups with app-driven facilitation
+**Last Updated**: 2025-12-24
+**Source of Truth**: Notion User Stories Database (a2d07350-84f9-41f3-ac64-fc4ed68f7bdd)
 
 ---
 
-## Phase 1: Fix Current Broken Layout (Immediate Priority)
+## 🔴 CRITICAL BLOCKERS
 
-### Issue: retro.html has wrong structure
-The current `retro.html` attempts to render a complex layout with navigation bars and sidebars, but:
-- Doesn't follow the mockup design
-- Has missing/broken components
-- Mixes multiple UI concepts (HTMX 2.x layout + old fragments)
+### Spring Boot 4.0 Migration - Integration Test Failures
 
-### Fix Strategy:
+**Status**: 🔴 **BLOCKED**
+**Date Added**: 2025-12-05
 
-**Step 1.1: Create Clean Base Template Structure**
-- Simplify `retro.html` to match mockup layout:
-  - **Top**: Golden header bar (brand logo, timer, stage progress indicators, user menu)
-  - **Main**: Three-column layout:
-    - **Left column (25%)**: Video/guidance area with coaching tooltips
-    - **Center column (50%)**: Main activity area (clean, focused)
-    - **Right column (25%)**: Participants list and results display
-  - **Bottom**: Facilitator controls (Cancel/Next buttons)
+**Problem**: 7 out of 92 integration tests failing after Spring Boot 4.0 and Java 25 migration.
 
-**Step 1.2: Implement Stage Progress Indicators**
-- Based on mockup: 5 circles showing stage progression
-- States: "In Progress" (filled yellow), "To Do" (dotted outline), "Complete" (checkmark)
-- Display stage names under each circle
-- Update automatically via SSE when facilitator advances
+**Error Pattern 1 - Session Creation Timeouts** (4 tests):
+- Test clicks "Create Session" button but HTMX redirect never happens
+- Timeout at `BaseIntegrationTest.createRetroSession:320` after 3000ms
+- **Critical Finding**: POST `/api/retro/create` never reaches controller during tests
+- Logs show "Session creation form found" but no "CREATE REQUEST START" logs
 
-**Step 1.3: Add Timer Display**
-- Golden header shows: `01 | 09 | 30` (session time or step timer)
-- Updates in real-time for timed activities
+**Error Pattern 2 - Redis Context Pollution** (3 tests):
+- ApplicationContext fails to start bean 'redisMessageListenerContainer'
+- Only happens in batch test runs (not in isolation)
+- Suggests test context caching/pollution
 
-**Step 1.4: Create Guidance Tooltip System**
-- Left sidebar shows video player or text instructions
-- Closeable overlay with facilitation guidance
-- Examples from mockup:
-  - "Reflect & Choose Your Score" with video
-  - "Need Help?" red alert box for critical tips
-  - Step-by-step numbered instructions
+**Next Steps**:
+1. Start application manually: `mvn spring-boot:run -Dspring-boot.run.profiles=import`
+2. Test session creation via browser
+3. Check browser console for JavaScript errors
+4. Verify WebJar paths are correct for Spring Boot 4.0
+5. Test Redis serialization with Jackson 3
+
+**Files to Investigate**:
+- src/main/java/direct/reflect/facilitator/facilitation/RetroApiController.java (RetroApiController.java:45-83)
+- src/main/java/direct/reflect/facilitator/common/config/RedisConfig.java
+- src/test/java/direct/reflect/facilitator/integration/BaseIntegrationTest.java:320
 
 ---
 
-## Phase 2: Implement 3-Pattern Data System (Foundation)
+## 📊 MVP Prioritization Analysis - All 15 Notion User Stories
 
-Based on roadmap.md "3-pattern retrospective data system":
+### Summary Statistics
+- **Total User Stories**: 15
+- **High Priority**: 12 stories (80%)
+- **Medium Priority**: 2 stories (13%)
+- **Low Priority**: 1 story (7%)
+- **Total BDD Scenarios**: 233 scenarios
+- **Implemented Scenarios**: ~75 scenarios (32%)
+- **Missing Scenarios**: ~158 scenarios (68%)
 
-### Step 2.1: RATING Pattern (Happiness Histogram)
-**Why first?** Mockups show this, simplest to implement, proves architecture
+### MVP Recommendation Matrix
 
-**Backend** (already partially done):
-- ✅ `ParticipantResponse` entity with `rating` field
-- ✅ `DataPattern.RATING` enum
-- ✅ `ResponseService.submitRatingResponse()`
+| User Story | Priority | Scenarios | Implemented | MVP Status | Complexity |
+|------------|----------|-----------|-------------|------------|------------|
+| Five Step Flow | High | 25 | 20 (80%) | ✅ DONE | Low |
+| Input Mechanism | High | 25 | 18 (72%) | 🟡 IMPORTANT | Low |
+| Numeric Rating Input | High | 6 | 6 (100%) | ✅ DONE | Low |
+| Voting Mechanism | High | 35 | 5 (14%) | 🔴 CRITICAL | Medium |
+| Timer | High | 14 | 4 (29%) | 🔴 CRITICAL | Medium |
+| Smart Improvement Story | High | 19 | 0 (0%) | 🔴 CRITICAL | High |
+| Action Item Management | High | 4 | 0 (0%) | 🔴 CRITICAL | Medium |
+| Guided Facilitation | High | 25 | 3 (12%) | 🟡 IMPORTANT | Medium |
+| Customized Length | High | 13 | 0 (0%) | 🟡 IMPORTANT | Medium |
+| Forced to Next Step | High | 14 | 4 (29%) | 🟡 IMPORTANT | Low |
+| Visual Clue Stage | High | 16 | 3 (19%) | 🟢 NICE-TO-HAVE | Low |
+| Clustering & Grouping | High | 4 | 0 (0%) | 🟡 IMPORTANT | High |
+| Format Catalog | Medium | 23 | 1 (4%) | 🟢 NICE-TO-HAVE | High |
+| Anonymous Login | Medium | 7 | 4 (57%) | 🟢 NICE-TO-HAVE | Low |
+| Statistical Calculations | Low | 3 | 0 (0%) | 🟢 NICE-TO-HAVE | Low |
 
-**Frontend UI Components Needed**:
-- Rating scale selector (1-10 radio buttons or dropdown)
-- Optional comment textarea
-- Histogram visualization for results (bar chart showing distribution)
-- Privacy toggle (PRIVATE input → PUBLIC reveal by facilitator)
+---
 
-**Template Structure**:
+## 📋 User Story Implementation Status
+
+### 1. Five Step Flow (Priority: High, 25 scenarios) ✅ MOSTLY COMPLETE
+
+**As a**: Facilitator
+**I want**: Retrospective structured in 5 proven phases
+**So that**: We follow Derby & Larsen best practices for effective retrospectives
+
+**Notion Priority**: High
+**Status**: In progress
+**MVP Classification**: ✅ **DONE** - Core structure implemented
+**Implementation Complexity**: Low (mostly complete)
+**Dependencies**: None
+
+#### Implementation Status: 80% (20 of 25 scenarios)
+
+**✅ Implemented Scenarios (20)**:
+- [x] 5 RetroPhase enum values (SET_THE_STAGE, GATHER_DATA, GENERATE_INSIGHTS, DECIDE_ACTIONS, CLOSE_RETRO)
+- [x] Phase progression logic (RetroPhase.next() method)
+- [x] 34-step CSV configuration covering all 5 phases
+- [x] Phase-based navigation in RetroSessionService
+- [x] SSE events for phase transitions (SESSION_STARTED, STEP_ADVANCED)
+- [x] Basic 5-circle progress indicator in UI
+- [x] Phase states tracked (CREATED, LOBBY, active phases, COMPLETED, PAUSED, ABANDONED)
+- [x] Active phase validation (isActivePhase() method)
+- [x] Most divergent/convergent step patterns (brainstorm → vote → discuss)
+
+**❌ Missing Scenarios (5)**:
+- [ ] Explicit divergent/convergent step markers in UI
+- [ ] Phase timing breakdown display (show estimated time per phase)
+- [ ] Phase completion validation (ensure minimum participation before advancing)
+- [ ] Phase-specific help tooltips (contextual guidance for each phase)
+- [ ] Phase summary screen (recap of each phase before advancing)
+
+**Why Mostly Complete**: The 5-phase structure is fully operational with proper enum states, progression logic, and CSV configuration. Missing features are UX enhancements, not blocking functionality.
+
+**Files Already Implemented**:
+- `RetroPhase.java` - Complete with all phases and transitions
+- `RetroSessionService.java` - Phase advancement logic
+- `retrospective_steps.csv` - 34 steps across 5 phases
+- `retro.html` - 5-circle progress indicator
+
+**Files to Modify** (for remaining 5 scenarios):
+- `retro.html` - Add divergent/convergent indicators, phase timing, summary screens
+- `RetroStep.java` - Add divergent/convergent boolean flags
+
+**Estimated Effort**: 1-2 days for remaining polish
+
+---
+
+### 2. Input Mechanism (Priority: High, 25 scenarios) 🟡 MOSTLY COMPLETE
+
+**As a**: Team member
+**I want**: To submit responses in various formats (text, categories, ratings)
+**So that**: I can participate effectively in all retrospective activities
+
+**Notion Priority**: High
+**Status**: In progress
+**MVP Classification**: 🟡 **IMPORTANT** - Core working, missing some capabilities
+**Implementation Complexity**: Low (mostly complete)
+**Dependencies**: None
+
+#### Implementation Status: 72% (18 of 25 scenarios)
+
+**✅ Implemented Scenarios (18)**:
+- [x] MULTI_COLUMN_BOARD component (1-N columns)
+- [x] Card submission with HTMX
+- [x] Real-time updates via SSE (NOTE_ADDED events)
+- [x] Privacy controls (isVisible flag for PRIVATE → PUBLIC reveal)
+- [x] Edit functionality for own cards (inline editing)
+- [x] RATING_SCALE component (1-10 numeric input)
+- [x] Optional comment field for ratings
+- [x] HISTOGRAM_CHART visualization
+- [x] Category-specific responses (column-based)
+- [x] Response data stored as JSONB
+- [x] Character limit enforcement (maxLength capability)
+- [x] Placeholder text per column
+- [x] Anonymous submission (no author shown until revealed)
+- [x] Facilitator reveal control (manual PUBLIC switch)
+- [x] Response counting for participation tracking
+- [x] Response editing with timestamps (editedAt field)
+- [x] Vote storage in response data
+- [x] Participant-specific response filtering
+
+**❌ Missing Scenarios (7)**:
+- [ ] Rich text formatting (bold, italic, bullet lists)
+- [ ] Emoji picker integration
+- [ ] Card templates (pre-filled common responses)
+- [ ] Bulk import/export for responses
+- [ ] Response drafts (save without submitting)
+- [ ] Response length indicator (show "X/500 characters")
+- [ ] Keyboard shortcuts for quick submission (Ctrl+Enter)
+
+**Why Important for MVP**: Core input mechanisms work perfectly. Missing features are productivity enhancements, not blocking.
+
+**Files Already Implemented**:
+- `multi-column-board.html` (191 lines) - Card-based input
+- `rating-scale.html` - Numeric ratings
+- `histogram-chart.html` - Visualization
+- `ResponseService.java` - Polymorphic submitResponse()
+- `ParticipantResponse.java` - JSONB storage
+- `ColumnResponseDto.java`, `RatingResponseDto.java` - Type-safe DTOs
+
+**Files to Modify** (for remaining 7 scenarios):
+- `multi-column-board.html` - Add rich text toolbar, emoji picker, character counter
+- `ResponseService.java` - Add draft save functionality
+- Create: `response-import-export.html` - Bulk operations UI
+
+**Estimated Effort**: 2-3 days for enhancements
+
+---
+
+### 3. Numeric Rating Input (Priority: High, 6 scenarios) ✅ COMPLETE
+
+**As a**: Team member
+**I want**: To rate my experience on a 1-10 scale
+**So that**: We can quantify team sentiment
+
+**Notion Priority**: High
+**Status**: To do (marked, but actually COMPLETE)
+**MVP Classification**: ✅ **DONE** - Fully implemented
+**Implementation Complexity**: Low
+**Dependencies**: None
+
+#### Implementation Status: 100% (6 of 6 scenarios)
+
+**✅ All Scenarios Implemented (6)**:
+- [x] Scenario 1: Display 1-10 rating scale with radio buttons
+- [x] Scenario 2: Submit rating with optional comment
+- [x] Scenario 3: Rating stored in responseData as integer
+- [x] Scenario 4: Ratings aggregate into histogram visualization
+- [x] Scenario 5: Comments displayed alongside ratings
+- [x] Scenario 6: Real-time rating submission via HTMX
+
+**Why Complete**: RATING_SCALE component fully functional with all features. Used in Happiness Histogram and ROTI formats.
+
+**Files Already Implemented**:
+- `rating-scale.html` - Radio button input (1-10 scale)
+- `histogram-chart.html` - SVG visualization
+- `RatingResponseDto.java` - Type-safe DTO
+- `ResponseService.java` - Rating submission logic
+- `retrospective_steps.csv` - Steps 2, 8 use RATING_SCALE
+
+**No Changes Needed**: This story is complete.
+
+---
+
+### 4. Voting Mechanism (Priority: High, 35 scenarios) 🔴 CRITICAL
+
+**As a**: Team member
+**I want**: To vote on team members' responses
+**So that**: We can identify which items to focus on
+
+**Notion Priority**: High
+**Status**: To do
+**MVP Classification**: 🔴 **CRITICAL** - Core retrospective activity
+**Implementation Complexity**: Medium (UI work, no new backend logic needed)
+**Dependencies**: None (voting backend already exists)
+
+#### Implementation Status: 14% (5 of 35 scenarios)
+
+**✅ Implemented Scenarios (5)**:
+- [x] Scenario 3: Vote allocation is fixed and format-specific (numberOfVotes in CSV)
+- [x] Scenario 4: Dot voting allows vote distribution (toggleVote() in ResponseService)
+- [x] Scenario 18: Participants cannot exceed vote allocation (VoteLimitExceededException)
+- [x] Scenario 19: All participants have equal voting power (no privileged voting)
+- [x] Scenario 31: Limited vote budget allocation (enforced in ResponseService:262)
+
+**❌ Missing Scenarios (30)** - Organized by Theme:
+
+**Vote Period Management (8 scenarios)**:
+- [ ] Scenario 6: Voting period has countdown timer
+- [ ] Scenario 8: Facilitator can start voting period
+- [ ] Scenario 9: Facilitator can stop voting period early
+- [ ] Scenario 10: Voting automatically closes when timer expires
+- [ ] Scenario 13: Participants can only change votes during active period
+- [ ] Scenario 14: Votes locked after voting period ends
+- [ ] Scenario 23: Voting status clearly indicated
+- [ ] Scenario 29: Visual notification when voting starts/ends
+
+**Vote Visualization (7 scenarios)**:
+- [ ] Scenario 17: Vote counts displayed with dots and numbers (●●● 3)
+- [ ] Scenario 27: Vote count shown with voter attribution
+- [ ] Scenario 31: Limited vote budget allocation UI (show "X votes remaining")
+- [ ] Scenario 32: Vote redistribution within budget UI
+- [ ] Scenario 33: Stack multiple votes on single item UI
+- [ ] Scenario 34: Real-time vote tally with budget constraints
+- [ ] Scenario 35: Vote budget enforcement across formats UI
+
+**Vote Sorting & Display (3 scenarios)**:
+- [ ] Scenario 15: Items sorted by vote count
+- [ ] Scenario 16: Tied items marked and sorted chronologically
+- [ ] Scenario 24: Zero votes is valid outcome (show "0" not blank)
+
+**Vote Attribution (2 scenarios)**:
+- [ ] Scenario 12: Participants can see who voted for what
+- [ ] Scenario 25: Voting synchronizes across all participants (SSE event)
+
+**Other Missing (10 scenarios)**:
+- [ ] Scenarios 1-2: Voting available in phases 2, 3, 4 only (UI toggle)
+- [ ] Scenarios 5, 7: Voting period is format-specific
+- [ ] Scenario 11: Live vote counts visible to all (real-time UI update)
+- [ ] Scenario 20: Voting results persist across phases
+- [ ] Scenario 21: Each phase can have independent voting
+- [ ] Scenario 22: Facilitator cannot override vote counts
+- [ ] Scenario 26: Highest-voted items clearly identifiable (highlighting)
+- [ ] Scenario 28: Voting period duration is format-dependent
+
+**Why Critical for MVP**: Voting determines which topics get discussed and which actions get prioritized. Without visible vote counts, sorted results, and vote attribution, retrospectives lose their democratic prioritization mechanism. Participants need to see "3 people voted for this issue" to build consensus.
+
+**Files to Create**:
+- None (backend exists)
+
+**Files to Modify**:
+- `multi-column-board.html:112-119` - Enhance vote button UI with dots and count
+- `retro.html` - Add voting period controls for facilitator
+- `ResponseService.java` - Add getVoteAttribution() query
+- `RetroApiController.java` - Add startVoting/stopVoting endpoints
+- Create new template fragment: `voting-controls.html`
+
+**Estimated Effort**: 2-3 days (mostly UI work)
+
+---
+
+### 5. Timer (Priority: High, 14 scenarios) 🔴 CRITICAL
+
+**As a**: Facilitator
+**I want**: Countdown timer for each step
+**So that**: Participants know how much time remains and we stay on schedule
+
+**Notion Priority**: High
+**Status**: In progress
+**MVP Classification**: 🔴 **CRITICAL** - Essential for time management
+**Implementation Complexity**: Medium (UI timer + auto-advancement)
+**Dependencies**: None
+
+#### Implementation Status: 29% (4 of 14 scenarios)
+
+**✅ Implemented Scenarios (4)**:
+- [x] Scenario 4: Timer duration stored in CSV (durationSeconds field)
+- [x] Scenario 8: Timer tracking logic (RetroSession.stepStartedAt field)
+- [x] Scenario 10: Backend validation (RetroSessionService.timerHasExpired())
+- [x] Scenario 14: TIMER_EXPIRES advancement trigger enum
+
+**❌ Missing Scenarios (10)** - Organized by Theme:
+
+**Timer Display (4 scenarios)**:
+- [ ] Scenario 1: MM:SS countdown display visible to all participants
+- [ ] Scenario 2: Timer shows time remaining, not elapsed time
+- [ ] Scenario 3: Color states (green > 50% remaining, yellow 20-50%, red < 20%)
+- [ ] Scenario 11: Timer synchronized across all participants (SSE updates)
+
+**Timer Controls (3 scenarios)**:
+- [ ] Scenario 5: Facilitator can pause timer
+- [ ] Scenario 6: Facilitator can resume timer
+- [ ] Scenario 7: Facilitator can extend time (+1 min, +5 min buttons)
+
+**Auto-Submit Behavior (3 scenarios)**:
+- [ ] Scenario 9: Auto-submit when timer expires (save work in progress)
+- [ ] Scenario 12: 30-second warning notification before auto-submit
+- [ ] Scenario 13: Grace period (10 seconds) to finish typing after warning
+
+**Why Critical for MVP**: Without visible countdown, participants don't know how much time they have, leading to rushed submissions or time wastage. Timer color states provide at-a-glance awareness. Auto-submit ensures retrospective stays on schedule.
+
+**Files Already Implemented**:
+- `RetroStep.java` - durationSeconds field
+- `RetroSessionService.java` - timerHasExpired() logic
+- `AdvancementTrigger.java` - TIMER_EXPIRES enum
+- `RetroSession.java` - stepStartedAt tracking
+
+**Files to Create**:
+- `src/main/resources/templates/fragments/components/countdown-timer.html` - Timer UI component
+- `src/main/java/direct/reflect/facilitator/scheduling/TimerService.java` - Timer state management
+
+**Files to Modify**:
+- `retro.html` - Add timer div in header (always visible)
+- `RetroApiController.java` - Add `/api/retro/{retroId}/timer/pause` and `/resume` endpoints
+- `EventService.java` - Add TIMER_WARNING event (30-second warning)
+- `ResponseService.java` - Add autosaveResponse() for graceful auto-submit
+
+**Estimated Effort**: 3-4 days (Timer UI, SSE sync, auto-save logic)
+
+---
+
+### 6. Smart Improvement Story (Priority: High, 19 scenarios) 🔴 CRITICAL
+
+**As a**: Facilitator
+**I want**: AI-assisted service to help formulate SMART improvement goals
+**So that**: We increase the chance of successful improvement
+
+**Notion Priority**: High
+**Status**: To do
+**MVP Classification**: 🔴 **CRITICAL** - Core value proposition
+**Implementation Complexity**: High (new AI integration, prompt engineering)
+**Dependencies**: Voting Mechanism (to identify highest-voted item)
+
+#### Implementation Status: 0% (0 of 19 scenarios)
+
+**❌ All Scenarios Missing (19)**:
+
+**AI Service Integration (6 scenarios)**:
+- [ ] Scenario 1: AI activates automatically in phase 4
+- [ ] Scenario 2: AI analyzes all retrospective inputs with emphasis on phase 4
+- [ ] Scenario 8: No editing allowed - only accept or regenerate
+- [ ] Scenario 9: AI considers only current retrospective data
+- [ ] Scenario 17: Goal cannot proceed if no votes in phase 4
+- [ ] Scenario 18: AI service automatically retries on failure
+
+**SMART Goal Generation (6 scenarios)**:
+- [ ] Scenario 3: AI generates user story from highest-voted action item
+- [ ] Scenario 4: AI enforces all SMART criteria (Specific, Measurable, Achievable, Relevant, Time-bound)
+- [ ] Scenario 11: BDD acceptance criteria in proper Given-When-Then format
+- [ ] Scenario 12: User story includes standard attributes (As a...I want...So that...)
+- [ ] Scenario 13: AI focuses on highest-voted item from phase 4
+- [ ] Scenario 14: AI handles tied votes appropriately (ask facilitator or pick first)
+
+**User Workflow (5 scenarios)**:
+- [ ] Scenario 5: Single improvement goal presented to all participants
+- [ ] Scenario 6: Facilitator can accept the generated goal
+- [ ] Scenario 7: Facilitator can regenerate the goal
+- [ ] Scenario 15: All participants see AI progress and results (loading state, final output)
+- [ ] Scenario 16: Regeneration produces different but valid alternatives
+
+**Data Persistence (2 scenarios)**:
+- [ ] Scenario 10: Generated goal saved as retrospective output
+- [ ] Scenario 19: Single goal per retrospective (no multiple goals)
+
+**Why Critical for MVP**: This is the killer feature that differentiates Facilitator from basic retro tools. It transforms vague action items ("improve communication") into concrete, trackable goals with acceptance criteria. Without this, retrospectives end with good intentions but no accountability.
+
+**Files to Create**:
+- `src/main/java/direct/reflect/facilitator/ai/SmartGoalService.java` - AI orchestration
+- `src/main/java/direct/reflect/facilitator/ai/AnthropicClient.java` - Claude API integration
+- `src/main/java/direct/reflect/facilitator/ai/dto/SmartGoalRequest.java` - Request DTO
+- `src/main/java/direct/reflect/facilitator/ai/dto/SmartGoalResponse.java` - Response DTO
+- `src/main/resources/templates/fragments/components/smart-goal-generator.html` - UI component
+- `src/main/resources/prompts/smart-goal-system-prompt.txt` - Claude system prompt
+
+**Files to Modify**:
+- `RetroApiController.java` - Add `/api/retro/{retroId}/generate-smart-goal` endpoint
+- `ResponseService.java` - Add getHighestVotedResponse() query
+- `pom.xml` - Add Anthropic SDK dependency
+
+**Estimated Effort**: 5-7 days (AI integration, prompt engineering, UI, testing)
+
+---
+
+### 7. Action Item Management (Priority: High, 4 scenarios) 🔴 CRITICAL
+
+**As a**: Team member
+**I want**: To create structured action items with clear owners and deadlines
+**So that**: Our retrospective decisions lead to real change
+
+**Notion Priority**: High
+**Status**: To do
+**MVP Classification**: 🔴 **CRITICAL** - Core retrospective outcome
+**Implementation Complexity**: Medium (new entity, CRUD operations)
+**Dependencies**: None
+
+#### Implementation Status: 0% (0 of 4 scenarios)
+
+**❌ All Scenarios Missing (4)**:
+- [ ] Scenario 1: Create structured action item (WHAT, WHO, WHEN fields)
+- [ ] Scenario 2: Owner assignment and validation
+- [ ] Scenario 3: Action specificity validation (reject vague actions like "improve communication")
+- [ ] Scenario 4: Review and confirm action list
+
+**Why Critical for MVP**: Action items are the primary output of phase 4 (DECIDE_ACTIONS). Without structured action items, retrospectives end without clear commitments. The WHAT/WHO/WHEN structure ensures accountability.
+
+**Files to Create**:
+- `src/main/java/direct/reflect/facilitator/actions/ActionItem.java` - Entity
+- `src/main/java/direct/reflect/facilitator/actions/ActionItemRepository.java` - Repository
+- `src/main/java/direct/reflect/facilitator/actions/ActionItemService.java` - Business logic
+- `src/main/java/direct/reflect/facilitator/actions/ActionItemController.java` - API endpoints
+- `src/main/resources/templates/fragments/components/action-item-form.html` - UI
+
+**Files to Modify**:
+- `retrospective_steps.csv` - Add ACTION_ITEM_FORM component to phase 4 steps
+- `ComponentType.java` - Add ACTION_ITEM_FORM enum value
+
+**Estimated Effort**: 3-4 days
+
+---
+
+### 8. Guided Facilitation (Priority: High, 25 scenarios) 🟡 PARTIALLY IMPLEMENTED
+
+**As a**: Facilitator
+**I want**: Step-by-step facilitation guidance
+**So that**: I can run effective retrospectives without specialized training
+
+**Notion Priority**: High
+**Status**: To do
+**MVP Classification**: 🟡 **IMPORTANT** - Basic guidance exists, enhancements needed
+**Implementation Complexity**: Medium (conditional logic, multimedia support)
+**Dependencies**: None
+
+#### Implementation Status: 12% (3 of 25 scenarios)
+
+**✅ Implemented Scenarios (3)**:
+- [x] Scenario 1: Guidance text stored in CSV (RetroStep.guidance field)
+- [x] Scenario 2: Guidance displayed in left sidebar (retro.html tooltip)
+- [x] Scenario 8: Text-based facilitation scripts for all 34 steps
+
+**❌ Missing Scenarios (22)** - Organized by Theme:
+
+**Multimedia Guidance (3 scenarios)**:
+- [ ] Scenario 5: Video guidance support (YouTube embed or uploaded video)
+- [ ] Scenario 6: Audio playback for verbal instructions
+- [ ] Scenario 7: Visual diagrams and metaphors (Sailboat, Tree, etc.)
+
+**Conditional Guidance (5 scenarios)**:
+- [ ] Scenario 21: AI-generated guidance based on participation rates ("Only 3 of 8 responded - consider...")
+- [ ] Scenario 22: Context-aware prompts based on vote patterns ("Votes clustered in 'Sad' - focus discussion there")
+- [ ] Scenario 23: Dynamic script adaptation (adjust guidance if team is stuck)
+- [ ] Scenario 24: Facilitator alerts (red boxes for critical reminders)
+- [ ] Scenario 25: Situational tips (e.g., "If discussion stalls, try asking...")
+
+**Sidebar UI Enhancements (6 scenarios)**:
+- [ ] Scenario 3: Expandable sections for detailed scripts
+- [ ] Scenario 4: Step-by-step numbered checklists ("1. Explain activity 2. Start timer 3...")
+- [ ] Scenario 9: "Need Help?" red alert boxes for common pitfalls
+- [ ] Scenario 10: Collapsible guidance panel (minimize to give more screen space)
+- [ ] Scenario 11: Guidance history (see previous steps' instructions)
+- [ ] Scenario 15: Facilitator notes section (private scratchpad)
+
+**Script Management (5 scenarios)**:
+- [ ] Scenario 12: Script versioning (track changes to guidance text)
+- [ ] Scenario 13: Custom scripts per template (different guidance for Mad/Sad/Glad vs Start/Stop/Continue)
+- [ ] Scenario 14: Facilitator can customize guidance per session (override default text)
+- [ ] Scenario 16: Guidance templates library (copy proven scripts)
+- [ ] Scenario 17: Export guidance as facilitator playbook
+
+**Chatbox-Style Guidance (3 scenarios)**:
+- [ ] Scenario 18: Guidance appears as chat messages (simulates human facilitator)
+- [ ] Scenario 19: Message threading (questions and answers)
+- [ ] Scenario 20: Guidance persists across steps (scroll back to earlier instructions)
+
+**Why Important for MVP**: Basic text guidance works, but facilitators need:
+1. Visual/audio support for complex activities
+2. Conditional logic to adapt to team dynamics
+3. Better UI organization (checklists, alerts, expandable sections)
+
+Without these enhancements, facilitators still need to interpret generic instructions and adapt on the fly.
+
+**Files Already Implemented**:
+- `RetroStep.java` - guidance field (TEXT column)
+- `retro.html` - Left sidebar tooltip
+- `retrospective_steps.csv` - 34 steps with guidance text
+
+**Files to Create**:
+- `src/main/java/direct/reflect/facilitator/guidance/ConditionalGuidanceService.java` - Logic for context-aware tips
+- `src/main/resources/templates/fragments/guidance-chatbox.html` - Chatbox-style UI
+- `src/main/resources/templates/fragments/guidance-checklist.html` - Step-by-step checklists
+
+**Files to Modify**:
+- `retro.html` - Replace simple tooltip with rich guidance panel (video player, audio, checklists)
+- `RetroStep.java` - Add mediaType and mediaUrl fields for video/audio
+- `RetroViewController.java` - Add getGuidanceHistory() endpoint
+- `ResponseService.java` - Add metrics for conditional guidance (participation rate, vote distribution)
+
+**Estimated Effort**: 4-5 days (multimedia support, conditional logic, UI redesign)
+
+---
+
+### 9. Customized Length (Priority: High, 13 scenarios) 🟡 IMPORTANT
+
+**As a**: Facilitator
+**I want**: Retrospective session that ends within selected time
+**So that**: I know the session will be effective and end on time
+
+**Notion Priority**: High
+**Status**: In progress
+**MVP Classification**: 🟡 **IMPORTANT** - Improves usability but not blocking
+**Implementation Complexity**: Medium (time allocation algorithm)
+**Dependencies**: Format Catalog (for compatible format selection)
+
+#### Implementation Status: 0% (0 of 13 scenarios)
+
+**❌ All Scenarios Missing (13)**:
+- [ ] Scenario 1: Facilitator selects meeting duration during retro creation (30, 60, 90, 120 min)
+- [ ] Scenario 2: Duration constraints enforced (dropdown only shows valid options)
+- [ ] Scenario 3: Only compatible formats shown for selected duration
+- [ ] Scenario 4: Schedule breakdown displayed after format selection (per-phase timing)
+- [ ] Scenario 5: System avoids similar schedules when regenerating
+- [ ] Scenario 6: Facilitator can regenerate schedule
+- [ ] Scenario 7: Facilitator confirms and starts retrospective with schedule
+- [ ] Scenario 8: Duration cannot be changed after confirmation
+- [ ] Scenario 9: Phase durations calculated to the second
+- [ ] Scenario 10: Schedule breakdown shows Larsen & Derby phase names
+- [ ] Scenario 11: Schedule breakdown visible to team members during session
+- [ ] Scenario 12: Buffer time transparently allocated within phases
+- [ ] Scenario 13: Format availability changes with duration selection
+
+**Why Important for MVP**: Teams have different meeting constraints. A 30-minute retro needs different activities than a 120-minute retro. This enables the system to fit within real-world calendar constraints.
+
+**Conflict Note**: Scenario 12 in Format Catalog story states "format durations are fixed" which conflicts with this story's dynamic time allocation. Need to resolve with user.
+
+**Files to Create**:
+- `src/main/java/direct/reflect/facilitator/planning/DurationPlanner.java` - Time allocation algorithm
+- `src/main/resources/templates/fragments/duration-selector.html` - UI component
+
+**Files to Modify**:
+- `RetroSession.java` - Add totalDurationMinutes field
+- `RetroSessionService.java` - Add createSessionWithDuration() method
+- `create-retro-form.html` - Add duration dropdown
+
+**Estimated Effort**: 4-5 days
+
+---
+
+### 10. Forced to Next Step (Priority: High, 14 scenarios) 🟡 IMPORTANT
+
+**As a**: Facilitator
+**I want**: Automatic shift to next phase when time box expires
+**So that**: I don't have to manage time myself and we can finish within the given time box
+
+**Notion Priority**: High
+**Status**: To do
+**MVP Classification**: 🟡 **IMPORTANT** - Nice-to-have automation
+**Implementation Complexity**: Low (backend mostly done, need UI timer and scheduler)
+**Dependencies**: None
+
+#### Implementation Status: 29% (4 of 14 scenarios)
+
+**✅ Implemented Scenarios (4)**:
+- [x] Scenario 4: Auto-advance occurs when timer reaches zero (TIMER_EXPIRES trigger)
+- [x] Scenario 9: Manual advance still available (facilitator override always works)
+- [x] Scenario 10-11: Final phase shows completion screen (RetroPhase.next() logic)
+- [x] Backend: durationSeconds field, timerHasExpired() validation
+
+**❌ Missing Scenarios (10)**:
+- [ ] Scenario 1: Auto-advance enabled by default
+- [ ] Scenario 2-3: Facilitator can toggle auto-advance off/on (UI control)
+- [ ] Scenario 5: Countdown warning before auto-advance (10 seconds)
+- [ ] Scenario 6-7: Paused timer prevents/re-enables auto-advance
+- [ ] Scenario 8: Work in progress is lost during auto-advance (warning dialog)
+- [ ] Scenario 12: Auto-advance disabled requires manual progression
+- [ ] Scenario 13: All participants see auto-advance simultaneously (SSE)
+- [ ] Scenario 14: Auto-advance state persists through reconnection
+
+**Why Important for MVP**: Keeps retrospectives on schedule without facilitator micromanagement. However, manual advancement works fine for MVP - this is quality-of-life automation.
+
+**Files to Create**:
+- `src/main/java/direct/reflect/facilitator/scheduling/StepAdvancementScheduler.java` - Background job
+- `src/main/resources/templates/fragments/components/countdown-timer.html` - UI component
+
+**Files to Modify**:
+- `RetroSessionService.java` - Add autoAdvanceEnabled field, polling logic
+- `retro.html` - Add countdown timer display
+- `EventService.java` - Add AUTO_ADVANCE_WARNING event
+
+**Estimated Effort**: 2-3 days
+
+---
+
+### 11. Clustering and Grouping System (Priority: High, 4 scenarios) 🟡 IMPORTANT
+
+**As a**: Retrospective participant
+**I want**: To group similar ideas together
+**So that**: We can identify patterns and themes in feedback
+
+**Notion Priority**: High
+**Status**: To do
+**MVP Classification**: 🟡 **IMPORTANT** - Enhances analysis but not blocking
+**Implementation Complexity**: High (drag-and-drop UI, AI clustering)
+**Dependencies**: None
+
+#### Implementation Status: 0% (0 of 4 scenarios)
+
+**❌ All Scenarios Missing (4)**:
+- [ ] Scenario 1: Manual clustering via drag-and-drop
+- [ ] Scenario 2: AI-suggested clustering with confidence scores
+- [ ] Scenario 3: Collaborative cluster naming
+- [ ] Scenario 4: Cluster reorganization
+
+**Why Important for MVP**: Essential for 3 major formats (Mad Sad Glad, Perfection Game, Start Stop Continue). When teams submit 50+ sticky notes, clustering reveals patterns. Without it, teams spend 30+ minutes manually organizing notes.
+
+**Note**: This is complex to implement (drag-and-drop, real-time collaboration, AI suggestions) but high value for team analysis.
+
+**Files to Create**:
+- `src/main/java/direct/reflect/facilitator/clustering/ResponseCluster.java` - Entity
+- `src/main/java/direct/reflect/facilitator/clustering/ClusteringService.java` - Business logic
+- `src/main/java/direct/reflect/facilitator/ai/ClusteringAIService.java` - AI suggestions
+- `src/main/resources/templates/fragments/components/clustering-board.html` - Drag-and-drop UI
+
+**Files to Modify**:
+- `ParticipantResponse.java` - Add clusterId foreign key
+- `ComponentType.java` - Add CLUSTERING_BOARD enum value
+
+**Estimated Effort**: 7-10 days (complex drag-and-drop, real-time sync, AI)
+
+---
+
+### 12. Visual Clue Stage (Priority: High, 16 scenarios) 🟢 NICE-TO-HAVE
+
+**As a**: Facilitator
+**I want**: Visual clue on where I am in the overall process
+**So that**: I can relate to where we are in the process
+
+**Notion Priority**: High
+**Status**: To do
+**MVP Classification**: 🟢 **NICE-TO-HAVE** - Basic progress indicator exists
+**Implementation Complexity**: Low (UI work only)
+**Dependencies**: None
+
+#### Implementation Status: 19% (3 of 16 scenarios)
+
+**✅ Implemented Scenarios (3)**:
+- [x] Scenario 3: Current phase is visually highlighted (basic 5-circle indicator)
+- [x] Scenario 6: Map updates when phase changes (SSE real-time update)
+- [x] Scenario 7: All participants see identical map state
+
+**❌ Missing Scenarios (13)** - Metro Map Enhancement:
+- [ ] Scenario 1: Underground map displayed horizontally at top (current: simple circles)
+- [ ] Scenario 2: Map shows all 5 phases as connected stations (need connecting lines)
+- [ ] Scenario 4: Completed phases are greyed out (need styling)
+- [ ] Scenario 5: Upcoming phases displayed normally
+- [ ] Scenario 8: Map shows complete retrospective journey (visual continuity)
+- [ ] Scenario 9: Map is always visible and cannot be hidden
+- [ ] Scenario 10: Map is non-interactive (correct - current implementation)
+- [ ] Scenario 11: Map updates synchronously for all participants (already working via SSE)
+- [ ] Scenario 12: Map provides contextual awareness through phase states
+- [ ] Scenario 13: Map styling follows underground/metro design (SVG graphics needed)
+- [ ] Scenario 14: First phase shows correct initial state
+- [ ] Scenario 15: Final phase shows correct completion state
+- [ ] Scenario 16: Connecting lines show journey progression
+
+**Why Nice-to-Have for MVP**: Current 5-circle indicator works functionally. Metro map is cosmetic enhancement that improves UX but doesn't block retrospective flow.
+
+**Files to Modify**:
+- `retro.html` - Replace 5 circles with metro map SVG
+- Add CSS for metro map styling
+- Add SVG assets for train/station icons
+
+**Estimated Effort**: 1-2 days (UI design work)
+
+---
+
+### 13. Anonymous Login (Priority: Medium, 7 scenarios) 🟢 NICE-TO-HAVE
+
+**As a**: Team member
+**I want**: To login anonymously without barriers
+**So that**: I can participate easily while maintaining psychological safety
+
+**Notion Priority**: Medium
+**Status**: To do
+**MVP Classification**: 🟢 **NICE-TO-HAVE** - Guest mode exists, animals are cosmetic
+**Implementation Complexity**: Low (simple name generation)
+**Dependencies**: None
+
+#### Implementation Status: 57% (4 of 7 scenarios)
+
+**✅ Implemented Scenarios (4)**:
+- [x] Scenario 1: Team member joins via unique session link (working)
+- [x] Scenario 3: Consistent identity within session (CookieAuthenticationToken)
+- [x] Scenario 4: Re-entry preserves session state (Redis session storage)
+- [x] Scenario 5: Invalid or expired session link handling (404 error page)
+
+**❌ Missing Scenarios (3)** - Animal Pseudonyms:
+- [ ] Scenario 2: Automatic pseudonym assignment with random animal name
+- [ ] Scenario 6: Multiple participants with unique animal pseudonyms
+- [ ] Scenario 7: No login barriers or friction (already working - just need animals)
+
+**Why Nice-to-Have for MVP**: Guest mode fully functional with user-entered display names. Animal pseudonyms add whimsy but don't affect retrospective functionality.
+
+**Files to Create**:
+- `src/main/java/direct/reflect/facilitator/auth/AnimalPseudonymService.java` - Name generator
+
+**Files to Modify**:
+- `Participant.java` - Add animalPseudonym field (optional)
+- `AuthService.java` - Generate pseudonym on guest login
+- `join-retro-form.html` - Remove display name input, show assigned pseudonym
+
+**Estimated Effort**: 1 day
+
+---
+
+### 14. Format Catalog & Auto-Generation Engine (Priority: Medium, 23 scenarios) 🟢 NICE-TO-HAVE
+
+**As a**: Facilitator
+**I want**: System to intelligently generate unique 5-phase retrospective flow
+**So that**: I have a proven, varied retrospective without manual planning
+
+**Notion Priority**: Medium
+**Status**: In progress
+**MVP Classification**: 🟢 **NICE-TO-HAVE** - Single template works for MVP
+**Implementation Complexity**: High (format catalog, generation algorithm, conflict resolution)
+**Dependencies**: Customized Length (for duration-based format selection)
+
+#### Implementation Status: 4% (1 of 23 scenarios)
+
+**✅ Implemented Scenarios (1)**:
+- [x] Scenario 17: Generated flow integrates with all retrospective features (CSV template works)
+
+**❌ Missing Scenarios (22)**:
+- [ ] Scenario 1-2: Facilitator selects duration, system generates compatible format flow
+- [ ] Scenario 3: Same format can appear in same phase across different flows
+- [ ] Scenario 4: Display complete retrospective flow overview
+- [ ] Scenario 5: Calculate and display total session duration
+- [ ] Scenario 6: System respects format duration constraints
+- [ ] Scenario 7: Ensure true randomness in generation
+- [ ] Scenario 8: Each phase format includes all necessary configuration
+- [ ] Scenario 9: View detailed format instructions before starting
+- [ ] Scenario 10: Regenerate flow with uniqueness constraint
+- [ ] Scenario 11: Start retrospective session with generated flow
+- [ ] Scenario 12: Format durations are fixed (CONFLICTS with Customized Length)
+- [ ] Scenario 13: Phase 1 formats have no voting configuration
+- [ ] Scenario 14: System optimizes format selection for time constraints
+- [ ] Scenario 15: Minimum catalog of 5 formats per phase (25 total)
+- [ ] Scenario 16: Format catalog enables 3,125 possible combinations
+- [ ] Scenario 18: Flow generation considers format compatibility
+- [ ] Scenario 19: Format instructions designed for online facilitation
+- [ ] Scenario 20: System handles exhausted combinations gracefully
+- [ ] Scenario 21: Each format has unique identity within its phase
+- [ ] Scenario 22: Generated flow creates coherent retrospective experience
+- [ ] Scenario 23: Facilitator can see available formats for their duration
+
+**Why Nice-to-Have for MVP**: Current single-template approach works fine for initial users. Format variety prevents "retro fatigue" but isn't needed for first 10-20 retrospectives.
+
+**Conflict Note**: Scenario 12 conflicts with Customized Length story - need user decision on whether format durations are fixed or flexible.
+
+**Files to Create**:
+- `src/main/java/direct/reflect/facilitator/formats/FormatCatalog.java` - Format definitions
+- `src/main/java/direct/reflect/facilitator/formats/FlowGenerator.java` - Generation algorithm
+- Expand CSV to include 25 formats (5 per phase)
+
+**Estimated Effort**: 10-14 days (complex algorithm, large catalog creation)
+
+---
+
+### 15. Statistical Calculations and Display (Priority: Low, 3 scenarios) 🟢 NICE-TO-HAVE
+
+**As a**: Facilitator
+**I want**: To see statistical summaries of numeric inputs
+**So that**: I can quickly understand team sentiment and patterns
+
+**Notion Priority**: Low
+**Status**: To do
+**MVP Classification**: 🟢 **NICE-TO-HAVE** - Basic histogram exists
+**Implementation Complexity**: Low (simple calculations)
+**Dependencies**: None
+
+#### Implementation Status: 0% (0 of 3 scenarios)
+
+**❌ All Scenarios Missing (3)**:
+- [ ] Scenario 1: Calculate and display rating statistics (average, median, range, distribution chart)
+- [ ] Scenario 2: Real-time statistical updates during voting
+- [ ] Scenario 3: Outlier detection and display with alerts
+
+**Why Nice-to-Have for MVP**: Current histogram shows distribution visually. Adding mean/median/range adds analytical depth but doesn't change retrospective outcomes.
+
+**Files to Modify**:
+- `histogram-chart.html` - Add statistics panel below chart
+- `ResponseService.java` - Add getRatingStatistics() method
+
+**Estimated Effort**: 0.5-1 day
+
+---
+
+## 🎯 MVP Implementation Roadmap
+
+### What's Already Done ✅ (33% Implementation)
+
+**Fully Complete (2 stories)**:
+- ✅ **Five Step Flow** - 80% complete, core structure working
+- ✅ **Numeric Rating Input** - 100% complete, fully functional
+
+**Mostly Complete (2 stories)**:
+- 🟡 **Input Mechanism** - 72% complete, missing rich text/emoji
+- 🟡 **Anonymous Login** - 57% complete, missing animal pseudonyms only
+
+**Partially Complete (3 stories)**:
+- 🟡 **Timer** - 29% complete, backend done, missing UI
+- 🟡 **Voting** - 14% complete, backend done, missing UI
+- 🟡 **Visual Clue Stage** - 19% complete, basic circles, missing metro map
+
+**Total Implemented**: ~75 of 233 scenarios (32%)
+
+---
+
+### 🔴 TIER 1 - Core Retrospective Flow (3-4 weeks)
+
+**Must-Have Features for Functional MVP**:
+
+1. **Timer** (3-4 days) - Countdown display, color states, auto-submit
+   - **Why Critical**: Without visible timer, participants don't know time remaining. Teams waste time or rush submissions.
+   - **Current**: Backend complete, need MM:SS display and SSE sync
+
+2. **Voting Mechanism** (2-3 days) - Vote visualization (●●● 3), sorting, attribution
+   - **Why Critical**: Voting determines which topics get discussed. Need to see "3 people voted for this" to build consensus.
+   - **Current**: Backend complete, need UI enhancements
+
+3. **Action Item Management** (3-4 days) - Structured WHAT/WHO/WHEN fields
+   - **Why Critical**: Retrospectives must end with clear commitments, not vague intentions.
+   - **Current**: Not started, need new entity and CRUD
+
+4. **Smart Improvement Story** (5-7 days) - AI-powered SMART goals from votes
+   - **Why Critical**: Killer feature that transforms vague action items into trackable goals with acceptance criteria.
+   - **Current**: Not started, need AI integration
+
+**TIER 1 Total**: 13-18 days (2.5-3.5 weeks)
+
+**Why These 4 Are Critical**: They define Facilitator's value proposition:
+- **Timer**: Keeps retrospectives on schedule (time management)
+- **Voting**: Democratic prioritization (team consensus)
+- **Action Items**: Structured commitments (accountability)
+- **AI Goals**: Transforms intentions into measurable outcomes (SMART criteria)
+
+Without these, Facilitator is just another sticky note tool.
+
+---
+
+### 🟡 TIER 2 - Flow Automation & Analysis (3-4 weeks)
+
+**Important Enhancements for Polished MVP**:
+
+5. **Guided Facilitation** (4-5 days) - Video/audio guidance, conditional tips, checklists
+   - **Current**: Basic text exists (12% complete), need multimedia + conditional logic
+
+6. **Customized Length** (4-5 days) - Duration selection (30/60/90/120 min) with compatible formats
+   - **Current**: Not started, need time allocation algorithm
+
+7. **Forced to Next Step** (2-3 days) - Auto-advancement when timer expires
+   - **Current**: Backend 29% complete, need scheduler + UI controls
+
+8. **Clustering & Grouping** (7-10 days) - Drag-and-drop grouping, AI-suggested clusters
+   - **Current**: Not started, complex drag-and-drop + AI integration
+
+**TIER 2 Total**: 17-23 days (3.5-4.5 weeks)
+
+**Why Important**: Improves facilitator experience and team analysis quality, but not blocking for basic retrospectives.
+
+---
+
+### 🟢 TIER 3 - Polish & Delight (2-3 weeks)
+
+**UX Enhancements for Delightful MVP**:
+
+9. **Input Mechanism Enhancements** (2-3 days) - Rich text, emoji picker, keyboard shortcuts
+   - **Current**: 72% complete, core working
+
+10. **Visual Clue Stage** (1-2 days) - Metro map progress indicator
+    - **Current**: 19% complete, basic circles working
+
+11. **Anonymous Login Animals** (1 day) - Animal pseudonyms
+    - **Current**: 57% complete, guest mode working
+
+12. **Format Catalog** (10-14 days) - Multiple retrospective templates (3,125 combinations)
+    - **Current**: 4% complete, single template working
+
+13. **Statistical Calculations** (0.5-1 day) - Mean/median/range for ratings
+    - **Current**: Not started, histogram exists
+
+**TIER 3 Total**: 14.5-21 days (3-4 weeks)
+
+**Why Nice-to-Have**: Cosmetic improvements that delight users but don't affect core retrospective outcomes.
+
+---
+
+### Estimated MVP Timeline
+
+**Foundation Already Done** (Week 0):
+- Five Step Flow structure ✅
+- Input mechanism working ✅
+- Numeric ratings working ✅
+- Anonymous guest mode ✅
+
+**Phase 1 - Critical Features** (Weeks 1-2):
+- Week 1: Timer + Voting UI = TIME MANAGEMENT + PRIORITIZATION
+- Week 2: Action Items + start AI integration = ACCOUNTABILITY
+
+**Phase 2 - AI Completion** (Weeks 3-4):
+- Week 3: Smart Improvement Story (AI) = SMART GOALS
+- Week 4: Testing + bug fixes = **FUNCTIONAL MVP** 🎯
+
+**Phase 3 - Flow Automation** (Weeks 5-7):
+- Week 5: Guided Facilitation enhancements
+- Week 6: Customized Length + Forced Next Step
+- Week 7: Clustering & Grouping = **POLISHED MVP** ✨
+
+**Phase 4 - Polish** (Weeks 8-10):
+- Weeks 8-10: Tier 3 enhancements = **DELIGHTFUL MVP** 🚀
+
+**Total Timeline**:
+- **4 weeks to Functional MVP** (Tier 1 complete)
+- **7 weeks to Polished MVP** (Tier 1 + 2 complete)
+- **10 weeks to Delightful MVP** (all 15 stories complete)
+
+---
+
+## 🔗 Key Dependencies & Conflicts
+
+### Dependencies
+1. **Smart Improvement Story** requires **Voting Mechanism** (to identify highest-voted item)
+2. **Format Catalog** requires **Customized Length** (to filter compatible formats)
+3. **Clustering** enhances **Voting** (vote on clusters, not individual cards)
+
+### Conflicts to Resolve
+1. **Format Catalog Scenario 12 vs. Customized Length**: Are format durations fixed or flexible?
+   - **Recommendation**: Make durations flexible (support Customized Length story)
+   - **Rationale**: Real-world teams have varying time constraints
+
+2. **Auto-Advancement vs. Manual Control**: Should facilitators always have override?
+   - **Current Implementation**: Facilitators can always override (correct approach)
+   - **Recommendation**: Keep facilitator override for all advancement triggers
+
+---
+
+## 🏗️ Architecture & Technical Notes
+
+### Component-Based Architecture (Implemented)
+
+**Core Enums**:
+- `ComponentType`: MULTI_COLUMN_BOARD, RATING_SCALE, HISTOGRAM_CHART, VISUAL_LAYOUT
+- `AdvancementTrigger`: FACILITATOR_CLICK, ALL_RESPONDED, TIMER_EXPIRES, AUTO
+
+**Entity Structure**:
+- RetroStep: `componentType`, `componentConfig` (JSONB), `advancementTrigger`, `durationSeconds`, `guidance`
+- ParticipantResponse: `responseData` (JSONB Map<String, Object>)
+
+**Templates**:
+- `fragments/components/multi-column-board.html` (191 lines)
+- `fragments/components/rating-scale.html`
+- `fragments/components/histogram-chart.html`
+
+**Key Principle**: Pure JSON configuration, no Java config classes needed. Templates read from ${config} directly.
+
+### SSE Real-Time Collaboration (Working)
+
+**Event Types** (RetroEvent.EventType):
+- PARTICIPANT_JOINED / PARTICIPANT_LEFT
+- SESSION_STARTED
+- STEP_ADVANCED
+- NOTE_ADDED / NOTE_UPDATED / NOTE_DELETED
+- VOTE_ADDED / VOTE_REMOVED (future)
+
+**HTMX Integration Pattern**:
 ```html
-<div class="three-column-layout">
-  <!-- LEFT: Guidance -->
-  <div class="guidance-sidebar">
-    <div class="video-player"><!-- Video guidance --></div>
-    <div class="instructions">Reflect on your experience...</div>
-  </div>
-
-  <!-- CENTER: Activity -->
-  <div class="activity-area">
-    <h2>Stage 1: Happiness Histogram</h2>
-    <p>What is your current hapiness?</p>
-    <select name="rating"><!-- 1-10 options --></select>
-    <!-- Submit with HTMX POST -->
-  </div>
-
-  <!-- RIGHT: Results (shown after reveal) -->
-  <div class="results-sidebar">
-    <!-- Histogram chart (initially hidden) -->
-    <div id="histogram"><!-- SVG bar chart --></div>
+<div hx-ext="sse" sse-connect="/api/retro/{retroId}/events">
+  <div id="component"
+       hx-get="/retro/{retroId}/step/{stepId}/responses/column"
+       hx-trigger="sse:note_added from:body"
+       hx-swap="innerHTML">
   </div>
 </div>
 ```
 
-**Multi-Step Flow** (from roadmap.md):
-1. INSTRUCTION step: Show guidance
-2. ACTIVITY step (PRIVATE): Participants select rating
-3. REVEAL step: Facilitator clicks reveal, histogram appears
-4. DISCUSSION step: Comments section opens
-5. WRAP-UP step: Next stage
+**Test Coverage**: All 8 integration tests passing (SSEConnectionIntegrationTest + RetroFlowIntegrationTest)
 
-### Step 2.2: CATEGORICAL Pattern (Mad Sad Glad)
-**Why second?** Common format, tests multi-column layout
+### Security & Validation (Implemented)
 
-**Frontend UI Components**:
-- 3-column grid with category headers (Mad/Sad/Glad with emojis)
-- Text input areas for sticky notes in each column
-- Real-time note display (privacy-aware: blurred when PRIVATE)
-- Clustering UI (future: drag-and-drop grouping)
+**Jakarta Bean Validation** at controller level:
+- `@Valid @ModelAttribute` for automatic form binding
+- Custom exceptions: `InvalidSessionStateException`, `InvalidStepException`, `VoteLimitExceededException`
+- Authorization-first validation (prevents session ID enumeration)
 
-### Step 2.3: FREEFORM Pattern (One Word, Kudos)
-**Why third?** Simplest, wraps up basic patterns
+**Test Coverage**: 21 unit tests in RetroApiControllerTest (100% pass rate)
 
-**Frontend UI Components**:
-- Single text input or multiple text areas
-- Word cloud visualization (results phase)
-- List display for longer responses
+### Important Technical Rules
 
----
+1. **Thymeleaf Reserved Words**: Never use `session` as variable name (reserved in web context). Always use `retroSession`.
 
-## Phase 3: Multi-Step Flow System
+2. **Avoid Complex SpEL**: Use Thymeleaf utilities (`#aggregates.sum()`, `#numbers.sequence()`) instead of stream operations.
 
-### Step 3.1: StepType Rendering
-Current `RetroStep` has `stepType` enum (INSTRUCTION, ACTIVITY, DISCUSSION):
-- **INSTRUCTION**: Show guidance only, no input
-- **ACTIVITY**: Show input UI based on `dataPattern`
-- **DISCUSSION**: Show results + comment areas
-- **REVEAL**: Transition step (facilitator-triggered)
+3. **DTO Pattern**: Always convert entities to DTOs before template rendering. DTOs implement `ComponentResponseDto.toResponseData()`.
 
-### Step 3.2: Privacy Controls
-- Backend: `isPrivate` flag on `RetroStep`
-- Frontend: When PRIVATE:
-  - Participants see only their own responses
-  - Others see "Waiting for responses..." or blurred content
-- Facilitator control: "Reveal All" button (POST `/api/retro/{id}/step/{stepId}/reveal`)
-- SSE event: `STEP_REVEALED` triggers UI update for all participants
+4. **No Null Returns**: Services throw exceptions instead of returning null. Fail-fast principle.
 
-### Step 3.3: Step Advancement
-- Facilitator sees "Next" button (golden color from mockup)
-- POST `/api/retro/{id}/next` advances to next step
-- SSE event `STEP_ADVANCED` updates all participant UIs
-- Progress indicators update automatically
+5. **Facilitator Override**: Facilitator can ALWAYS advance, even if blocking conditions not met. Show warnings but never block.
 
 ---
 
-## Phase 4: Polish and UX Details
+## 📝 Development Commands
 
-### Step 4.1: Visual Design Match
-- Golden header bar (`bg-amber-500` or custom yellow)
-- Clean white content areas
-- Progress circles with proper states
-- Button styling (Cancel white, Next golden)
+### Run Application
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=import
+```
+**IMPORTANT**: Always use `import` profile to load CSV templates/stages/steps.
 
-### Step 4.2: Responsive Behavior
-- Three-column layout collapses on mobile
-- Guidance tooltips become expandable accordion
-- Maintain usability on tablets
-
-### Step 4.3: Error States
-- Handle disconnections gracefully
-- Show reconnection UI
-- Preserve user input during brief disconnects
-
----
-
-## Implementation Order (Recommended)
-
-### Sprint 1: Foundation & Immediate Fixes (Week 1) ⬅️ **CURRENT SPRINT**
-1. 🔄 **Day 1-2**: Fix retro.html base template structure
-   - Create clean 3-column layout
-   - Add golden header with progress indicators
-   - Add timer display
-   - Test with empty/mock content
-
-2. 🔲 **Day 3-4**: Implement guidance sidebar system
-   - Video player component
-   - Text instruction cards
-   - "Need Help?" alert boxes
-   - Closeable tooltips
-
-3. 🔲 **Day 5**: Add facilitator controls
-   - Cancel/Next buttons at bottom
-   - Wire up to existing `/api/retro/{id}/next` endpoint
-   - Test step advancement
-
-### Sprint 2: RATING Pattern Implementation (Week 2) ✅ COMPLETED
-4. ✅ **Day 1-2**: Happiness Histogram activity UI
-   - ✅ Rating scale selector (1-10)
-   - ✅ Comment textarea
-   - ✅ HTMX form submission
-   - ✅ Integration with ResponseService
-
-5. ✅ **Day 3-4**: Histogram visualization
-   - ✅ Bar chart component (SVG histogram)
-   - ✅ Results display in right sidebar
-   - ✅ Privacy toggle (private input → public reveal)
-   - ✅ Fixed SpEL expression issues with complex lambdas
-   - ✅ Implemented DTO layer (RatingDto) for clean view rendering
-   - ✅ Moved visibility filtering to controller for simpler templates
-
-6. ⚠️ **Day 5**: Multi-step flow for Happiness Histogram - **BLOCKED BY CRITICAL BUGS**
-   - ✅ INSTRUCTION → ACTIVITY flow working for single participant
-   - ❌ Multi-participant testing INCOMPLETE - critical SSE and session management bugs prevent proper testing
-   - ❌ REVEAL functionality blocked by facilitator authorization issues
-   - ❌ Real-time participant list sync not working
-   - 🔴 **BLOCKER**: Cannot write reliable multi-user tests until SSE/session bugs are fixed
-   - **See detailed test report below**
-
-### Sprint 2.5: Fix SSE & Multi-User Critical Bugs (Week 2.5) ⬅️ **CURRENT PRIORITY**
-7. 🔴 **CRITICAL**: Fix participant session/cookie management
-   - Investigate why participant sessions expire after ~5 minutes
-   - Review `CookieAuthenticationToken` implementation
-   - Ensure cookies have sufficient lifetime for typical retrospective duration (60+ minutes)
-   - Add logging to track session expiration events
-   - **Files to review**: `AuthService.java`, `CookieAuthenticationToken.java`
-
-8. 🔴 **CRITICAL**: Fix SSE connection stability
-   - Add comprehensive SSE connection logging (connect, disconnect, error, participant ID)
-   - Investigate why SSE connections fail with 404 after session expiration
-   - Ensure HTMX auto-reconnect works correctly
-   - Add connection health monitoring to EventService
-   - **Files to review**: `RetroEventController.java`, `EventService.java`
-
-9. 🔴 **CRITICAL**: Fix facilitator role persistence
-   - Debug why `participantService.isFacilitator()` returns false when session expires
-   - Consider storing facilitator role in database `ParticipantRole.FACILITATOR` instead of session
-   - Add comprehensive logging to `isFacilitator()` checks
-   - **Files to review**: `ParticipantService.java`, `Participant.java`
-
-10. ✅ **COMPLETED**: Comprehensive multi-user integration tests
-    - **File**: `SSEConnectionIntegrationTest.java`
-    - **Test Results**: All 5 tests passing (100% success rate)
-    - Test scenarios:
-      - ✅ **PASSING**: SSE connection stability (shouldMaintainStableSSEConnection)
-        - Connection established within ~10ms
-        - Remains stable for 30 seconds without reconnections
-        - Uses `page.waitForResponse()` for reliable SSE detection
-      - ✅ **PASSING**: Participant list syncs via SSE (shouldBroadcastParticipantJoinedToAllParticipants)
-        - Two browser contexts (facilitator + participant)
-        - Both establish SSE connections
-        - Verify DOM updates when participant joins (1 → 2 participants)
-      - ✅ **PASSING**: Session started event broadcast (shouldBroadcastSessionStartedEventToAllParticipants)
-        - Both facilitator and participant transition from lobby to active retro
-        - SSE event triggers page updates for both users simultaneously
-      - ✅ **PASSING**: Histogram reveal updates (shouldSyncHistogramUpdatesAcrossParticipants)
-        - Participant submits rating in PRIVATE mode
-        - Facilitator clicks "Reveal All Responses"
-        - Both see histogram update via SSE NOTE_UPDATED event
-      - ✅ **PASSING**: Facilitator controls (shouldEnforceFacilitatorControls)
-        - UI shows/hides buttons correctly based on role
-        - Facilitator can advance step, participant sees update via SSE
-    - **Applies to all SSE pages**: Lobby, Retrospective (all stages)
-    - **File**: `src/test/java/direct/reflect/facilitator/integration/SSEConnectionIntegrationTest.java`
-
-11. 🟢 **MEDIUM**: Add UI connection status indicator
-    - Show green/yellow/red dot for SSE connection health
-    - Display reconnection attempts to user
-    - Provide "Reconnect" button if connection fails
-    - **New files**: `sse-status.html` fragment
-
-### Sprint 3: CATEGORICAL Pattern (Week 3) - **PAUSED UNTIL SPRINT 2.5 COMPLETE**
-12. 🔲 Mad Sad Glad implementation
-13. 🔲 Privacy controls and reveal functionality
-14. 🔲 Real-time collaborative updates
-
-### Sprint 4: FREEFORM Pattern & Polish (Week 4)
-10. 🔲 One Word / Kudos implementation
-11. 🔲 Visual design final touches
-12. 🔲 Cross-browser testing
-13. 🔲 Performance optimization
-
----
-
-## Key Success Criteria
-
-### Must Have (MVP):
-- ✅ Clean 3-column layout matching mockups
-- ✅ Stage progress indicators working
-- ⚠️ One complete pattern (RATING) with multi-step flow - **PARTIAL** (single user works, multi-user blocked)
-- ⚠️ Privacy controls (private input → public reveal) - **PARTIAL** (UI exists, reveal blocked by bugs)
-- ✅ Facilitator advancement controls - **WORKS** (Next button functional)
-- ⚠️ Real-time synchronization via SSE - **CRITICAL BUGS** (single user works, multi-user fails)
-
-### Should Have:
-- ✅ All 3 patterns working (RATING, CATEGORICAL, FREEFORM)
-- ✅ Guidance tooltip system
-- ✅ Timer display
-- ✅ Participant list in right sidebar
-- ✅ Mobile-responsive layout
-
-### Nice to Have (Future):
-- Clustering/grouping for CATEGORICAL
-- Voting system
-- Action item management
-- Analytics dashboard
-
----
-
-## Design References
-
-### System UI Mockups Location
-- `system-ui/Screenshot 2025-08-27 at 13.07.33.png` - Happiness Histogram input screen
-- `system-ui/Screenshot 2025-08-27 at 13.08.01.png` - Histogram results/insights screen
-- `system-ui/Screenshot 2025-08-27 at 13.07.47.png` - Additional mockups
-- See all 7 mockup screenshots in `system-ui/` directory
-
-### Key Design Elements from Mockups
-- **Golden header**: Brand logo left, timer center (`01 | 09 | 30`), user menu right
-- **Progress circles**: 5 stages with states (In Progress=filled yellow, To Do=dotted, Complete=checkmark)
-- **Left sidebar**: Video player with dark overlay + closeable guidance cards
-- **Center area**: Clean white background, focused activity UI, minimal clutter
-- **Right sidebar**: (Not shown in current mockups - reserved for participants/results)
-- **Bottom controls**: "Cancel" (white) and "Next" (golden) buttons
-
----
-
-## Questions to Resolve
-
-1. **CSV Import**: Should we prioritize CSV import for RetroSteps, or manually configure first template in code?
-   - **Decision**: Start with hardcoded template in Java, add CSV later
-
-2. **Video Guidance**: Do we have actual videos, or placeholder for now?
-   - **Decision**: Start with text instructions, design for video support
-
-3. **Chart Library**: Use Chart.js, D3.js, or SVG for histogram?
-   - **Decision**: Simple SVG bars first, Chart.js if time permits
-
-4. **Clustering UI**: Drag-and-drop library (SortableJS, DnD Kit)?
-   - **Decision**: Phase 2 feature, skip for MVP
-
----
-
-## Important Technical Notes
-
-### Thymeleaf Reserved Words
-- **NEVER use `session` as a variable name** - it's reserved in Thymeleaf web context
-- Always use `retroSession` for the RetroSession model object
-- Model attribute: `model.addAttribute("retroSession", session);`
-- Template parameter: `th:fragment="content(retroSession)"`
-- Template usage: `th:replace="~{fragments/retro :: content(retroSession=${retroSession})}"`
-
-### SSE Event Types (from RetroEvent.EventType)
-- `PARTICIPANT_JOINED` / `PARTICIPANT_LEFT` - Update participant lists
-- `SESSION_STARTED` - Lobby → Active retro transition
-- `STEP_ADVANCED` - Facilitator moves to next step (triggers full UI update)
-- `NOTE_ADDED` / `NOTE_UPDATED` / `NOTE_DELETED` - Response changes
-- `VOTE_ADDED` / `VOTE_REMOVED` - Voting updates (future)
-- `GROUP_CREATED` / `GROUP_UPDATED` / `GROUP_DELETED` - Clustering (future)
-
-### HTMX SSE Integration Pattern
-```html
-<!-- SSE connection setup (in fragment root) -->
-<div hx-ext="sse" th:attr="sse-connect=@{/api/retro/{retroId}/events(retroId=${retroSession.id})}"></div>
-
-<!-- Component that updates on SSE event -->
-<div id="participants-list"
-     th:attr="hx-get=@{/retro/{retroId}/participants(retroId=${retroSession.id})}"
-     hx-trigger="sse:participant_joined from:body, sse:participant_left from:body"
-     hx-swap="innerHTML">
-  <!-- Content updated via HTMX GET when SSE event fires -->
-</div>
+### Build & Test
+```bash
+mvn clean compile
+mvn test
+mvn test -Dtest=ClassName#methodName
 ```
 
----
-
-## File Structure Reference
-
-### Key Templates
-- `src/main/resources/templates/layout.html` - Master layout
-- `src/main/resources/templates/fragments/retro.html` - Active retrospective UI (TO BE REFACTORED)
-- `src/main/resources/templates/fragments/lobby.html` - Lobby UI (working)
-- `src/main/resources/templates/fragments/sse-connection.html` - Shared SSE handlers
-
-### Key Controllers
-- `RetroViewController.java` - Thymeleaf template rendering
-- `RetroApiController.java` - REST endpoints for HTMX
-- `RetroEventController.java` - SSE streaming
-
-### Key Services
-- `RetroSessionService.java` - Session lifecycle management
-- `ParticipantService.java` - Participant management
-- `ResponseService.java` - Response submission and retrieval
-- `EventService.java` - SSE event broadcasting
-
----
-
-## Progress Tracking
-
-### 🎯 Current Priorities (Ordered by Urgency)
-
-1. ✅ **COMPLETED: SSE Auto-Reload** - Fixed and verified working
-   - SSE connection persists across step advances
-   - Real-time collaboration working for multi-user scenarios
-
-2. ✅ **COMPLETED: Sprint 2 - Happiness Histogram** - Activity UI and visualization complete
-   - Rating scale selector (1-10) working
-   - HTMX form submission integrated
-   - SVG histogram visualization displaying correctly
-   - Privacy controls working (hidden until revealed)
-   - Real-time updates via SSE functional for multi-user scenarios
-
-3. ✅ **COMPLETED: Sprint 2.5 - Multi-User Integration Tests** - All 5 tests passing (100%)
-   - **Task 10**: ✅ All 5 integration tests implemented and passing
-   - **Test 1**: ✅ SSE connection stability (30 seconds, no reconnections)
-   - **Test 2**: ✅ Participant list syncs via SSE across multiple browser contexts
-   - **Test 3**: ✅ Session started event broadcast to all participants
-   - **Test 4**: ✅ Histogram reveal functionality verified working (private → public)
-   - **Test 5**: ✅ Facilitator controls and authorization working correctly
-   - **Tasks 7-9**: ⏭️ SKIPPED - No bugs found, session management working correctly
-   - **Task 11**: ⏭️ DEFERRED - UI connection status indicator (nice-to-have, low priority)
-   - **Conclusion**: Comprehensive automated tests confirm SSE works reliably for multi-user scenarios
-   - **Original manual test bugs**: Cannot be reproduced, likely caused by app restarts during testing
-
-4. 🎯 **NEXT: Sprint 3 - CATEGORICAL Pattern** ⬅️ **READY TO START**
-   - Implement Mad Sad Glad activity
-   - Three-column layout with category headers (Mad/Sad/Glad)
-   - Sticky note submission with HTMX
-   - Real-time updates via SSE (NOTE_ADDED events)
-   - Privacy controls (PRIVATE → PUBLIC reveal)
-   - Safe to proceed - SSE foundation is solid
-
-5. **Low Priority: Sprint 1 Day 3-4: Guidance System Enhancement** (Optional)
-   - Basic guidance already working
-   - Could enhance with video player component
-   - Add closeable tooltips
-   - "Need Help?" alert boxes
-
-6. **Low Priority: Sprint 1 Day 5: Facilitator Controls Polish** (Optional)
-   - Wire up Back button (currently only Next works)
-   - Test full multi-step flow backwards navigation
-   - Verify all step types render correctly
-
----
-
-### Sprint 1 - Day 1-2: Base Template Structure ✅ COMPLETED
-- [x] Analyze current retro.html structure
-- [x] Remove debug content from center area (retro.html:214-220)
-- [x] Remove duplicate header (retro.html:9-101)
-- [x] Fix typo: "Hapiness" → "Happiness" (CSV + tests)
-- [x] Verify UI renders cleanly with 3-column layout
-- [x] Verify stage progress indicators (5 circles working)
-- [x] Test Next button functionality
-- [x] Verify SSE connection works
-- [x] Test step advancement (INSTRUCTION → ACTIVITY)
-
-**Started**: 2025-10-22
-**Completed**: 2025-10-22
-
-**Findings**:
-- ✅ UI layout is already well-structured (no major refactor needed)
-- ✅ 3-column layout working correctly
-- ✅ Stage progress indicators displaying properly
-- ✅ Backend step advancement working
-- ⚠️ **CRITICAL ISSUE FOUND**: SSE auto-reload not triggering after step advancement
-
-**Files Modified**:
-- `retro.html` - Removed debug content and duplicate header
-- `retrospective_stages.csv` - Fixed typo
-- `CsvImporterServiceTest.java` - Updated test expectations
-
-### ✅ RESOLVED: SSE Auto-Reload Issue
-
-**Status**: ✅ **COMPLETELY RESOLVED** - 2025-10-22
-
-#### Root Causes Identified and Fixed
-
-**Three separate issues were causing SSE connection problems:**
-
-1. **HTMX 2.x SSE Extension Requirement Violation** (layout.html)
-   - **Problem**: SSE listeners MUST be children of the element with `hx-ext="sse"` and `sse-connect`
-   - **Symptom**: SSE events not triggering HTMX automatically
-   - **Fix**: Wrapped lobby/retro fragments **inside** the SSE connection div
-   - **File**: `layout.html` lines 48-58
-
-2. **Fragment Returning Full Wrapper** (RetroViewController.java + retro.html)
-   - **Problem**: `/content` endpoint returned entire `#retro-content` wrapper, causing nested divs and SSE reconnection
-   - **Symptom**: SSE connection closed and recreated on every content swap
-   - **Fix**: Created `inner-content` fragment containing only the actual content (not the wrapper div)
-   - **Files**:
-     - `retro.html` line 8: Added `<div th:fragment="inner-content">`
-     - `RetroViewController.java` line 183: Changed return to `fragments/retro :: inner-content`
-
-3. **Forced Page Reload on SSE Events** (retro.html)
-   - **Problem**: JavaScript listening for `htmx:sseMessage` and calling `window.location.reload()` on `step_advanced`
-   - **Symptom**: Full page reload triggered, creating new SSE connection
-   - **Fix**: Removed obsolete reload code (HTMX handles updates automatically via `hx-trigger`)
-   - **File**: `retro.html` lines 378-384 (removed)
-
-#### Verification Results
-
-**Test Session**: "Final SSE Fix Test" (019a0bee-ea86-7bba-b01d-857ac176dff8)
-- ✅ SSE connection established once: `ccced824-4a79-4c43-a15c-2ab498728d6e`
-- ✅ Step advances Stage 1 → 2 → 3 with NO reconnection
-- ✅ Same connection ID used throughout entire session
-- ✅ No "SSE connection requested" after step advances
-- ✅ Predictable connection count (exactly 1 active connection)
-- ✅ Real-time updates work automatically via HTMX SSE triggers
-
-#### Files Modified
-
-1. **layout.html** - Restructured SSE div to wrap content properly
-2. **retro.html** - Added `inner-content` fragment, removed reload code
-3. **RetroViewController.java** - Updated `/content` endpoint to return inner fragment
-
-#### Key Learning
-
-Always consult HTMX extension documentation (https://htmx.org/extensions/sse/) when implementing SSE. The parent-child relationship requirement is critical for HTMX 2.x SSE extension functionality.
-
----
-
-### ✅ Sprint 2 Day 3-4: Histogram Visualization - COMPLETED
-
-**Status**: ✅ **COMPLETED** - 2025-10-28
-
-#### Implementation Summary
-
-Successfully implemented the histogram visualization for the Happiness Histogram activity with real-time updates via SSE.
-
-#### Root Cause of Initial Issues
-
-The histogram endpoint was failing with multiple SpEL (Spring Expression Language) errors:
-
-1. **SpEL .toList() Not Supported**
-   - **Problem**: Template tried to use `.toList()` which doesn't exist in SpEL
-   - **Error**: `SpelParseException: Expression [...] @56: EL1042E: Problem parsing right operand`
-
-2. **Lambda Expressions in Complex Conditions**
-   - **Problem**: SpEL doesn't support lambda expressions inside parenthesized conditions
-   - **Example**: `responses.empty or (!isFacilitator and responses.stream().noneMatch(r -> r.visible()))`
-
-3. **Stream Operations in Templates**
-   - **Problem**: Complex stream filtering and collection operations don't work reliably in SpEL
-   - **Anti-pattern**: Trying to do business logic in templates
-
-#### Solution Architecture
-
-**1. DTO Layer for Clean View Separation** (`RatingDto.java`)
-```java
-public record RatingDto(
-    UUID id,
-    Integer rating,
-    String comment,
-    Boolean visible,
-    String participantName
-) {
-    public static RatingDto from(ParticipantResponse response) {
-        // Converts entity to clean DTO for template rendering
-    }
-}
+### Docker Services
+```bash
+docker compose up -d    # Start PostgreSQL + Redis
+docker compose down     # Stop services
 ```
 
-**2. Visibility Filtering in Controller** (`RetroViewController.java:291-294`)
-```java
-// Filter visible responses (facilitator sees all, others see only visible)
-List<RatingDto> visibleResponses = isFacilitator
-    ? ratingDtos
-    : ratingDtos.stream().filter(RatingDto::visible).toList();
-
-model.addAttribute("totalResponses", ratingDtos.size());
-model.addAttribute("responses", visibleResponses);
-```
-
-**3. Simplified Template with Thymeleaf Utilities** (`retro-rating.html:110-122`)
-```html
-<!-- Count responses with this rating using Thymeleaf's built-in aggregates -->
-<div th:each="rating : ${#numbers.sequence(minRating, maxRating, 1)}">
-    <div th:with="count=${#aggregates.sum(responses.![rating == __${rating}__ ? 1 : 0])}"
-         class="flex items-center space-x-2">
-        <span th:text="${rating}">1</span>
-        <div class="flex-1 bg-gray-200 rounded h-8">
-            <div class="bg-blue-500 h-full"
-                 th:style="'width: ' + ${count > 0 ? (count * 100.0 / responses.size()) : 0} + '%'">
-            </div>
-            <span th:if="${count > 0}" th:text="${count}">0</span>
-        </div>
-    </div>
-</div>
-```
-
-#### Key Technical Decisions
-
-1. **Moved Business Logic to Controller**
-   - Templates should only handle presentation, not filtering/transformation
-   - Controller pre-filters visible responses based on user role
-   - Template receives clean, ready-to-render DTOs
-
-2. **Used Thymeleaf Projection Syntax**
-   - `responses.![rating == __${rating}__ ? 1 : 0]` creates a list of 1s and 0s
-   - `#aggregates.sum()` counts matching ratings
-   - Avoids complex stream operations in SpEL
-
-3. **Created Pattern-Specific DTOs**
-   - `RatingDto`, `CategoricalDto`, `FreeformDto` for each pattern
-   - Dual purpose: API input validation AND view rendering
-   - Clean separation from JPA entities
-
-#### Files Modified
-
-1. **`/src/main/java/direct/reflect/facilitator/facilitation/dto/RatingDto.java`**
-   - Created new DTO with `from()` static factory method
-   - Fixed Boolean naming convention (`visible` instead of `isVisible`)
-
-2. **`/src/main/java/direct/reflect/facilitator/web/RetroViewController.java:277-306`**
-   - Added visibility filtering logic
-   - Converted entities to DTOs before passing to template
-   - Added `totalResponses` attribute for hidden count
-
-3. **`/src/main/resources/templates/fragments/retro-rating.html:99-141`**
-   - Replaced complex SpEL stream operations with Thymeleaf utilities
-   - Used `#aggregates.sum()` with projection syntax for counting
-   - Simplified conditional logic by using pre-filtered lists
-
-#### Verification Results
-
-**Test Session**: "Final Histogram Test" (019a2b8b-6989-7021-95d0-3cc9e09bd950)
-- ✅ Histogram endpoint called successfully: `/retro/{retroId}/step/{stepId}/histogram`
-- ✅ No SpEL parsing errors
-- ✅ No `HttpMessageNotWritableException` errors
-- ✅ Histogram displays correctly with rating distribution bars
-- ✅ Shows "1 rating(s) submitted" with count for rating 8
-- ✅ Real-time updates via SSE work correctly (`hx-trigger="sse:note_added"`)
-
-#### Key Learnings
-
-1. **Avoid Complex SpEL Expressions**
-   - SpEL has limited support for stream operations and lambdas
-   - Keep template logic simple - use Thymeleaf utilities instead
-   - Move filtering/transformation to controller
-
-2. **DTO Pattern for Templates**
-   - Always convert JPA entities to DTOs before template rendering
-   - DTOs provide clean, immutable data contracts
-   - Prevents lazy-loading issues and simplifies templates
-
-3. **Boolean Naming Convention**
-   - Java Bean properties: field `visible`, accessor `visible()` or `isVisible()`
-   - Do NOT name field `isVisible` - breaks convention
-
-4. **Thymeleaf Projection Syntax**
-   - `collection.![expression]` creates derived collection
-   - Works with `#aggregates` functions for counting/summing
-   - Cleaner than trying to use Java streams in templates
+### Logs
+Application logs to **both**:
+- Console (for user)
+- `/tmp/facilitator.log` (for Claude to monitor)
 
 ---
 
-### ⚠️ Sprint 2 Day 5: Multi-Participant Testing Results - CRITICAL BUGS FOUND
-
-**Status**: ⚠️ **PARTIAL SUCCESS WITH CRITICAL ISSUES** - 2025-10-30
-
-**Tested**: Happiness Histogram multi-step flow with two participants (Facilitator Bob + Participant Carol)
-
-#### ✅ What Works
-
-1. **Single Participant Flow**: Works perfectly
-   - Rating submission via HTMX form
-   - Histogram visualization displays correctly
-   - Comments section shows rating + comment together
-   - Facilitator controls appear for session creator
-
-2. **Multi-Participant Page Load**: Carol's browser correctly shows both participants when loading page (server-side rendering works)
-
-3. **Response Submission**: Carol's rating (5) successfully submitted and saved to database with `isVisible=false`
-
-#### ❌ Critical Bugs Found
-
-**1. SSE Connection Instability** 🔴 **CRITICAL**
-
-**Symptom**: Bob's (facilitator) SSE connection fails with 404 errors after ~5 minutes
-```
-/api/retro/.../events GET [failed - 404]
-```
-
-**Impact**:
-- Bob doesn't receive real-time updates
-- Participant list doesn't sync between users
-- Histogram doesn't update when other participants submit ratings
-
-**Evidence**: Chrome DevTools network logs show many failed SSE reconnection attempts
-
-**Root Cause**: Bob's participant session/cookie becomes invalid, causing authorization failures on SSE endpoint
-
----
-
-**2. Participant List Not Syncing** 🔴 **CRITICAL**
-
-**Symptom**: Bob only sees himself in participant list, even though Carol joined
-
-**Evidence**:
-- Bob's view: Only "Facilitator Bob"
-- Carol's view: Both "Facilitator Bob" and "Participant Carol"
-
-**Expected**: When Carol joins, Bob should receive `PARTICIPANT_JOINED` SSE event and his participant list should update in real-time
-
-**Actual**: Bob never receives the event because his SSE connection is broken
-
----
-
-**3. Facilitator Can't See Hidden Responses** 🟠 **HIGH**
-
-**Symptom**: Bob (facilitator) sees only 1 rating in histogram, not Carol's hidden rating
-
-**Evidence**:
-- Server logs show 2 responses retrieved (rating 8 visible=true, rating 5 visible=false)
-- Bob's histogram only shows rating 8 with count "1"
-- Controller code at RetroViewController.java:292-294 should show facilitator ALL responses
-
-**Expected**: Facilitator should see ALL responses regardless of `isVisible` flag
-
-**Actual**: Bob only sees visible responses, same as regular participants
-
-**Likely Cause**: `participantService.isFacilitator(request, retroId)` returns `false` for Bob because his session is invalid
-
----
-
-**4. Reveal Functionality Fails** 🟠 **HIGH**
-
-**Symptom**: Clicking "Reveal All Responses" button does nothing
-
-**Evidence**:
-- Server logs show reveal endpoint called: `Revealing responses for retro: ..., step: 2`
-- But no "Revealed X responses" log appears (should be at ResponseService.java:91)
-- Network logs show: `/api/retro/.../step/2/reveal POST [failed - 403]`
-
-**Root Cause**: Bob is not recognized as facilitator, so authorization check at RetroApiController.java:335-338 returns HTTP 403 Forbidden
-
----
-
-#### Root Cause Analysis
-
-**All bugs trace back to Bob's participant session becoming invalid:**
-
-1. Bob creates session → becomes facilitator
-2. Bob starts retrospective → SSE connection established
-3. Carol joins session → Carol's page loads correctly
-4. **Bob's participant cookie/session expires or becomes invalid** ⬅️ ROOT CAUSE
-5. Bob's SSE reconnection attempts fail with 404 (not authorized)
-6. Bob doesn't receive `PARTICIPANT_JOINED` event
-7. Bob's facilitator status check returns false
-8. Reveal button returns 403 Forbidden
-9. Histogram filtering treats Bob as regular participant
-
-#### Recommended Fixes
-
-1. **Investigate participant session management** 🔴 **PRIORITY 1**
-   - Check `CookieAuthenticationToken` implementation in `src/main/java/direct/reflect/facilitator/auth/`
-   - Ensure participant cookies have sufficient lifetime (currently expires too quickly)
-   - Add logging to track when/why participant sessions become invalid
-   - **File to review**: `AuthService.java`, `CookieAuthenticationToken.java`
-
-2. **Add SSE connection health monitoring**
-   - Log when SSE connections drop with participant ID and reason
-   - Implement automatic reconnection with exponential backoff (HTMX should handle this?)
-   - Show connection status indicator to users (red/yellow/green dot)
-   - **New files**: SSE health check component
-
-3. **Fix facilitator role persistence**
-   - Ensure `participantService.isFacilitator()` correctly identifies session creator
-   - Add debug logging to track facilitator status checks (DONE in RetroViewController.java:290)
-   - Consider using database `ParticipantRole.FACILITATOR` instead of relying on session state
-   - **File to review**: `ParticipantService.java:isFacilitator()`
-
-4. **Test with longer session durations**
-   - Current test ran for ~5 minutes before issues appeared
-   - Need to test 30-minute and 1-hour sessions to ensure stability
-   - Set up automated multi-user integration test
-
-5. **Add comprehensive integration test**
-   - Test multi-participant flow with SSE events
-   - Verify participant list syncs across clients
-   - Verify facilitator sees all responses regardless of visibility
-   - **New file**: `MultiParticipantIntegrationTest.java`
-
-#### Test Session Details
-
-- **Session ID**: 019a33fc-df60-724a-b36e-f2b22b5b1f9a
-- **Session Name**: "Test Enum Fix"
-- **Participants**:
-  - Facilitator Bob (UUID: 132a2a3e-3c93-4a1f-b852-8fe7ac40154c) - Rating 8 submitted
-  - Participant Carol (UUID: 197bb07a-f545-4ca7-b24a-7df33d27855f) - Rating 5 submitted
-- **Template**: Test Template
-- **Current Step**: Stage 2 - Happiness Histogram (Activity)
-- **Test Duration**: ~5 minutes
-- **Browser**: Chrome DevTools MCP
-- **Testing Method**: Browser automation with manual verification
-
-#### Files Modified During Debugging
-
-1. **`RetroViewController.java:290`** - Added debug logging for `isFacilitator` check (not yet tested with recompile)
-
-#### MCP Browser Test Results (2025-11-03)
-
-**Status**: ✅ **SSE WORKS - MCP LIMITATION CONFIRMED**
-
-**Test Scenario**: Reproduced multi-user flow using MCP Chrome DevTools with `/auth/guest` endpoint to create separate sessions
-
-**Key Findings**:
-
-1. ✅ **SSE Multi-User Synchronization Works**
-   - Bob created session (participantId: `f21a1adc-504c-48e4-99d2-9844d0210da1`, role: FACILITATOR)
-   - Carol joined via `/auth/guest` endpoint (participantId: `866f3b6c-32ab-4f84-9d46-17d04dd6ee3e`, role: PARTICIPANT)
-   - `PARTICIPANT_JOINED` SSE event successfully sent to Bob's connection
-   - Bob's participant list auto-updated to show Carol (HTMX SSE trigger worked)
-   - Both SSE connections established successfully (total active: 2)
-
-2. ❌ **MCP Chrome DevTools Limitation**
-   - All tabs share the same cookie jar (HttpOnly session cookies)
-   - When Carol authenticated via `/auth/guest`, Tab 1's session was replaced
-   - Tab 1 switched from Bob's identity to Carol's identity
-   - This is a **tool limitation**, not an application bug
-
-3. ✅ **Authorization Working Correctly**
-   - Carol (PARTICIPANT role) correctly received 403 when trying to start retrospective
-   - Only FACILITATOR should be able to start sessions
-   - `isFacilitator()` check working as expected
-
-4. ✅ **Session Management Solid**
-   - Redis-backed sessions (2hr timeout) working correctly
-   - Participant database lookups successful
-   - No session expiration issues observed
-   - HTTP session IDs tracked correctly: Bob=`ae775cef`, Carol=`688c2654`
-
-**Evidence from Logs**:
-```
-16:56:34 - Bob creates session as FACILITATOR (f21a1adc-504c-48e4-99d2-9844d0210da1)
-16:46:18 - Carol joins as PARTICIPANT (866f3b6c-32ab-4f84-9d46-17d04dd6ee3e)
-16:46:18 - PARTICIPANT_JOINED event published to Redis Stream
-16:46:18 - Event sent to Bob's SSE connection successfully
-16:46:18 - Carol's SSE connection established (total active: 2)
-16:46:40 - Start retrospective returns 403 (Carol lacks FACILITATOR role) ✅ EXPECTED
-```
-
-**Conclusion**:
-- ✅ Multi-user SSE synchronization is **working correctly**
-- ✅ No bugs found in session management, SSE, or authorization
-- ❌ Original manual test bugs (todo.md lines 652-711) **cannot be reproduced** with MCP
-- ⚠️ **Recommendation**: Manual testing with separate browser profiles required to verify if original bugs still exist
-
-**Original Bug Status**: ⚠️ **UNVERIFIED**
-- May have been caused by app restarts during manual testing (`create-drop` wiped database)
-- SSE appears stable with proper session management
-- Need real multi-browser test to confirm
-
-#### Next Steps
-
-1. ✅ **COMPLETED**: Session management analyzed - 2hr Redis timeout, no expiration issues
-2. ✅ **COMPLETED**: SSE logging improved - DEBUG/TRACE levels appropriate
-3. ⏭️ **SKIP**: Facilitator role persistence - working correctly (403 test confirmed)
-4. ⏭️ **OPTIONAL**: Manual multi-browser test - only if bugs reappear in production
-5. ⏭️ **FUTURE**: UI connection status indicator - low priority now that SSE is stable
-3. 🟡 **MEDIUM**: Implement integration test for multi-participant scenarios
-4. 🟢 **LOW**: Add UI connection status indicator
-
-#### Conclusion (Updated 2025-11-07)
-
-The Happiness Histogram feature is **fully working** for multi-user scenarios. The original manual test bugs **cannot be reproduced** with automated Playwright tests and were likely caused by app restarts during testing (which wiped the database with `create-drop` configuration).
-
-**Status**: ✅ **Sprint 2 & Sprint 2.5 COMPLETED** - Safe to proceed with Sprint 3 (CATEGORICAL pattern).
-
----
-
-### ✅ Sprint 2.5: Multi-User Integration Tests - COMPLETED (2025-11-08)
-
-**Status**: ✅ **ALL TESTS PASSING** - 5/5 tests verified
-
-#### Test Implementation Summary
-
-Created comprehensive multi-user integration tests using Playwright to verify SSE functionality across multiple browser contexts.
-
-**File**: `src/test/java/direct/reflect/facilitator/integration/SSEConnectionIntegrationTest.java`
-
-#### Test Results
-
-All 5 tests passing (100% success rate):
-
-1. ✅ **shouldMaintainStableSSEConnection**
-   - Verifies SSE connection remains stable for 30 seconds without reconnections
-   - Result: PASSED - No reconnection attempts detected
-
-2. ✅ **shouldBroadcastParticipantJoinedToAllParticipants**
-   - Verifies participant list syncs in real-time when new participant joins
-   - Tests: Two separate browser contexts (facilitator + participant)
-   - Result: PASSED - Both see updated participant list via PARTICIPANT_JOINED SSE event
-
-3. ✅ **shouldBroadcastSessionStartedEventToAllParticipants**
-   - Verifies all participants receive SESSION_STARTED event when facilitator starts retro
-   - Tests: Lobby → Active phase transition for both facilitator and participant
-   - Result: PASSED - Both pages transition simultaneously via SSE event
-
-4. ✅ **shouldSyncHistogramUpdatesAcrossParticipants**
-   - Verifies histogram reveal functionality works across all participants
-   - Tests:
-     - Participant submits rating in PRIVATE mode (radio button input)
-     - Facilitator clicks "Reveal All Responses" button
-     - Both facilitator and participant see updated histogram via SSE NOTE_UPDATED event
-   - Result: PASSED - Real-time histogram updates confirmed working
-   - **Key Fix**: Changed from dropdown to radio button input matching actual template
-
-5. ✅ **shouldEnforceFacilitatorControls**
-   - Verifies UI correctly hides/shows facilitator-only controls
-   - Tests:
-     - Facilitator SEES Next/Reveal buttons, participant DOES NOT
-     - Facilitator CAN click Next button and advance step
-     - Both pages update via SSE STEP_ADVANCED event
-   - Result: PASSED - Authorization and SSE step advancement confirmed working
-   - **Key Fix**: Simplified to UI-only testing (browser context shares cookies correctly)
-
-#### Technical Fixes for Tests 4 & 5
-
-**Test 4 Bug**: Test looking for `select[name='rating']` dropdown, but template uses radio buttons
-- **Root Cause**: Template mismatch - `retro-rating.html:22-31` uses `<input type="radio">`
-- **Fix**: Changed test to use `click("input[name='rating'][value='8']")` instead of `selectOption()`
-- **Added**: `waitForFunction()` to wait for SSE event propagation instead of comparing entire body content
-- **Improved**: Assertions now look for "rating(s) submitted" text to verify histogram updates
-
-**Test 5 Bug**: API requests via `BrowserContext.request()` getting 403 errors
-- **Root Cause**: `BrowserContext.request()` creates separate API context without browser cookies
-- **Fix**: Simplified test to UI-only (removed direct API calls)
-- **Changed**: Test now verifies facilitator can click buttons and changes propagate via SSE
-- **Fixed**: Text matching changed from "Step 1:" to "Welcome - Happiness Histogram" (actual template text)
-
-**Reveal Flow Verified Working**:
-1. Button POSTs to `/api/retro/{retroId}/step/{stepId}/reveal` (RetroApiController:324)
-2. ResponseService sets `isVisible=true` and publishes `NOTE_UPDATED` SSE event (line 94)
-3. Histogram div listens for `sse:note_updated` and triggers HTMX refresh (retro-rating.html:64)
-4. RetroViewController filters responses by visibility (facilitators see all, participants see only visible)
-
-#### Key Findings
-
-1. **No Session Management Issues**
-   - Redis-backed sessions (2-hour timeout) working correctly
-   - No participant cookie expiration detected
-   - No SSE connection drops due to authentication failures
-
-2. **No SSE Connection Issues**
-   - Connections remain stable without unnecessary reconnections
-   - Multi-user event broadcasting works correctly
-   - HTMX SSE extension integration working as expected
-
-3. **Reveal Functionality Working Correctly**
-   - Facilitators see ALL responses (even when `isVisible=false`)
-   - Participants only see responses where `isVisible=true`
-   - Templates correctly hide/show buttons based on `isFacilitator` flag
-   - SSE-driven real-time updates work reliably
-
-4. **Original Manual Test Bugs**
-   - **Cannot be reproduced** with automated tests
-   - Likely caused by app restarts during manual testing
-   - Database wiped with `spring.jpa.hibernate.ddl-auto=create-drop` configuration
-
-#### Skipped Tasks
-
-- **Task 7** (Fix participant session/cookie management): ⏭️ SKIPPED - No issues found
-- **Task 8** (Fix SSE connection stability): ⏭️ SKIPPED - No issues found
-- **Task 9** (Fix facilitator role persistence): ⏭️ SKIPPED - Working correctly (403 test confirmed)
-- **Task 11** (UI connection status indicator): ⏭️ DEFERRED - Nice-to-have, low priority
-
-#### Recommendation
-
-✅ **PROCEED TO SPRINT 3 - CATEGORICAL PATTERN IMPLEMENTATION**
-
-**Sprint 2.5 Summary**: All 5 integration tests passing (100% success rate)
-- SSE foundation is solid and reliable for multi-user real-time collaboration
-- Histogram reveal functionality verified working end-to-end
-- Facilitator authorization and role-based controls working correctly
-- All retrospective activities (including Mad Sad Glad) can be built on this stable base
-
-**Test Coverage Achieved**:
-- ✅ SSE connection stability (30+ seconds without reconnection)
-- ✅ Multi-user event broadcasting (participant joins, session starts)
-- ✅ Real-time UI updates via SSE (histogram reveals, step advances)
-- ✅ Role-based authorization (facilitator-only controls)
-- ✅ Privacy controls (private input → public reveal)
-
----
-
-## Related Documentation
-- `CLAUDE.md` - Full product vision, architecture, and technical patterns
-- `roadmap.md` - Detailed user stories and Gherkin scenarios
-- `system-ui/` - UI mockup screenshots
+## 📚 Related Documentation
+
+- `CLAUDE.md` - Full product vision, architecture, technical patterns
+- `roadmap.md` - Detailed user stories and Gherkin scenarios (if exists)
+- `system-ui/` - UI mockup screenshots (7 files)
+- Notion User Stories: https://notion.so/a2d07350-84f9-41f3-ac64-fc4ed68f7bdd
+- Plan File: `/Users/micheljansen/.claude/plans/happy-pondering-hennessy.md`

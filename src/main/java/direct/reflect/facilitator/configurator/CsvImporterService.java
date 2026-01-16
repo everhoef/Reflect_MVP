@@ -1,5 +1,6 @@
 package direct.reflect.facilitator.configurator;
 
+import tools.jackson.databind.ObjectMapper;
 import direct.reflect.facilitator.configurator.RetroStage;
 import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.configurator.RetroStageRepository;
@@ -17,6 +18,8 @@ import org.springframework.stereotype.Service;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +29,7 @@ public class CsvImporterService {
     private final RetroTemplateRepository retroTemplateRepository;
     private final RetroStageRepository retroStageRepository;
     private final RetroStepRepository retroStepRepository;
+    private final ObjectMapper objectMapper;
 
     @PostConstruct
     @Profile("import")
@@ -151,12 +155,12 @@ public class CsvImporterService {
             
             Reader reader = new InputStreamReader(resource.getInputStream());
             CSVFormat csvFormat = CSVFormat.Builder.create(CSVFormat.DEFAULT)
-                    .setHeader("stageID", "orderIndex", "stepType", "dataPattern", "title", "durationSeconds", "configuration")
+                    .setHeader("stageID", "orderIndex", "componentType", "advancementTrigger", "durationSeconds", "componentConfig", "guidance")
                     .setSkipHeaderRecord(true)
                     .setTrim(true)
                     .setAllowMissingColumnNames(true)
                     .build();
-            
+
             try (CSVParser csvParser = new CSVParser(reader, csvFormat)) {
                 int count = 0;
                 for (CSVRecord record : csvParser) {
@@ -168,7 +172,7 @@ public class CsvImporterService {
 
                     Integer stageId = Integer.parseInt(stageIdStr.trim());
                     RetroStage stage = retroStageRepository.findByMastersheetID(stageId).orElse(null);
-                    
+
                     if (stage == null) {
                         log.warn("Skipping step - stage with mastersheetID {} not found", stageId);
                         continue;
@@ -176,36 +180,56 @@ public class CsvImporterService {
 
                     RetroStep step = new RetroStep();
                     step.setRetroStage(stage);
-                    
+
                     String orderIndexStr = record.get("orderIndex");
-                    step.setOrderIndex(orderIndexStr != null && !orderIndexStr.trim().isEmpty() 
+                    step.setOrderIndex(orderIndexStr != null && !orderIndexStr.trim().isEmpty()
                         ? Integer.parseInt(orderIndexStr.trim()) : 1);
-                    
-                    String stepTypeStr = record.get("stepType");
-                    if (stepTypeStr != null && !stepTypeStr.trim().isEmpty()) {
-                        step.setStepType(StepType.valueOf(stepTypeStr.trim()));
+
+                    // ComponentType (required)
+                    String componentTypeStr = record.get("componentType");
+                    if (componentTypeStr != null && !componentTypeStr.trim().isEmpty()) {
+                        step.setComponentType(ComponentType.valueOf(componentTypeStr.trim()));
                     } else {
-                        step.setStepType(StepType.INSTRUCTION);
+                        step.setComponentType(ComponentType.MULTI_COLUMN_BOARD); // Default
                     }
-                    
-                    String dataPatternStr = record.get("dataPattern");
-                    if (dataPatternStr != null && !dataPatternStr.trim().isEmpty()) {
-                        step.setDataPattern(DataPattern.valueOf(dataPatternStr.trim()));
+
+                    // AdvancementTrigger (optional, defaults to FACILITATOR_CLICK)
+                    String advancementTriggerStr = record.get("advancementTrigger");
+                    if (advancementTriggerStr != null && !advancementTriggerStr.trim().isEmpty()) {
+                        step.setAdvancementTrigger(AdvancementTrigger.valueOf(advancementTriggerStr.trim()));
+                    } else {
+                        step.setAdvancementTrigger(AdvancementTrigger.FACILITATOR_CLICK);
                     }
-                    
-                    String title = record.get("title");
-                    step.setTitle(title != null ? title.trim() : "");
-                    
+
+                    // Duration
                     String durationStr = record.get("durationSeconds");
                     step.setDurationSeconds(durationStr != null && !durationStr.trim().isEmpty()
                         ? Integer.parseInt(durationStr.trim()) : 0);
-                    
-                    String configuration = record.get("configuration");
-                    step.setConfiguration(configuration != null ? configuration.trim() : "{}");
+
+                    // ComponentConfig (JSON string to Map)
+                    String componentConfigStr = record.get("componentConfig");
+                    if (componentConfigStr != null && !componentConfigStr.trim().isEmpty()) {
+                        try {
+                            Map<String, Object> configMap = objectMapper.readValue(
+                                componentConfigStr.trim(),
+                                new tools.jackson.core.type.TypeReference<Map<String, Object>>() {}
+                            );
+                            step.setComponentConfig(configMap);
+                        } catch (Exception e) {
+                            log.warn("Failed to parse componentConfig JSON for stage {}: {}", stageId, e.getMessage());
+                            step.setComponentConfig(new HashMap<>());
+                        }
+                    } else {
+                        step.setComponentConfig(new HashMap<>());
+                    }
+
+                    // Instructions (guidance text for chatbox)
+                    String instructions = record.get("guidance");
+                    step.setInstructions(instructions != null && !instructions.trim().isEmpty() ? instructions.trim() : null);
 
                     retroStepRepository.save(step);
                     count++;
-                    log.debug("Imported step: {} for stage: {}", step.getTitle(), stage.getName());
+                    log.debug("Imported step: {} for stage: {}", step.getComponentType(), stage.getName());
                 }
                 log.info("Successfully imported {} retro steps.", count);
             }

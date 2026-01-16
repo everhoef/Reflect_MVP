@@ -1,6 +1,13 @@
 spring:
   application:
     name: facilitator
+  datasource:
+    hikari:
+      maximum-pool-size: 30          # Increase from default 10 for integration tests
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jpa:
     hibernate:
       ddl-auto: create-drop
@@ -35,25 +42,19 @@ spring:
 
 logging:
   level:
-    # Test logging - minimal noise, failures only
-    "[direct.reflect.facilitator.integration]": DEBUG
-    "[direct.reflect.facilitator]": ERROR              # Only actual errors
-    "[direct.reflect.facilitator.web.RetroViewController]": DEBUG
-    "[direct.reflect.facilitator.facilitation.ParticipantService]": DEBUG
-    "[direct.reflect.facilitator.facilitation.RetroApiController]": DEBUG
-    "[direct.reflect.facilitator.auth.AuthenticationHelper]": DEBUG
-    "[direct.reflect.facilitator.facilitation.ParticipantRepository]": DEBUG
-    
-    # SSE cleanup errors are expected during test shutdown
-    "[direct.reflect.facilitator.eventing.EventService]": ERROR
-    "[direct.reflect.facilitator.common.exception.ApiExceptionHandler]": ERROR
-    
-    # BaseIntegrationTest - only show actual problems
-    "[direct.reflect.facilitator.integration.BaseIntegrationTest]": INFO
-    
+    # Test logging - MINIMAL NOISE, package-level settings
+    "[direct.reflect.facilitator.integration]": INFO                          # Test execution flow
+    "[direct.reflect.facilitator.integration.BaseIntegrationTest]": DEBUG     # Enable debug for base test helpers
+    "[direct.reflect.facilitator.facilitation]": DEBUG                        # Business logic (temporarily DEBUG for session start debugging)
+    "[direct.reflect.facilitator.eventing]": DEBUG                            # SSE events (temporarily DEBUG to see session_started event)
+    "[direct.reflect.facilitator.web]": WARN                                  # Controllers
+    "[direct.reflect.facilitator.auth]": WARN                                 # Authentication
+    "[direct.reflect.facilitator.common]": ERROR                              # Exceptions only
+    "[direct.reflect.facilitator]": ERROR                                     # Catch-all
+
     # Silence external noise completely
     "[org.springframework]": ERROR
-    "[org.hibernate]": ERROR  
+    "[org.hibernate]": ERROR
     "[org.testcontainers]": WARN
     "[com.zaxxer.hikari]": ERROR
     "[io.lettuce]": ERROR

@@ -6,14 +6,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.StreamOperations;
-import org.springframework.data.redis.connection.stream.RecordId;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
@@ -25,7 +21,7 @@ import static org.mockito.Mockito.*;
  * - SSE connection management
  * - One connection per user enforcement
  * - Event publishing
- * - Redis stream operations
+ * - Redis Pub/Sub operations
  * - Connection cleanup
  */
 @ExtendWith(MockitoExtension.class)
@@ -33,10 +29,10 @@ class EventServiceTest {
 
     @Mock
     private RedisTemplate<String, Object> redisTemplate;
-    
+
     @Mock
-    private StreamOperations<String, Object, Object> streamOperations;
-    
+    private ApplicationEventPublisher applicationEventPublisher;
+
     @Mock
     private direct.reflect.facilitator.facilitation.ParticipantService participantService;
 
@@ -52,12 +48,10 @@ class EventServiceTest {
     @Test
     void shouldCreateSseEmitter() {
         // Given
-        MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setSession(new MockHttpSession());
         UUID participantId = UUID.randomUUID();
 
         // When
-        SseEmitter emitter = eventService.createSseEmitter(testRetroId, request, "Test User", participantId);
+        SseEmitter emitter = eventService.createSseEmitter(testRetroId, participantId, "Test User");
 
         // Then
         assertThat(emitter).isNotNull();
@@ -67,18 +61,11 @@ class EventServiceTest {
     @Test
     void shouldEnforceOneConnectionPerUser() {
         // Given
-        MockHttpServletRequest request1 = new MockHttpServletRequest();
-        MockHttpServletRequest request2 = new MockHttpServletRequest();
         UUID participantId = UUID.randomUUID();
 
-        // Same session ID to simulate same user making multiple connections
-        MockHttpSession session = new MockHttpSession();
-        request1.setSession(session);
-        request2.setSession(session);
-
-        // When
-        SseEmitter emitter1 = eventService.createSseEmitter(testRetroId, request1, "Test User", participantId);
-        SseEmitter emitter2 = eventService.createSseEmitter(testRetroId, request2, "Test User", participantId);
+        // When - same participantId makes multiple connections
+        SseEmitter emitter1 = eventService.createSseEmitter(testRetroId, participantId, "Test User");
+        SseEmitter emitter2 = eventService.createSseEmitter(testRetroId, participantId, "Test User");
 
         // Then
         assertThat(emitter1).isNotNull();
@@ -92,19 +79,12 @@ class EventServiceTest {
     @Test
     void shouldAllowMultipleUsersInSameRetro() {
         // Given
-        MockHttpServletRequest user1Request = new MockHttpServletRequest();
-        MockHttpServletRequest user2Request = new MockHttpServletRequest();
         UUID participant1Id = UUID.randomUUID();
         UUID participant2Id = UUID.randomUUID();
 
-        MockHttpSession session1 = new MockHttpSession();
-        MockHttpSession session2 = new MockHttpSession();
-        user1Request.setSession(session1);
-        user2Request.setSession(session2);
-
         // When
-        SseEmitter emitter1 = eventService.createSseEmitter(testRetroId, user1Request, "User 1", participant1Id);
-        SseEmitter emitter2 = eventService.createSseEmitter(testRetroId, user2Request, "User 2", participant2Id);
+        SseEmitter emitter1 = eventService.createSseEmitter(testRetroId, participant1Id, "User 1");
+        SseEmitter emitter2 = eventService.createSseEmitter(testRetroId, participant2Id, "User 2");
 
         // Then
         assertThat(emitter1).isNotNull();
@@ -119,12 +99,9 @@ class EventServiceTest {
         UUID retro2 = UUID.randomUUID();
         UUID participantId = UUID.randomUUID();
 
-        MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setSession(new MockHttpSession());
-
         // When
-        SseEmitter emitter1 = eventService.createSseEmitter(retro1, request, "Test User", participantId);
-        SseEmitter emitter2 = eventService.createSseEmitter(retro2, request, "Test User", participantId);
+        SseEmitter emitter1 = eventService.createSseEmitter(retro1, participantId, "Test User");
+        SseEmitter emitter2 = eventService.createSseEmitter(retro2, participantId, "Test User");
 
         // Then
         assertThat(emitter1).isNotNull();
@@ -162,46 +139,31 @@ class EventServiceTest {
     }
 
     @Test
-    void shouldPublishRetroCreatedEventToCorrectStream() {
+    void shouldPublishRetroCreatedEventToCorrectChannel() {
         // Arrange
         UUID retroId = UUID.randomUUID();
         RetroEvent<Void> event = RetroEvent.retroCreated(retroId, "facilitator1");
-        String expectedStreamKey = "retro:stream:" + retroId;
-        String expectedRecordId = "1234567890-0";
-        
-        when(redisTemplate.opsForStream()).thenReturn(streamOperations);
-        when(streamOperations.add(eq(expectedStreamKey), any(Map.class)))
-            .thenReturn(RecordId.of(expectedRecordId));
 
         // Act
-        String result = eventService.publish(event);
+        eventService.publish(event);
 
-        // Assert
-        assertThat(result).isEqualTo(expectedRecordId);
-        verify(streamOperations).add(eq(expectedStreamKey), any(Map.class));
+        // Assert - verify event is published to ApplicationEventPublisher (transaction-aware)
+        verify(applicationEventPublisher).publishEvent(eq(event));
     }
 
     @Test
-    void shouldPublishDifferentEventsToSameRetroStream() {
+    void shouldPublishDifferentEventsToSameRetroChannel() {
         // Arrange
         UUID retroId = UUID.randomUUID();
-        String expectedStreamKey = "retro:stream:" + retroId;
-        
+
         RetroEvent<Void> createdEvent = RetroEvent.retroCreated(retroId, "facilitator1");
         RetroEvent<String> phaseEvent = RetroEvent.phaseStarted(retroId, "participant1", "reflection");
-        
-        when(redisTemplate.opsForStream()).thenReturn(streamOperations);
-        when(streamOperations.add(eq(expectedStreamKey), any(Map.class)))
-            .thenReturn(RecordId.of("1234567890-0"))
-            .thenReturn(RecordId.of("1234567891-0"));
 
-        // Act - both events should go to same stream
-        String result1 = eventService.publish(createdEvent);
-        String result2 = eventService.publish(phaseEvent);
+        // Act - both events should be published via ApplicationEventPublisher
+        eventService.publish(createdEvent);
+        eventService.publish(phaseEvent);
 
-        // Assert
-        assertThat(result1).isEqualTo("1234567890-0");
-        assertThat(result2).isEqualTo("1234567891-0");
-        verify(streamOperations, times(2)).add(eq(expectedStreamKey), any(Map.class));
+        // Assert - verify both events are published to ApplicationEventPublisher (transaction-aware)
+        verify(applicationEventPublisher, times(2)).publishEvent(any(RetroEvent.class));
     }
 }

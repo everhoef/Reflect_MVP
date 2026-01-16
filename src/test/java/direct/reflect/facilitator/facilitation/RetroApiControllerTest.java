@@ -2,10 +2,10 @@ package direct.reflect.facilitator.facilitation;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
-import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
+import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
+import org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -29,6 +29,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
@@ -86,9 +87,9 @@ public class RetroApiControllerTest {
 
         CreateRetroRequest request = new CreateRetroRequest("Test Session");
 
-        when(participantService.createAndAssignFacilitatorForSession(eq("Test Session"), any(HttpServletRequest.class)))
-            .thenReturn(mockParticipant);
-        
+        when(retroSessionService.createSessionWithFacilitator(eq("Test Session"), any(HttpServletRequest.class)))
+            .thenReturn(mockSession);
+
         // Act & Assert
         mockMvc.perform(post("/api/retro/create")
                 .with(csrf())
@@ -118,7 +119,7 @@ public class RetroApiControllerTest {
         when(retroSessionService.getSessionById(retroId)).thenReturn(mockSession); 
         when(participantService.addParticipantToSession(any(HttpServletRequest.class), eq(mockSession), eq(ParticipantRole.PARTICIPANT)))
             .thenReturn(mockParticipant);
-        when(eventService.publish(any())).thenReturn("1234567890-0");
+        doNothing().when(eventService).publish(any());
 
         // Act & Assert
         mockMvc.perform(post("/api/retro/join")
@@ -144,8 +145,8 @@ public class RetroApiControllerTest {
         mockParticipant.setDisplayName("Test Guest");
         mockParticipant.setSession(mockSession);
 
-        when(participantService.createAndAssignFacilitatorForSession(eq("Test Session"), any(HttpServletRequest.class)))
-            .thenReturn(mockParticipant);
+        when(retroSessionService.createSessionWithFacilitator(eq("Test Session"), any(HttpServletRequest.class)))
+            .thenReturn(mockSession);
 
         // Act & Assert
         mockMvc.perform(post("/api/retro/create")
@@ -201,5 +202,219 @@ public class RetroApiControllerTest {
                 .with(csrf()))
                 .andExpect(status().isFound()) // Guest auth redirects on error
                 .andExpect(redirectedUrl("/login?error=missing_display_name"));
+    }
+
+    // ============================================================================
+    // Response Submission Tests
+    // ============================================================================
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitColumnResponse_ValidInput_ShouldReturnOk() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        // Act & Assert
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(csrf())
+                .param("columnId", "Mad")
+                .param("content", "Too many meetings"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("HX-Trigger", "responseSubmitted"));
+    }
+
+    @Test
+    @WithMockUser(roles = "GUEST")
+    void submitColumnResponse_GuestUser_ShouldReturnOk() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        // Act & Assert
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(csrf())
+                .param("columnId", "Glad")
+                .param("content", "Great collaboration"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("HX-Trigger", "responseSubmitted"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitColumnResponse_EmptyContent_ShouldReturnBadRequest() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        // Act & Assert - Empty content violates @NotBlank constraint
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(csrf())
+                .param("columnId", "Mad")
+                .param("content", ""))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Validation failed")));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitColumnResponse_ContentTooLong_ShouldReturnBadRequest() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+        String tooLongContent = "a".repeat(501); // Exceeds @Size(max = 500)
+
+        // Act & Assert
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(csrf())
+                .param("columnId", "Mad")
+                .param("content", tooLongContent))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Validation failed")));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitColumnResponse_MissingColumnId_ShouldReturnBadRequest() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        // Act & Assert - Missing columnId violates @NotBlank constraint
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(csrf())
+                .param("content", "Some content"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitRatingResponse_ValidInput_ShouldReturnOk() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        // Act & Assert
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+                .with(csrf())
+                .param("rating", "8")
+                .param("comment", "Good sprint overall"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("HX-Trigger", "responseSubmitted"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitRatingResponse_WithoutComment_ShouldReturnOk() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        // Act & Assert - Comment is optional
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+                .with(csrf())
+                .param("rating", "7"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("HX-Trigger", "responseSubmitted"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitRatingResponse_RatingTooLow_ShouldReturnBadRequest() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        // Act & Assert - Rating 0 violates @Min(1) constraint
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+                .with(csrf())
+                .param("rating", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Validation failed")));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitRatingResponse_RatingTooHigh_ShouldReturnBadRequest() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        // Act & Assert - Rating 11 violates @Max(10) constraint
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+                .with(csrf())
+                .param("rating", "11"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Validation failed")));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitRatingResponse_MissingRating_ShouldReturnBadRequest() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        // Act & Assert - Missing rating violates @NotNull constraint
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+                .with(csrf())
+                .param("comment", "Some comment"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void submitColumnResponse_Unauthenticated_ShouldReturnUnauthorized() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        // Act & Assert - Unauthenticated requests should be rejected
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(anonymous())
+                .with(csrf())
+                .param("columnId", "Mad")
+                .param("content", "Should not work"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void submitRatingResponse_Unauthenticated_ShouldReturnUnauthorized() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        // Act & Assert - Unauthenticated requests should be rejected
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+                .with(anonymous())
+                .with(csrf())
+                .param("rating", "8"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitColumnResponse_WithoutCSRF_ShouldReturnForbidden() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        // Act & Assert - Requests without CSRF token should be rejected
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .param("columnId", "Mad")
+                .param("content", "Should not work"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitRatingResponse_WithoutCSRF_ShouldReturnForbidden() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        // Act & Assert - Requests without CSRF token should be rejected
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+                .param("rating", "8"))
+                .andExpect(status().isForbidden());
     }
 }

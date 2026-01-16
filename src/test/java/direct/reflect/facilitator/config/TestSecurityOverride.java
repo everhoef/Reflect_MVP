@@ -2,6 +2,7 @@ package direct.reflect.facilitator.config;
 
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -15,6 +16,7 @@ import direct.reflect.facilitator.common.config.SecurityConfig;
 /**
  * Complete test security configuration that replaces the main SecurityConfig for tests.
  * Includes the /test/** endpoints for test authentication.
+ * Marked as @Primary to override the main SecurityConfig bean.
  */
 @TestConfiguration
 @EnableWebSecurity
@@ -23,6 +25,7 @@ import direct.reflect.facilitator.common.config.SecurityConfig;
 public class TestSecurityOverride {
 
     @Bean
+    @Primary
     public SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
         return http
             // OIDC authentication for registered users

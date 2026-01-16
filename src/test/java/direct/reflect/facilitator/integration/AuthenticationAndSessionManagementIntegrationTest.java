@@ -112,23 +112,20 @@ public class AuthenticationAndSessionManagementIntegrationTest extends BaseInteg
                     "Bob should be on retro page");
                 assertTrue(participant2Page.url().contains("/retro/" + sessionId), 
                     "Charlie should be on retro page");
-                assertTrue(participant3Page.url().contains("/retro/" + sessionId), 
+                assertTrue(participant3Page.url().contains("/retro/" + sessionId),
                     "Diana should be on retro page");
-                
-                // Give time for pages to load
-                Thread.sleep(2000);
-                
+
+                // Wait for all pages to load participant list
+                waitForAllPagesElement("ul#participants-list", facilitatorPage, participant1Page, participant2Page, participant3Page);
+
                 // Verify participants don't see home page elements
                 assertThat(facilitatorPage.locator("body")).not().containsText("Create New Retrospective");
                 assertThat(participant1Page.locator("body")).not().containsText("Join Existing Retrospective");
                 assertThat(participant2Page.locator("body")).not().containsText("Join Existing Retrospective");
                 assertThat(participant3Page.locator("body")).not().containsText("Join Existing Retrospective");
-                
+
                 log.info("✅ Multi-user session creation and joining successful");
-                
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                fail("Test interrupted: " + e.getMessage());
+
             } finally {
                 facilitatorContext.close();
                 participant1Context.close();
@@ -238,85 +235,42 @@ public class AuthenticationAndSessionManagementIntegrationTest extends BaseInteg
 
                 // Step 3: Verify all 4 users are in session 1
                 log.info("Step 3: Verifying all 4 users in Session 1");
-                // Wait for participant list to stabilize via SSE
-                try {
-                    // Wait for 4 participants to appear (more specific than generic sleep)
-                    testPages.get(0).waitForFunction("() => document.querySelectorAll('ul li').length >= 4", 
-                        new Page.WaitForFunctionOptions().setTimeout(6000));
-                } catch (Exception e) {
-                    Thread.sleep(1200);
-                }
-                
-                verifyParticipantCountInSession(testPages.get(0), 4, "OAuth2 user");
-                verifyParticipantCountInSession(testPages.get(1), 4, "Guest Facilitator");
-                verifyParticipantCountInSession(testPages.get(2), 4, "Guest User 1");
-                verifyParticipantCountInSession(testPages.get(3), 4, "Guest User 2");
+                String[] allFourParticipants = {"Michel Test User", "Guest Facilitator",
+                    "Guest User 1", "Guest User 2"};
+                waitForAllPagesParticipantList(allFourParticipants,
+                    testPages.get(0), testPages.get(1), testPages.get(2), testPages.get(3));
 
                 // Step 4: Guest User 2 creates a new session (switches from session 1)
                 log.info("Step 4: Guest User 2 creating new session (switching)");
-                testPages.get(3).navigate(baseUrl + "/");
-                testPages.get(3).waitForLoadState(LoadState.NETWORKIDLE);
+                navigateToHome(testPages.get(3));
                 String session2Id = createRetroSession(testPages.get(3), "Second Session by Guest");
                 log.info("Session 2 created: {}", session2Id);
                 assertNotEquals(session1Id, session2Id);
 
-                // Step 5: Wait for session updates and verify counts
-                Thread.sleep(5000); // Allow time for SSE events to propagate
-                
-                verifyParticipantCountInSession(testPages.get(0), 3, "Session 1 - OAuth2 user (should have 3 participants now)");
-                verifyParticipantCountInSession(testPages.get(1), 3, "Session 1 - Guest Facilitator");
-                verifyParticipantCountInSession(testPages.get(2), 3, "Session 1 - Guest User 1");
-                verifyParticipantCountInSession(testPages.get(3), 1, "Session 2 - Guest User 2 (should have 1 participant)");
+                // Step 5: Verify session 1 now has 3 participants, session 2 has 1
+                log.info("Step 5: Verifying participant lists after Guest User 2 switched to Session 2");
+                String[] session1After = {"Michel Test User", "Guest Facilitator", "Guest User 1"};
+                waitForAllPagesParticipantList(session1After, testPages.get(0), testPages.get(1), testPages.get(2));
+                waitForParticipantList(testPages.get(3), "Guest User 2");
 
                 // Step 6: Guest User 1 switches to session 2
                 log.info("Step 6: Guest User 1 switching to Session 2");
-                
-                testPages.get(2).navigate(baseUrl + "/");
-                testPages.get(2).waitForLoadState(LoadState.NETWORKIDLE);
+
+                navigateToHome(testPages.get(2));
                 joinRetroSession(testPages.get(2), session2Id);
-                
-                // Step 7: Final verification - wait for session switching and SSE events to complete
-                Thread.sleep(8000);
-                
-                // Debug: print actual participant counts for troubleshooting
-                for (int i = 0; i < 4; i++) {
-                    List<ElementHandle> participants = testPages.get(i).querySelectorAll("ul li");
-                    log.debug("Browser {} sees {} participants", i, participants.size());
-                }
-                
-                verifyParticipantCountInSession(testPages.get(0), 2, "Session 1 - OAuth2 user (final count)");
-                verifyParticipantCountInSession(testPages.get(1), 2, "Session 1 - Guest Facilitator (final)");  
-                verifyParticipantCountInSession(testPages.get(2), 2, "Session 2 - Guest User 1");
-                verifyParticipantCountInSession(testPages.get(3), 2, "Session 2 - Guest User 2 (final)");
+
+                // Step 7: Final verification after Guest User 1 switched to Session 2
+                log.info("Step 7: Final verification - Session 1 has 2, Session 2 has 2");
+                String[] session1Final = {"Michel Test User", "Guest Facilitator"};
+                String[] session2Final = {"Guest User 1", "Guest User 2"};
+                waitForAllPagesParticipantList(session1Final, testPages.get(0), testPages.get(1));
+                waitForAllPagesParticipantList(session2Final, testPages.get(2), testPages.get(3));
 
                 log.info("✅ 4-user mixed authentication session switching test completed successfully!");
 
             } finally {
                 testPages.forEach(Page::close);
                 testContexts.forEach(BrowserContext::close);
-            }
-        }
-
-        private void verifyParticipantCountInSession(Page page, int expectedCount, String userDescription) {
-            try {
-                // Wait for participant list to load
-                page.waitForSelector("ul li", new Page.WaitForSelectorOptions().setTimeout(5000));
-                
-                // Get actual count
-                List<ElementHandle> participants = page.querySelectorAll("ul li");
-                int actualCount = participants.size();
-                
-                log.info("{} sees {} participants (expected: {})", userDescription, actualCount, expectedCount);
-                
-                assertEquals(expectedCount, actualCount, 
-                    userDescription + " should see " + expectedCount + " participants, but saw " + actualCount);
-                    
-            } catch (Exception e) {
-                log.error("Error verifying participant count for {}: {}", userDescription, e.getMessage());
-                // Debug page content if verification fails
-                String pageContent = page.textContent("body");
-                log.debug("Page content: {}", pageContent.length() > 500 ? pageContent.substring(0, 500) + "..." : pageContent);
-                throw new AssertionError("Participant count verification failed for " + userDescription, e);
             }
         }
     }
