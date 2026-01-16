@@ -24,6 +24,7 @@ import direct.reflect.facilitator.facilitation.response.ResponseService;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponse;
 import direct.reflect.facilitator.facilitation.dto.RatingResponseDto;
 import direct.reflect.facilitator.facilitation.dto.ColumnResponseDto;
+import direct.reflect.facilitator.facilitation.dto.StageProgressDto;
 import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.configurator.RetroStep;
@@ -121,6 +122,7 @@ public class RetroViewController {
             model.addAttribute("participants", participants);
             model.addAttribute("isFacilitator", isFacilitator);
             model.addAttribute("userName", participant.getDisplayName());
+            model.addAttribute("stageProgress", StageProgressDto.forSession(session));
 
             log.info("Prepared retro view for session {} - page: {}, phase: {}",
                 retroId, page, session.getPhase());
@@ -182,6 +184,7 @@ public class RetroViewController {
             model.addAttribute("participant", participant);
             model.addAttribute("participants", participants);
             model.addAttribute("isFacilitator", isFacilitator);
+            model.addAttribute("stageProgress", StageProgressDto.forSession(session));
 
             log.debug("Returning fragment for session {} - page: {}, phase: {}",
                 retroId, page, session.getPhase());

@@ -61,10 +61,10 @@ public class SessionRecreationIntegrationTest extends BaseIntegrationTest {
             UUID participantId = firstParticipant.getParticipantId();
             log.info("First session participant: {} (status: {})", firstParticipant.getDisplayName(), firstParticipant.getStatus());
 
-            // Create second session (this should mark first session as LEFT)
             log.info("Step 3: Create second session with same user");
             page.navigate(baseUrl + "/");
-            page.waitForLoadState(LoadState.NETWORKIDLE);
+            page.waitForSelector("input[name='sessionName']",
+                new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
 
             String secondSessionId = createRetroSession(page, "Second Session");
             log.info("Created second session: {}", secondSessionId);
@@ -166,10 +166,10 @@ public class SessionRecreationIntegrationTest extends BaseIntegrationTest {
             // Note: We can't directly access ResponseRepository here, but we can verify via participant
             assertNotNull(participantId, "Participant ID should exist");
 
-            // Participant creates a new session (leaves current session)
             log.info("Step 5: Participant creates new session (leaves current one)");
             participantPage.navigate(baseUrl + "/");
-            participantPage.waitForLoadState(LoadState.NETWORKIDLE);
+            participantPage.waitForSelector("input[name='sessionName']",
+                new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
             createRetroSession(participantPage, "Alice's New Session");
 
             // Verify participant is marked as LEFT in original session

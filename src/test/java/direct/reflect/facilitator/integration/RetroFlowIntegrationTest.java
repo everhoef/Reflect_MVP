@@ -69,13 +69,12 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
 
             // Skip AUTO instruction step
             logTestProgress("PHASE_1", 3, 24, "Skipping instruction step (AUTO)");
-            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS);
+            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS, bobPage, carolPage);
 
             // RATING_SCALE step - all submit ratings WITH COMMENTS
             logTestProgress("PHASE_1", 4, 24, "Submitting happiness ratings with comments");
             log.info("  ├─ Testing RATING_SCALE with comments...");
 
-            // Submit ratings with comments using centralized helpers
             clickElement(bobPage, "input[name='rating'][value='8']");
             fillElement(bobPage, "textarea[name='comment']", "Great sprint overall!");
             clickElement(bobPage, "button:has-text('Submit')");
@@ -192,13 +191,9 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
 
             if (bobPage.locator(voteSelector).count() > 0) {
                 clickElement(bobPage, voteSelector, DEFAULT_TIMEOUT_MS);
-                // Brief wait for vote to propagate via SSE (no specific content change to verify)
-                try {
-                    Thread.sleep(SHORT_TIMEOUT_MS);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-                log.info("  ├─ ✅ Voting functionality validated");
+                bobPage.waitForLoadState(LoadState.DOMCONTENTLOADED,
+                    new Page.WaitForLoadStateOptions().setTimeout(SHORT_TIMEOUT_MS));
+                log.info("  Voting functionality validated");
             } else {
                 log.warn("  ├─ ⚠️ Vote button UI not implemented yet (expected - see todo.md)");
             }
@@ -426,22 +421,29 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             String sessionId = setupRetroSession(facilitatorPage, "Response Editing Test",
                 new UserPage(participantPage, "Editor"));
 
-            navigateToStepType(facilitatorPage, "CATEGORICAL", participantPage);
+            // navigateToStepType(facilitatorPage, "CATEGORICAL", participantPage); // Removed as it stops at first categorical step (instructions)
 
-            // Skip past instruction/reveal steps until we find an input step (allowInput: true)
-            // CATEGORICAL steps like Mad/Sad/Glad have multiple sub-steps: instruction → input → reveal → voting
-            int maxSkips = 5;
+            log.info("🎯 Navigating to Mad/Sad/Glad input step...");
+            int maxSkips = 15; // Increased to ensure we reach stage 2
+            boolean foundMadInputStep = false;
+            
             for (int i = 0; i < maxSkips; i++) {
-                if (participantPage.locator("[data-column=\"Mad\"] textarea").count() > 0) {
-                    log.info("✅ Found CATEGORICAL step with input capability");
+                // Check WITHOUT waiting first to avoid timeouts on wrong steps
+                if (participantPage.locator("[data-column=\"Mad\"] textarea[name='content']").count() > 0) {
+                    log.info("✅ Found Mad/Sad/Glad step with input capability at iteration {}", i);
+                    foundMadInputStep = true;
                     break;
                 }
-                log.info("Skipping CATEGORICAL step {} (no input capability)", i + 1);
-                clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS);
+                
+                log.info("Step {} doesn't have Mad input, clicking Next...", i + 1);
+                clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS, participantPage);
             }
 
-            // Participant submits initial response
-            fillElement(participantPage, "[data-column=\"Mad\"] textarea", "Initial frustration");
+            if (!foundMadInputStep) {
+                throw new AssertionError("Failed to find Mad/Sad/Glad input step after " + maxSkips + " iterations");
+            }
+
+            fillElement(participantPage, "[data-column=\"Mad\"] textarea[name='content']", "Initial frustration");
             clickElement(participantPage, "[data-column=\"Mad\"] button:has-text('➕')");
 
             // Wait for response to appear
@@ -536,15 +538,17 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
                 }
             """);
 
-            // Add third participant to trigger PARTICIPANT_JOINED SSE event
             log.info("Adding third participant to test SSE event delivery");
             authenticateAsGuest(participant2Page, "Participant2");
             joinRetroSession(participant2Page, sessionId);
 
-            // Wait for SSE events to be delivered and captured
-            Thread.sleep(2000);
+            facilitatorPage.waitForFunction(
+                "() => window.sseEventsReceived && window.sseEventsReceived.length > 0",
+                null, new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+            participant1Page.waitForFunction(
+                "() => window.sseEventsReceived && window.sseEventsReceived.length > 0",
+                null, new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
 
-            // Verify that PARTICIPANT_JOINED events were received by existing participants
             Integer facilitatorEventCount = (Integer) facilitatorPage.evaluate("() => window.sseEventsReceived ? window.sseEventsReceived.length : 0");
             Integer participant1EventCount = (Integer) participant1Page.evaluate("() => window.sseEventsReceived ? window.sseEventsReceived.length : 0");
 
@@ -593,10 +597,10 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             // Verify both users see both participants in session 1
             waitForAllPagesParticipantList(new String[]{"User1", "User2"}, user1Page, user2Page);
 
-            // User2 creates new session (switches away)
             log.info("User2 switching to new session");
             user2Page.navigate(baseUrl + "/");
-            user2Page.waitForLoadState(LoadState.NETWORKIDLE);
+            user2Page.waitForSelector("input[name='sessionName']",
+                new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
             String session2Id = createRetroSession(user2Page, "Second Session");
 
             // Verify User1 now sees only itself in session 1 (User2 left)

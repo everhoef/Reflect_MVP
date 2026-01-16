@@ -5,45 +5,33 @@
      hx-swap="innerHTML"
      hx-target="this">
 
-    <div th:fragment="inner-content">
-    <!-- Stage Progress Bar -->
+    <div th:fragment="inner-content"
+         th:attr="data-step-index=${retroSession.currentStepIndex},
+                  data-phase=${retroSession.phase?.name()},
+                  data-component-type=${currentStep != null ? currentStep.componentType?.name() : 'NONE'}">
+    
     <div th:if="${currentStep != null}" class="bg-white border-b border-gray-200 px-6 py-4">
         <div class="flex items-center justify-center space-x-8">
-            <!-- Dynamic stage indicators - simplified for now -->
-            <div class="flex items-center space-x-6">
-                <div class="flex flex-col items-center">
-                    <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-bold">✓</div>
-                    <div class="text-xs mt-1 text-green-600 font-medium">Complete</div>
-                    <div class="text-xs text-gray-600">Stage 1</div>
-                </div>
-                <div class="w-8 h-0.5 bg-gray-300"></div>
-                
-                <div class="flex flex-col items-center">
-                    <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-white text-sm font-bold">2</div>
-                    <div class="text-xs mt-1 text-yellow-600 font-medium">In Progress</div>
-                    <div class="text-xs text-gray-600">Stage 2</div>
-                </div>
-                <div class="w-8 h-0.5 bg-gray-300"></div>
-                
-                <div class="flex flex-col items-center">
-                    <div class="w-8 h-8 border-2 border-gray-300 rounded-full flex items-center justify-center text-gray-500 text-sm font-bold">3</div>
-                    <div class="text-xs mt-1 text-gray-500">To Do</div>
-                    <div class="text-xs text-gray-500">Stage 3</div>
-                </div>
-                <div class="w-8 h-0.5 bg-gray-300"></div>
-                
-                <div class="flex flex-col items-center">
-                    <div class="w-8 h-8 border-2 border-gray-300 rounded-full flex items-center justify-center text-gray-500 text-sm font-bold">4</div>
-                    <div class="text-xs mt-1 text-gray-500">To Do</div>
-                    <div class="text-xs text-gray-500">Stage 4</div>
-                </div>
-                <div class="w-8 h-0.5 bg-gray-300"></div>
-                
-                <div class="flex flex-col items-center">
-                    <div class="w-8 h-8 border-2 border-gray-300 rounded-full flex items-center justify-center text-gray-500 text-sm font-bold">5</div>
-                    <div class="text-xs mt-1 text-gray-500">To Do</div>
-                    <div class="text-xs text-gray-500">Stage 5</div>
-                </div>
+            <div class="flex items-center space-x-2">
+                <th:block th:each="stage, iterStat : ${stageProgress}">
+                    <div class="flex flex-col items-center">
+                        <div th:if="${stage.status.name() == 'COMPLETE'}"
+                             class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-bold">✓</div>
+                        <div th:if="${stage.status.name() == 'IN_PROGRESS'}"
+                             class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-white text-sm font-bold"
+                             th:text="${stage.number}">2</div>
+                        <div th:if="${stage.status.name() == 'TO_DO'}"
+                             class="w-8 h-8 border-2 border-gray-300 rounded-full flex items-center justify-center text-gray-500 text-sm font-bold"
+                             th:text="${stage.number}">3</div>
+                        
+                        <div th:if="${stage.status.name() == 'COMPLETE'}" class="text-xs mt-1 text-green-600 font-medium">Complete</div>
+                        <div th:if="${stage.status.name() == 'IN_PROGRESS'}" class="text-xs mt-1 text-yellow-600 font-medium">In Progress</div>
+                        <div th:if="${stage.status.name() == 'TO_DO'}" class="text-xs mt-1 text-gray-500">To Do</div>
+                        
+                        <div class="text-xs text-gray-600 truncate max-w-20" th:text="${stage.name}">Stage Name</div>
+                    </div>
+                    <div th:if="${!iterStat.last}" class="w-8 h-0.5 bg-gray-300 self-start mt-4"></div>
+                </th:block>
             </div>
         </div>
     </div>
@@ -281,19 +269,7 @@
     </div>
 
 
-    <!-- Shared SSE Handlers -->
+    <!-- Shared SSE Handlers (includes window.eventSource management) -->
     <div th:replace="~{fragments/sse-connection :: sse-handlers}"></div>
-    
-    <!-- Retro-specific SSE handling -->
-    <script>
-        // Store eventSource reference for integration tests
-        document.body.addEventListener('htmx:sseOpen', function(evt) {
-            window.eventSource = evt.detail.source;
-        });
-
-        document.body.addEventListener('htmx:sseClose', function() {
-            window.eventSource = null;
-        });
-    </script>
     </div> <!-- end inner-content fragment -->
 </div> <!-- end content fragment -->
