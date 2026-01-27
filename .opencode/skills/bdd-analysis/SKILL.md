@@ -110,7 +110,30 @@ Report:
 - Number of test methods
 - What behaviors are covered
 
-### Step 5: Generate Report
+### Step 5: Generate and Save Report
+
+**IMPORTANT:** After generating the report, save it as a Markdown file.
+
+**File Naming Convention:**
+```
+.sisyphus/bdd-reports/{ID}-{Story Name}.md
+```
+
+Where:
+- `{ID}` = The `userDefined:ID` from Notion properties (e.g., "6")
+- `{Story Name}` = The user story name from Notion (e.g., "Five step flow")
+
+**Example:** For user story with ID "6" and name "Five step flow":
+```
+.sisyphus/bdd-reports/6-Five step flow.md
+```
+
+**Steps:**
+1. Extract `userDefined:ID` from Notion page properties
+2. Extract story name from Notion page title
+3. Create the `.sisyphus/bdd-reports/` directory if it doesn't exist
+4. Write the report to the file
+5. Confirm the file path to the user
 
 ---
 
