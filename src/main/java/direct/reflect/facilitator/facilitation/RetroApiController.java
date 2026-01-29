@@ -25,6 +25,7 @@ import direct.reflect.facilitator.configurator.ComponentType;
 import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException;
 import direct.reflect.facilitator.common.exception.VoteLimitExceededException;
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
+import direct.reflect.facilitator.common.exception.InputLimitExceededException;
 
 import jakarta.validation.Valid;
 
@@ -244,7 +245,7 @@ public class RetroApiController {
      */
     @PostMapping("/{retroId}/step/{stepId}/response/column")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<Void> submitColumnResponse(
+    public ResponseEntity<String> submitColumnResponse(
             @PathVariable UUID retroId,
             @PathVariable Long stepId,
             @Valid @ModelAttribute ColumnResponseDto dto,
@@ -259,8 +260,11 @@ public class RetroApiController {
 
             return ResponseEntity.ok()
                 .header("HX-Trigger", "responseSubmitted")
-                .build();
+                .body("");
 
+        } catch (InputLimitExceededException e) {
+            log.debug("Input limit exceeded for retro {}: {}", retroId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         } catch (RetroSessionNotFoundException e) {
             log.warn("Session not found: {}", retroId);
             return ResponseEntity.notFound().build();

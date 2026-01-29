@@ -23,7 +23,7 @@
                     <form th:attr="hx-post=@{/api/retro/{retroId}/step/{stepId}/response/column(retroId=${retroSession.id}, stepId=${currentStep.id})}"
                           hx-swap="none"
                           hx-trigger="submit"
-                          hx-on::after-request="this.reset()"
+                          hx-on::after-request="if(event.detail.successful) { this.reset(); } else if(event.detail.xhr.status === 400) { alert(event.detail.xhr.responseText); }"
                           class="bg-white p-2 rounded-lg border border-gray-300 hover:border-blue-400 hover:shadow-md transition-all">
                         <!-- Hidden columnId field -->
                         <input type="hidden"
