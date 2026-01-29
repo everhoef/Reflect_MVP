@@ -62,20 +62,27 @@ public interface ParticipantResponseRepository extends JpaRepository<Participant
         @Param("step") RetroStep step,
         @Param("category") String category);
 
-    /**
-     * Find all responses for a specific component type within a stage.
-     * Used by display components (e.g., HISTOGRAM_CHART) to retrieve responses
-     * from input components (e.g., RATING_SCALE) within the same stage.
-     * Uses explicit JOIN to navigate the RetroStep relationship.
-     */
-    @Query("SELECT r FROM ParticipantResponse r " +
-           "JOIN r.retroStep step " +
-           "WHERE r.participant.session = :session " +
-           "AND step.retroStage = :stage " +
-           "AND step.componentType = :componentType " +
-           "ORDER BY r.displayOrder ASC, r.submittedAt ASC")
-    List<ParticipantResponse> findBySessionAndStageAndComponentType(
-        @Param("session") RetroSession session,
-        @Param("stage") RetroStage stage,
-        @Param("componentType") ComponentType componentType);
+     /**
+      * Find all responses for a specific component type within a stage.
+      * Used by display components (e.g., HISTOGRAM_CHART) to retrieve responses
+      * from input components (e.g., RATING_SCALE) within the same stage.
+      * Uses explicit JOIN to navigate the RetroStep relationship.
+      */
+     @Query("SELECT r FROM ParticipantResponse r " +
+            "JOIN r.retroStep step " +
+            "WHERE r.participant.session = :session " +
+            "AND step.retroStage = :stage " +
+            "AND step.componentType = :componentType " +
+            "ORDER BY r.displayOrder ASC, r.submittedAt ASC")
+     List<ParticipantResponse> findBySessionAndStageAndComponentType(
+         @Param("session") RetroSession session,
+         @Param("stage") RetroStage stage,
+         @Param("componentType") ComponentType componentType);
+
+     /**
+      * Count responses submitted by a specific participant for a specific step.
+      * Used to enforce 10-input limit per step for MULTI_COLUMN_BOARD.
+      */
+     @Query("SELECT COUNT(r) FROM ParticipantResponse r WHERE r.participant = :participant AND r.participant.session = :session AND r.retroStep = :step")
+     Long countByParticipantSessionAndStep(@Param("participant") Participant participant, @Param("session") RetroSession session, @Param("step") RetroStep step);
 }
