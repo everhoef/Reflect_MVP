@@ -10,11 +10,13 @@ import direct.reflect.facilitator.configurator.ComponentType;
 import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException;
 import direct.reflect.facilitator.configurator.RetroStepRepository;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponseRepository;
+import direct.reflect.facilitator.facilitation.dto.TimerStateDto;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.EventType;
 import direct.reflect.facilitator.eventing.RetroEvent;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -204,6 +206,64 @@ public class RetroSessionService {
         return LocalDateTime.now().isAfter(expirationTime);
     }
 
+    public TimerStateDto getTimerState(UUID sessionId) {
+        RetroSession session = getSessionById(sessionId);
+        RetroStep currentStep = getCurrentStep(sessionId);
+        
+        if (currentStep == null || currentStep.getDurationSeconds() == null || currentStep.getDurationSeconds() <= 0) {
+            return null;
+        }
+        
+        LocalDateTime now = LocalDateTime.now();
+        long elapsedWallClock = Duration.between(session.getStepStartedAt(), now).getSeconds();
+        
+        boolean isPaused = session.getTimerPausedAt() != null;
+        if (isPaused) {
+            elapsedWallClock = Duration.between(session.getStepStartedAt(), session.getTimerPausedAt()).getSeconds();
+        }
+        
+        long effectiveElapsed = elapsedWallClock - (session.getAccumulatedPauseSeconds() != null ? session.getAccumulatedPauseSeconds() : 0L);
+        
+        long remaining = currentStep.getDurationSeconds() - effectiveElapsed;
+        if (remaining < 0) remaining = 0;
+        
+        String state;
+        if (remaining <= 0) {
+            state = "expired";
+        } else if (remaining <= 30) {
+            state = "red";
+        } else if (remaining <= 120) {
+            state = "yellow";
+        } else {
+            state = "green";
+        }
+        
+        return new TimerStateDto(remaining, isPaused, state);
+    }
+
+    @Transactional
+    public void pauseTimer(UUID sessionId) {
+        RetroSession session = getSessionById(sessionId);
+        if (session.getTimerPausedAt() == null) {
+            session.setTimerPausedAt(LocalDateTime.now());
+            sessionRepository.save(session);
+            eventService.publish(RetroEvent.timerPaused(sessionId));
+        }
+    }
+
+    @Transactional
+    public void resumeTimer(UUID sessionId) {
+        RetroSession session = getSessionById(sessionId);
+        if (session.getTimerPausedAt() != null) {
+            long pauseDuration = Duration.between(session.getTimerPausedAt(), LocalDateTime.now()).getSeconds();
+            long accumulated = (session.getAccumulatedPauseSeconds() != null ? session.getAccumulatedPauseSeconds() : 0L) + pauseDuration;
+            session.setAccumulatedPauseSeconds(accumulated);
+            session.setTimerPausedAt(null);
+            sessionRepository.save(session);
+            eventService.publish(RetroEvent.timerStarted(sessionId));
+        }
+    }
+
     /**
      * Get instruction messages for chatbox display.
      * Returns all instructions from steps in the current stage up to current step.
@@ -237,11 +297,15 @@ public class RetroSessionService {
         if (session.getCurrentStepIndex() < 0) {
             session.setCurrentStepIndex(0);
             session.setStepStartedAt(LocalDateTime.now());
+            session.setTimerPausedAt(null);
+            session.setAccumulatedPauseSeconds(0L);
             log.info("Started first step of stage '{}' in session {}",
                 currentStage != null ? currentStage.getName() : "unknown", sessionId);
         } else if (hasNextStepInCurrentStage(sessionId)) {
             session.setCurrentStepIndex(session.getCurrentStepIndex() + 1);
             session.setStepStartedAt(LocalDateTime.now());
+            session.setTimerPausedAt(null);
+            session.setAccumulatedPauseSeconds(0L);
             log.info("Advanced to step {} in stage '{}' for session {}",
                 session.getCurrentStepIndex(),
                 currentStage != null ? currentStage.getName() : "unknown",
@@ -251,6 +315,8 @@ public class RetroSessionService {
             session.advancePhase();
             session.setCurrentStepIndex(0);
             session.setStepStartedAt(LocalDateTime.now());
+            session.setTimerPausedAt(null);
+            session.setAccumulatedPauseSeconds(0L);
 
             if (session.getPhase() == RetroPhase.COMPLETED) {
                 session.setFinishedAt(LocalDateTime.now());

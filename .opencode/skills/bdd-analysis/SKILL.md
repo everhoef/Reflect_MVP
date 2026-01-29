@@ -116,7 +116,7 @@ Report:
 
 **File Naming Convention:**
 ```
-.sisyphus/bdd-reports/{ID}-{Story Name}.md
+./bdd-reports/{ID}-{Story Name}.md
 ```
 
 Where:
@@ -131,7 +131,7 @@ Where:
 **Steps:**
 1. Extract `userDefined:ID` from Notion page properties
 2. Extract story name from Notion page title
-3. Create the `.sisyphus/bdd-reports/` directory if it doesn't exist
+3. Create the `./bdd-reports/` directory if it doesn't exist
 4. Write the report to the file
 5. Confirm the file path to the user
 

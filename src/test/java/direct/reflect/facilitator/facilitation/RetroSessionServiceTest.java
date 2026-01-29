@@ -8,12 +8,14 @@ import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.ComponentType;
 import direct.reflect.facilitator.configurator.AdvancementTrigger;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponseRepository;
+import direct.reflect.facilitator.facilitation.dto.TimerStateDto;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -27,6 +29,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(MockitoExtension.class)
 class RetroSessionServiceTest {
@@ -285,5 +288,90 @@ class RetroSessionServiceTest {
 
         // Assert
         assertFalse(result);
+    }
+
+    @Test
+    void getTimerState_returnsCorrectRemainingSeconds() {
+        // Setup: Create test objects with full dependency chain
+        UUID sessionId = UUID.randomUUID();
+        
+        // Create step with timer
+        RetroStep step = new RetroStep();
+        step.setDurationSeconds(300);
+        step.setOrderIndex(0);
+        
+        // Create stage containing the step
+        RetroStage stage = new RetroStage();
+        stage.setName("Set the Stage");
+        
+        // Create template with stage mapping
+        RetroTemplate template = new RetroTemplate();
+        template.setSetTheStage(stage);
+        
+        // Create session with all required relationships
+        RetroSession session = new RetroSession();
+        session.setTemplate(template);
+        session.setPhase(RetroPhase.SET_THE_STAGE);
+        session.setCurrentStepIndex(0);
+        session.setStepStartedAt(LocalDateTime.now().minusSeconds(60)); // 60s ago
+        session.setTimerPausedAt(null);
+        session.setAccumulatedPauseSeconds(0L);
+        
+        // Stub repositories
+        when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+        when(stepRepository.findByRetroStageOrderByOrderIndexAsc(stage)).thenReturn(List.of(step));
+        
+        // Act
+        TimerStateDto result = retroSessionService.getTimerState(sessionId);
+        
+        // Assert with tolerance: expected ~240 seconds, allow ±2 seconds for test execution
+        assertNotNull(result);
+        assertThat(result.remainingSeconds()).isBetween(238L, 242L);
+        assertThat(result.state()).isEqualTo("green"); // 240s > 120s
+    }
+
+    @Test
+    void pauseTimer_setsTimerPausedAtAndSaves() {
+        // Setup
+        UUID sessionId = UUID.randomUUID();
+        RetroSession session = new RetroSession();
+        session.setId(sessionId);
+        session.setTimerPausedAt(null); // Not paused
+        
+        when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+        
+        // Act
+        retroSessionService.pauseTimer(sessionId);
+        
+        // Assert: verify save was called with timerPausedAt set
+        ArgumentCaptor<RetroSession> captor = ArgumentCaptor.forClass(RetroSession.class);
+        verify(sessionRepository).save(captor.capture());
+        RetroSession saved = captor.getValue();
+        assertNotNull(saved.getTimerPausedAt());
+        
+        // Verify event was published
+        verify(eventService).publish(any(RetroEvent.class));
+    }
+
+    @Test
+    void resumeTimer_addsToAccumulatedAndClearsPausedAt() {
+        // Setup: session paused 30 seconds ago
+        UUID sessionId = UUID.randomUUID();
+        RetroSession session = new RetroSession();
+        session.setId(sessionId);
+        session.setTimerPausedAt(LocalDateTime.now().minusSeconds(30));
+        session.setAccumulatedPauseSeconds(10L); // Already had 10s accumulated
+        
+        when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+        
+        // Act
+        retroSessionService.resumeTimer(sessionId);
+        
+        // Assert: accumulated should be ~40s (10 + 30), pausedAt cleared
+        ArgumentCaptor<RetroSession> captor = ArgumentCaptor.forClass(RetroSession.class);
+        verify(sessionRepository).save(captor.capture());
+        RetroSession saved = captor.getValue();
+        assertNull(saved.getTimerPausedAt());
+        assertThat(saved.getAccumulatedPauseSeconds()).isBetween(38L, 42L); // ~40s with tolerance
     }
 }
