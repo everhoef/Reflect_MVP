@@ -25,6 +25,7 @@ import direct.reflect.facilitator.facilitation.response.ParticipantResponse;
 import direct.reflect.facilitator.facilitation.dto.RatingResponseDto;
 import direct.reflect.facilitator.facilitation.dto.ColumnResponseDto;
 import direct.reflect.facilitator.facilitation.dto.StageProgressDto;
+import direct.reflect.facilitator.facilitation.dto.TimerStateDto;
 import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.configurator.RetroStep;
@@ -279,72 +280,108 @@ public class RetroViewController {
         }
     }
 
-    /**
-     * Get HTML fragment for all rating responses in a histogram chart.
-     * Called by HTMX when SSE events trigger (response_submitted, responses_revealed).
-     */
-    @GetMapping("/retro/{retroId}/step/{stepId}/histogram")
-    @PreAuthorize("@participantService.canAccessRetro(#retroId)")
-    public String getRatingHistogram(
-            @PathVariable UUID retroId,
-            @PathVariable Long stepId,
-            Model model,
-            HttpServletRequest request) {
+     /**
+      * Get HTML fragment for all rating responses in a histogram chart.
+      * Called by HTMX when SSE events trigger (response_submitted, responses_revealed).
+      */
+     @GetMapping("/retro/{retroId}/step/{stepId}/histogram")
+     @PreAuthorize("@participantService.canAccessRetro(#retroId)")
+     public String getRatingHistogram(
+             @PathVariable UUID retroId,
+             @PathVariable Long stepId,
+             Model model,
+             HttpServletRequest request) {
 
-        log.debug("Getting rating histogram for retro: {}, step: {}", retroId, stepId);
+         log.debug("Getting rating histogram for retro: {}, step: {}", retroId, stepId);
 
-        try {
-            RetroSession session = retroService.getSessionById(retroId);
-            RetroStep step = retroService.getCurrentStep(retroId);
+         try {
+             RetroSession session = retroService.getSessionById(retroId);
+             RetroStep step = retroService.getCurrentStep(retroId);
 
-            if (step == null || !step.getId().equals(stepId)) {
-                return "fragments/common-fragments :: error";
-            }
+             if (step == null || !step.getId().equals(stepId)) {
+                 return "fragments/common-fragments :: error";
+             }
 
-            // HISTOGRAM_CHART displays RATING_SCALE responses from the same stage
-            List<ParticipantResponse> allResponses = responseService.getResponsesForStageComponentType(
-                session,
-                step.getRetroStage(),
-                ComponentType.RATING_SCALE
-            );
+             // HISTOGRAM_CHART displays RATING_SCALE responses from the same stage
+             List<ParticipantResponse> allResponses = responseService.getResponsesForStageComponentType(
+                 session,
+                 step.getRetroStage(),
+                 ComponentType.RATING_SCALE
+             );
 
-            List<RatingResponseDto> ratingDtos = allResponses.stream()
-                .filter(r -> r.getResponseData().containsKey("rating"))
-                .map(RatingResponseDto::from)
-                .toList();
+             List<RatingResponseDto> ratingDtos = allResponses.stream()
+                 .filter(r -> r.getResponseData().containsKey("rating"))
+                 .map(RatingResponseDto::from)
+                 .toList();
 
-            log.debug("Converted {} responses to RatingDtos", ratingDtos.size());
+             log.debug("Converted {} responses to RatingDtos", ratingDtos.size());
 
-            // Get current participant to check visibility
-            boolean isFacilitator = participantService.isFacilitator(request, retroId);
-            log.debug("isFacilitator={}, will show {} of {} responses", isFacilitator,
-                isFacilitator ? ratingDtos.size() : ratingDtos.stream().filter(RatingResponseDto::visible).count(),
-                ratingDtos.size());
+             // Get current participant to check visibility
+             boolean isFacilitator = participantService.isFacilitator(request, retroId);
+             log.debug("isFacilitator={}, will show {} of {} responses", isFacilitator,
+                 isFacilitator ? ratingDtos.size() : ratingDtos.stream().filter(RatingResponseDto::visible).count(),
+                 ratingDtos.size());
 
-            // Filter visible responses (facilitator sees all, others see only visible)
-            List<RatingResponseDto> visibleResponses = isFacilitator
-                ? ratingDtos
-                : ratingDtos.stream().filter(RatingResponseDto::visible).toList();
+             // Filter visible responses (facilitator sees all, others see only visible)
+             List<RatingResponseDto> visibleResponses = isFacilitator
+                 ? ratingDtos
+                 : ratingDtos.stream().filter(RatingResponseDto::visible).toList();
 
-            // Get scale configuration from componentConfig
-            Map<String, Object> config = step.getComponentConfig();
-            int minRating = config.get("min") != null ? ((Number) config.get("min")).intValue() : 1;
-            int maxRating = config.get("max") != null ? ((Number) config.get("max")).intValue() : 10;
-            boolean showComments = Boolean.TRUE.equals(config.get("showComments"));
+             // Get scale configuration from componentConfig
+             Map<String, Object> config = step.getComponentConfig();
+             int minRating = config.get("min") != null ? ((Number) config.get("min")).intValue() : 1;
+             int maxRating = config.get("max") != null ? ((Number) config.get("max")).intValue() : 10;
+             boolean showComments = Boolean.TRUE.equals(config.get("showComments"));
 
-            model.addAttribute("totalResponses", ratingDtos.size());
-            model.addAttribute("responses", visibleResponses);
-            model.addAttribute("minRating", minRating);
-            model.addAttribute("maxRating", maxRating);
-            model.addAttribute("showComments", showComments);
-            model.addAttribute("isFacilitator", isFacilitator);
+             model.addAttribute("totalResponses", ratingDtos.size());
+             model.addAttribute("responses", visibleResponses);
+             model.addAttribute("minRating", minRating);
+             model.addAttribute("maxRating", maxRating);
+             model.addAttribute("showComments", showComments);
+             model.addAttribute("isFacilitator", isFacilitator);
 
-            return "fragments/components/histogram-chart :: histogram-data";
+             return "fragments/components/histogram-chart :: histogram-data";
 
-        } catch (Exception e) {
-            log.error("Error fetching rating histogram: ", e);
-            return "fragments/common-fragments :: error";
-        }
-    }
+         } catch (Exception e) {
+             log.error("Error fetching rating histogram: ", e);
+             return "fragments/common-fragments :: error";
+         }
+     }
 
-}
+     /**
+      * Get HTML fragment for timer countdown display.
+      * Called by HTMX when SSE events trigger (timer_paused, timer_started, step_advanced).
+      */
+     @GetMapping("/retro/{retroId}/timer-fragment")
+     @PreAuthorize("@participantService.canAccessRetro(#retroId)")
+     public String getTimerFragment(
+             @PathVariable UUID retroId,
+             Model model,
+             HttpServletRequest request) {
+
+         log.debug("Getting timer fragment for retro: {}", retroId);
+
+         try {
+             RetroSession session = retroService.getSessionById(retroId);
+             RetroStep currentStep = retroService.getCurrentStep(retroId);
+
+             // Timer only renders when there's an active step with a timer
+             TimerStateDto timerState = null;
+             if (currentStep != null) {
+                 timerState = retroService.getTimerState(retroId);
+             }
+
+             model.addAttribute("timerState", timerState);
+             model.addAttribute("isFacilitator", participantService.isFacilitator(request, retroId));
+             model.addAttribute("retroSession", session);
+
+             log.debug("Returning timer fragment for retro: {} - timerState: {}", retroId, timerState);
+             return "fragments/components/timer-countdown :: content";
+
+         } catch (Exception e) {
+             log.error("Error fetching timer fragment: ", e);
+             return "fragments/common-fragments :: error";
+         }
+     }
+
+ }
