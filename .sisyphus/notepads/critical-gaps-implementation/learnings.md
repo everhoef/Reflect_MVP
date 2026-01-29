@@ -119,3 +119,81 @@ Implemented complete timer pause/resume functionality with state calculation:
 - Events are published for real-time UI updates via SSE
 - No auto-advance on timer expiration (as per requirements)
 
+
+## Task 3: Timer REST and View Endpoints - COMPLETED
+
+### What Was Done
+Implemented 4 new endpoints for timer state management and UI refresh:
+
+1. **GET /api/retro/{retroId}/timer** (RetroApiController)
+   - Returns TimerStateDto with remaining seconds, pause state, and color state
+   - Returns HTTP 204 No Content when no timer exists for current step
+   - Authorization: Participant access check via getParticipantForSession() (throws exception)
+
+2. **POST /api/retro/{retroId}/timer/pause** (RetroApiController)
+   - Facilitator-only endpoint
+   - Calls retroService.pauseTimer(retroId)
+   - No HX-Trigger header (SSE handles refresh)
+
+3. **POST /api/retro/{retroId}/timer/resume** (RetroApiController)
+   - Facilitator-only endpoint
+   - Calls retroService.resumeTimer(retroId)
+   - No HX-Trigger header (SSE handles refresh)
+
+4. **GET /retro/{retroId}/timer-fragment** (RetroViewController)
+   - Returns HTML fragment for timer countdown display
+   - Uses @PreAuthorize("@participantService.canAccessRetro(#retroId)") annotation
+   - Sets model attributes: timerState, isFacilitator, retroSession
+   - Returns "fragments/components/timer-countdown :: content"
+
+### Implementation Details
+
+**Authorization Patterns Used**:
+- API endpoints: try/catch with getParticipantForSession() for participant check, isFacilitator() for facilitator check
+- View fragment: @PreAuthorize annotation with SpEL expression (matches getColumnResponses and getRatingHistogram patterns)
+
+**HTTP 204 Handling**:
+- When retroService.getTimerState() returns null (no timer for step), endpoint returns ResponseEntity.noContent().build()
+- UI template handles this with th:if="${timerState == null}" showing "No time limit"
+
+**Logging**:
+- DEBUG level for normal operations (getTimerState, pause/resume calls)
+- INFO level for successful operations (paused, resumed)
+- ERROR level for exceptions
+
+### Verification
+- ✅ Code compiles successfully: `./mvnw clean compile` (BUILD SUCCESS)
+- ✅ No compilation errors or warnings
+- ✅ Follows existing endpoint patterns (authorization, error handling, logging)
+- ✅ Matches reference patterns from startSession(), getColumnResponses(), getRatingHistogram()
+
+### Commit
+- Hash: e4dfe5c
+- Message: "feat(timer): add REST and view endpoints for timer state and pause/resume"
+- Files modified: RetroApiController.java, RetroViewController.java
+
+### Key Learnings
+
+1. **ParticipantNotFoundException Import**: Must import from `direct.reflect.facilitator.common.exception.ParticipantNotFoundException` in API controllers that use try/catch pattern.
+
+2. **Authorization Pattern Consistency**: 
+   - API endpoints use try/catch with exception handling
+   - View fragment endpoints use @PreAuthorize annotation with SpEL
+   - Never mix patterns in same controller
+
+3. **HTTP 204 for Missing Resources**: When a resource doesn't exist (no timer for step), return HTTP 204 No Content rather than 404. This signals "no content" vs "not found".
+
+4. **SSE Event Sufficiency**: No HX-Trigger headers needed for pause/resume endpoints. SSE events (timer_paused, timer_started) published by service layer handle all client refresh automatically.
+
+5. **Fragment Endpoint Pattern**: View fragment endpoints should:
+   - Use @PreAuthorize annotation (not internal authorization checks)
+   - Set all necessary model attributes before returning
+   - Return fragment selector string (e.g., "fragments/components/timer-countdown :: content")
+   - Handle null states gracefully (e.g., timerState can be null)
+
+### Notes for Task 4
+- Task 4 (Frontend) depends on these endpoints being available
+- Timer JSON endpoint provides debugging/integration capability
+- Timer fragment endpoint provides SSE-driven UI refresh
+- All endpoints follow established patterns and are production-ready
+

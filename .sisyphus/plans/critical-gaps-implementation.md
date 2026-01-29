@@ -466,7 +466,7 @@ Task 1 (Entity) → Task 2 (Service + Event) → Task 3 (API + View) → Task 4 
 
 ---
 
-- [ ] 3. Timer: Add REST API endpoints AND view fragment endpoint
+- [x] 3. Timer: Add REST API endpoints AND view fragment endpoint
 
   **What to do**:
   

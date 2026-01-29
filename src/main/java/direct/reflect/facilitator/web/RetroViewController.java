@@ -124,6 +124,7 @@ public class RetroViewController {
             model.addAttribute("isFacilitator", isFacilitator);
             model.addAttribute("userName", participant.getDisplayName());
             model.addAttribute("stageProgress", StageProgressDto.forSession(session));
+            model.addAttribute("timerState", retroService.getTimerState(retroId));
 
             log.info("Prepared retro view for session {} - page: {}, phase: {}",
                 retroId, page, session.getPhase());
@@ -186,6 +187,7 @@ public class RetroViewController {
             model.addAttribute("participants", participants);
             model.addAttribute("isFacilitator", isFacilitator);
             model.addAttribute("stageProgress", StageProgressDto.forSession(session));
+            model.addAttribute("timerState", retroService.getTimerState(retroId));
 
             log.debug("Returning fragment for session {} - page: {}, phase: {}",
                 retroId, page, session.getPhase());

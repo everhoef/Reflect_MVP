@@ -85,14 +85,8 @@
                 <div class="text-center mb-8">
                     <h2 class="text-3xl font-bold mb-2" th:text="'Stage ' + ${retroSession.currentStepIndex >= 0 ? retroSession.currentStepIndex + 1 : 1} + ': ' + ${currentStep.retroStage?.name ?: 'Current Stage'}">Stage 2: Mad Sad Glad</h2>
                     
-                    <!-- Step Timer (clean version from controller) -->
-                    <div th:if="${stepDurationMinutes != null}" class="flex items-center justify-center space-x-2 text-sm text-gray-600 mb-4">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        <span th:text="${stepDurationMinutes} + ' minutes for this step'">10 minutes for this step</span>
-                    </div>
+                    <!-- Dynamic Timer Countdown Component -->
+                    <div th:replace="~{fragments/components/timer-countdown :: content}"></div>
                 </div>
 
                 <!-- Component-based Content -->
