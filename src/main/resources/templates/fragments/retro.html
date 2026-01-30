@@ -86,7 +86,13 @@
                     <h2 class="text-3xl font-bold mb-2" th:text="'Stage ' + ${retroSession.currentStepIndex >= 0 ? retroSession.currentStepIndex + 1 : 1} + ': ' + ${currentStep.retroStage?.name ?: 'Current Stage'}">Stage 2: Mad Sad Glad</h2>
                     
                     <!-- Dynamic Timer Countdown Component -->
-                    <div th:replace="~{fragments/components/timer-countdown :: content}"></div>
+                    <div id="timer-fragment"
+                         th:attr="hx-get=@{/retro/{retroId}/timer-fragment(retroId=${retroSession.id})}"
+                         hx-trigger="load, sse:timer_paused from:body, sse:timer_started from:body, sse:step_advanced from:body"
+                         hx-target="this"
+                         hx-swap="innerHTML">
+                        <div th:replace="~{fragments/components/timer-countdown :: content}"></div>
+                    </div>
                 </div>
 
                 <!-- Component-based Content -->

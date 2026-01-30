@@ -15,16 +15,17 @@
         </svg>
         
         <!-- Countdown Display (JS will update this) -->
-         <span id="timer-display"
-               th:data-remaining="${timerState.remainingSeconds()}"
-               th:data-paused="${timerState.isPaused()}"
-               th:data-state="${timerState.state()}"
-               class="text-sm font-mono text-gray-600">
-             <!-- Initial value from server, JS will take over -->
-             <span th:text="${timerState.isPaused()} ? 'PAUSED' : '00:00'">
-                 05:00
-             </span>
-         </span>
+        <span id="timer-display"
+              th:data-remaining="${timerState.remainingSeconds()}"
+              th:data-paused="${timerState.isPaused()}"
+              th:data-state="${timerState.state()}"
+              th:class="${timerState.isPaused()} ? 'text-sm font-mono text-gray-500' : (${timerState.state() == 'red'} ? 'text-sm font-mono text-red-600 font-bold' : (${timerState.state() == 'yellow'} ? 'text-sm font-mono text-yellow-600' : 'text-sm font-mono text-green-600'))">
+            <!-- Initial value from server, JS will take over -->
+            <span th:with="mins=${timerState.remainingSeconds() / 60}, secs=${timerState.remainingSeconds() % 60}"
+                  th:text="${timerState.isPaused()} ? 'PAUSED ' + ${#numbers.formatInteger(mins,2)} + ':' + ${#numbers.formatInteger(secs,2)} : ${#numbers.formatInteger(mins,2)} + ':' + ${#numbers.formatInteger(secs,2)}">
+                05:00
+            </span>
+        </span>
         
         <!-- Pause/Resume Buttons (Facilitator only) -->
         <div th:if="${isFacilitator}" class="ml-2">
@@ -73,6 +74,14 @@
                     }
                     return;
                 }
+
+                if (isPaused) {
+                    var mins = Math.floor(remaining / 60);
+                    var secs = remaining % 60;
+                    innerSpan.textContent = 'PAUSED ' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+                    display.className = 'text-sm font-mono text-gray-500';
+                    return;
+                }
                 
                 var mins = Math.floor(remaining / 60);
                 var secs = remaining % 60;
@@ -88,6 +97,8 @@
                 }
             }
             
+            updateDisplay();
+
             // Only run countdown if not paused
             if (!isPaused && remaining > 0) {
                 window.facilitatorTimerInterval = setInterval(function() {
