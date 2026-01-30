@@ -1,8 +1,10 @@
 {
   "active_plan": "/Users/micheljansen/reflect.direct/facilitator/.sisyphus/plans/critical-gaps-implementation.md",
   "started_at": "2026-01-29T06:42:23.770Z",
+  "completed_at": "2026-01-30T05:20:00.000Z",
   "session_ids": [
     "ses_401c3209affeqPMrah4HHiOcgd"
   ],
-  "plan_name": "critical-gaps-implementation"
+  "plan_name": "critical-gaps-implementation",
+  "status": "completed"
 }
