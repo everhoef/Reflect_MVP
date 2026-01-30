@@ -1172,16 +1172,16 @@ tail -f /tmp/facilitator.log | grep -i error
 ```
 
 ### Final Checklist
-- [ ] Timer shows MM:SS countdown format
-- [ ] Timer color changes: green → yellow → red
-- [ ] Facilitator can pause/resume timer
-- [ ] Non-facilitators see "PAUSED" text when timer is paused (no buttons)
-- [ ] Timer state persists across page refresh
-- [ ] SSE events (`timer_paused`, `timer_started`) sync timer state across all participants
-- [ ] 10-input limit enforced for MULTI_COLUMN_BOARD
-- [ ] RATING_SCALE not affected by input limit
-- [ ] Error alert displayed when input limit exceeded
-- [ ] Left sidebar maintains fixed 320px width
-- [ ] All commits follow conventional commit format
-- [ ] No Java compilation errors
-- [ ] Logging follows AGENTS.md policy (DEBUG for debugging, ERROR for unexpected failures)
+- [x] Timer shows MM:SS countdown format
+- [x] Timer color changes: green → yellow → red
+- [x] Facilitator can pause/resume timer
+- [x] Non-facilitators see "PAUSED" text when timer is paused (no buttons)
+- [x] Timer state persists across page refresh
+- [x] SSE events (`timer_paused`, `timer_started`) sync timer state across all participants
+- [x] 10-input limit enforced for MULTI_COLUMN_BOARD
+- [x] RATING_SCALE not affected by input limit
+- [x] Error alert displayed when input limit exceeded
+- [x] Left sidebar maintains fixed 320px width
+- [x] All commits follow conventional commit format
+- [x] No Java compilation errors
+- [x] Logging follows AGENTS.md policy (DEBUG for debugging, ERROR for unexpected failures)
