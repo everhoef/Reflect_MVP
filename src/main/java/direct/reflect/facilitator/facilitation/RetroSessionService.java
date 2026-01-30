@@ -214,6 +214,11 @@ public class RetroSessionService {
             return null;
         }
         
+        // Guard against null stepStartedAt (can happen before step is fully initialized)
+        if (session.getStepStartedAt() == null) {
+            return null;
+        }
+        
         LocalDateTime now = LocalDateTime.now();
         long elapsedWallClock = Duration.between(session.getStepStartedAt(), now).getSeconds();
         
