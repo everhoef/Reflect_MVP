@@ -1,8 +1,5 @@
 <div th:fragment="content"
-     id="timer-container"
-     th:attr="hx-get=@{/retro/{retroId}/timer-fragment(retroId=${retroSession.id})}"
-      hx-trigger="sse:timer_paused from:body, sse:timer_started from:body"
-     hx-swap="outerHTML">
+     id="timer-container">
     
     <!-- No timer for this step -->
     <div th:if="${timerState == null}" class="text-gray-500 text-sm">
@@ -18,20 +15,16 @@
         </svg>
         
         <!-- Countdown Display (JS will update this) -->
-        <span id="timer-display"
-              th:data-remaining="${timerState.remainingSeconds()}"
-              th:data-paused="${timerState.isPaused()}"
-              th:data-state="${timerState.state()}"
-              th:classappend="${timerState.state() == 'green'} ? 'text-green-600' : 
-                               (${timerState.state() == 'yellow'} ? 'text-yellow-600' : 
-                               (${timerState.state() == 'red'} ? 'text-red-600 font-bold' : 'text-gray-600'))"
-              class="text-sm font-mono">
-            <!-- Initial value from server, JS will take over -->
-            <span th:text="${timerState.isPaused()} ? 'PAUSED' : 
-                           T(String).format('%02d:%02d', ${timerState.remainingSeconds()} / 60, ${timerState.remainingSeconds()} % 60)">
-                05:00
-            </span>
-        </span>
+         <span id="timer-display"
+               th:data-remaining="${timerState.remainingSeconds()}"
+               th:data-paused="${timerState.isPaused()}"
+               th:data-state="${timerState.state()}"
+               class="text-sm font-mono text-gray-600">
+             <!-- Initial value from server, JS will take over -->
+             <span th:text="${timerState.isPaused()} ? 'PAUSED' : '00:00'">
+                 05:00
+             </span>
+         </span>
         
         <!-- Pause/Resume Buttons (Facilitator only) -->
         <div th:if="${isFacilitator}" class="ml-2">
