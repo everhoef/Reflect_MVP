@@ -23,6 +23,7 @@ import direct.reflect.facilitator.facilitation.RetroApiController;
 import direct.reflect.facilitator.facilitation.dto.CreateRetroRequest;
 import direct.reflect.facilitator.facilitation.dto.JoinRetroRequest;
 import direct.reflect.facilitator.facilitation.response.ResponseService;
+import direct.reflect.facilitator.common.exception.InputLimitExceededException;
 import direct.reflect.facilitator.auth.AuthService;
 
 import java.util.UUID;
@@ -416,5 +417,47 @@ public class RetroApiControllerTest {
         mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
                 .param("rating", "8"))
                 .andExpect(status().isForbidden());
+    }
+
+    // ============================================================================
+    // Input Limit Tests
+    // ============================================================================
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitColumnResponse_InputLimitExceeded_ShouldReturnBadRequest() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+        
+        when(responseService.submitResponse(eq(retroId), eq(stepId), any(), any(HttpServletRequest.class)))
+            .thenThrow(new InputLimitExceededException(10, 10));
+
+        // Act & Assert
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(csrf())
+                .param("columnId", "Mad")
+                .param("content", "This is my 11th input"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Input limit exceeded")));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitColumnResponse_UnderInputLimit_ShouldReturnOk() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+        
+        when(responseService.submitResponse(eq(retroId), eq(stepId), any(), any(HttpServletRequest.class)))
+            .thenReturn(null);
+
+        // Act & Assert
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(csrf())
+                .param("columnId", "Mad")
+                .param("content", "Valid input under limit"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("HX-Trigger", "responseSubmitted"));
     }
 }

@@ -125,7 +125,7 @@ Where:
 
 **Example:** For user story with ID "6" and name "Five step flow":
 ```
-.sisyphus/bdd-reports/6-Five step flow.md
+./bdd-reports/6-Five step flow.md
 ```
 
 **Steps:**
