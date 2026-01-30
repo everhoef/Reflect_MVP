@@ -610,7 +610,7 @@ Task 1 (Entity) → Task 2 (Service + Event) → Task 3 (API + View) → Task 4 
 
 ---
 
-- [ ] 4. Timer: Create frontend countdown component with SSE + JavaScript integration
+- [x] 4. Timer: Create frontend countdown component with SSE + JavaScript integration
 
   **What to do**:
   
@@ -873,7 +873,7 @@ Task 1 (Entity) → Task 2 (Service + Event) → Task 3 (API + View) → Task 4 
 
 ---
 
-- [ ] 5. Input mechanism: Add 10-input limit validation per step
+- [x] 5. Input mechanism: Add 10-input limit validation per step
 
   **What to do**:
   
@@ -1091,7 +1091,7 @@ Task 1 (Entity) → Task 2 (Service + Event) → Task 3 (API + View) → Task 4 
 
 ---
 
-- [ ] 6. Guided Facilitation: CSS fix to lock sidebar visible
+- [x] 6. Guided Facilitation: CSS fix to lock sidebar visible
 
   **What to do**:
   - In `retro.html` around line 43, modify the left sidebar div:
