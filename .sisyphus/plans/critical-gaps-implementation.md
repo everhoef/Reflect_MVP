@@ -184,7 +184,7 @@ Task 1 (Entity) → Task 2 (Service + Event) → Task 3 (API + View) → Task 4 
 
 ---
 
-- [ ] 2. Timer: Add timer state calculation, pause/resume methods, and event factory methods
+- [x] 2. Timer: Add timer state calculation, pause/resume methods, and event factory methods
 
   **Current state**: `RetroEvent.EventType` enum has `TIMER_STARTED`, `TIMER_PAUSED`, `TIMER_FINISHED` values (defined in `RetroEvent.java:39-41`), but **no existing code publishes these events**. There are no factory methods for timer events yet. This task adds both the service methods AND the factory methods to enable timer event publishing for the first time.
 
