@@ -62,12 +62,12 @@ Implement 3 critical BDD gaps to achieve full compliance with user stories 8, 11
 3. **Guided Facilitation (ID 12)**: Sidebar CSS fix to prevent collapse
 
 ### Definition of Done
-- [ ] Timer displays MM:SS format, counts down in real-time
-- [ ] Timer shows visual states: green (>2min), yellow (30s-2min), red (<30s)
-- [ ] Facilitator can pause/resume timer (non-facilitators see pause indicator)
-- [ ] Timer state survives page refresh
-- [ ] 10-input limit enforced per step for MULTI_COLUMN_BOARD
-- [ ] Left sidebar does not collapse when center content expands
+- [x] Timer displays MM:SS format, counts down in real-time
+- [x] Timer shows visual states: green (>2min), yellow (30s-2min), red (<30s)
+- [x] Facilitator can pause/resume timer (non-facilitators see pause indicator)
+- [x] Timer state survives page refresh
+- [x] 10-input limit enforced per step for MULTI_COLUMN_BOARD
+- [x] Left sidebar does not collapse when center content expands
 
 ### Must Have
 - Server-authoritative timer (server calculates remaining time)
