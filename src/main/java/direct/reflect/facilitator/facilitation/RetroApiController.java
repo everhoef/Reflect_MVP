@@ -18,11 +18,14 @@ import direct.reflect.facilitator.facilitation.dto.SessionInfo;
 import direct.reflect.facilitator.facilitation.dto.ComponentResponseDto;
 import direct.reflect.facilitator.facilitation.dto.ColumnResponseDto;
 import direct.reflect.facilitator.facilitation.dto.RatingResponseDto;
+import direct.reflect.facilitator.facilitation.dto.TimerStateDto;
 import direct.reflect.facilitator.facilitation.response.ResponseService;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.ComponentType;
 import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException;
 import direct.reflect.facilitator.common.exception.VoteLimitExceededException;
+import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
+import direct.reflect.facilitator.common.exception.InputLimitExceededException;
 
 import jakarta.validation.Valid;
 
@@ -242,7 +245,7 @@ public class RetroApiController {
      */
     @PostMapping("/{retroId}/step/{stepId}/response/column")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<Void> submitColumnResponse(
+    public ResponseEntity<String> submitColumnResponse(
             @PathVariable UUID retroId,
             @PathVariable Long stepId,
             @Valid @ModelAttribute ColumnResponseDto dto,
@@ -257,8 +260,11 @@ public class RetroApiController {
 
             return ResponseEntity.ok()
                 .header("HX-Trigger", "responseSubmitted")
-                .build();
+                .body("");
 
+        } catch (InputLimitExceededException e) {
+            log.debug("Input limit exceeded for retro {}: {}", retroId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         } catch (RetroSessionNotFoundException e) {
             log.warn("Session not found: {}", retroId);
             return ResponseEntity.notFound().build();
@@ -361,41 +367,113 @@ public class RetroApiController {
         }
     }
 
-    @PostMapping("/{retroId}/step/{stepId}/reveal")
-    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<Void> revealResponses(
-            @PathVariable UUID retroId,
-            @PathVariable Long stepId,
-            HttpServletRequest httpRequest) {
-        
-        log.debug("Revealing responses for retro: {}, step: {}", retroId, stepId);
-        
-        try {
-            // Only facilitators can reveal responses
-            boolean isFacilitator = participantService.isFacilitator(httpRequest, retroId);
-            if (!isFacilitator) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-            }
-            
-            // Get the session
-            RetroSession session = retroService.getSessionById(retroId);
-            if (session == null) {
-                return ResponseEntity.notFound().build();
-            }
-            
-            // Reveal all responses for this step
-            responseService.revealAllResponses(session, stepId);
-            
-            log.info("Revealed responses for step: {} in retro: {}", stepId, retroId);
-                
-            return ResponseEntity.ok()
-                .header("HX-Trigger", "responsesRevealed")
-                .build();
-                
-        } catch (Exception e) {
-            log.error("Error revealing responses: ", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
+     @PostMapping("/{retroId}/step/{stepId}/reveal")
+     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+     public ResponseEntity<Void> revealResponses(
+             @PathVariable UUID retroId,
+             @PathVariable Long stepId,
+             HttpServletRequest httpRequest) {
+         
+         log.debug("Revealing responses for retro: {}, step: {}", retroId, stepId);
+         
+         try {
+             // Only facilitators can reveal responses
+             boolean isFacilitator = participantService.isFacilitator(httpRequest, retroId);
+             if (!isFacilitator) {
+                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+             }
+             
+             // Get the session
+             RetroSession session = retroService.getSessionById(retroId);
+             if (session == null) {
+                 return ResponseEntity.notFound().build();
+             }
+             
+             // Reveal all responses for this step
+             responseService.revealAllResponses(session, stepId);
+             
+             log.info("Revealed responses for step: {} in retro: {}", stepId, retroId);
+                 
+             return ResponseEntity.ok()
+                 .header("HX-Trigger", "responsesRevealed")
+                 .build();
+                 
+         } catch (Exception e) {
+             log.error("Error revealing responses: ", e);
+             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+         }
+     }
 
-}
+     @GetMapping("/{retroId}/timer")
+     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+     public ResponseEntity<TimerStateDto> getTimerState(
+             @PathVariable UUID retroId,
+             HttpServletRequest httpRequest) {
+         
+         log.debug("Getting timer state for retro: {}", retroId);
+         
+         try {
+             participantService.getParticipantForSession(httpRequest, retroId);
+         } catch (ParticipantNotFoundException e) {
+             log.debug("Participant not found for retro: {}", retroId);
+             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+         }
+         
+         TimerStateDto state = retroService.getTimerState(retroId);
+         if (state == null) {
+             log.debug("No timer for current step in retro: {}", retroId);
+             return ResponseEntity.noContent().build();
+         }
+         
+         log.debug("Returning timer state for retro: {} - remaining: {}s, paused: {}", 
+             retroId, state.remainingSeconds(), state.isPaused());
+         return ResponseEntity.ok(state);
+     }
+
+     @PostMapping("/{retroId}/timer/pause")
+     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+     public ResponseEntity<Void> pauseTimer(
+             @PathVariable UUID retroId,
+             HttpServletRequest httpRequest) {
+         
+         log.debug("Pausing timer for retro: {}", retroId);
+         
+         if (!participantService.isFacilitator(httpRequest, retroId)) {
+             log.debug("Non-facilitator attempted to pause timer for retro: {}", retroId);
+             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+         }
+         
+         try {
+             retroService.pauseTimer(retroId);
+             log.info("Paused timer for retro: {}", retroId);
+             return ResponseEntity.ok().build();
+         } catch (Exception e) {
+             log.error("Error pausing timer for retro: {}", retroId, e);
+             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+         }
+     }
+
+     @PostMapping("/{retroId}/timer/resume")
+     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+     public ResponseEntity<Void> resumeTimer(
+             @PathVariable UUID retroId,
+             HttpServletRequest httpRequest) {
+         
+         log.debug("Resuming timer for retro: {}", retroId);
+         
+         if (!participantService.isFacilitator(httpRequest, retroId)) {
+             log.debug("Non-facilitator attempted to resume timer for retro: {}", retroId);
+             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+         }
+         
+         try {
+             retroService.resumeTimer(retroId);
+             log.info("Resumed timer for retro: {}", retroId);
+             return ResponseEntity.ok().build();
+         } catch (Exception e) {
+             log.error("Error resuming timer for retro: {}", retroId, e);
+             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+         }
+     }
+
+ }

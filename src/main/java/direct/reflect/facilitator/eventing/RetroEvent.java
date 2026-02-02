@@ -116,4 +116,18 @@ public record RetroEvent<T>(
     public static RetroEvent<Long> responsesRevealed(UUID retroId, String facilitatorId, Long stepId) {
         return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.NOTE_UPDATED, facilitatorId, Instant.now(), stepId);
     }
+
+    /**
+     * Create a timer paused event
+     */
+    public static RetroEvent<Void> timerPaused(UUID retroId) {
+        return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.TIMER_PAUSED, "system", Instant.now(), null);
+    }
+
+    /**
+     * Create a timer started/resumed event (use TIMER_STARTED for both start and resume)
+     */
+    public static RetroEvent<Void> timerStarted(UUID retroId) {
+        return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.TIMER_STARTED, "system", Instant.now(), null);
+    }
 }

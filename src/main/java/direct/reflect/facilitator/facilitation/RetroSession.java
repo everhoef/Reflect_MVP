@@ -34,6 +34,9 @@ public class RetroSession {
   private LocalDateTime createdAt;
   private LocalDateTime finishedAt;
   private LocalDateTime stepStartedAt;
+  private LocalDateTime timerPausedAt;
+
+  private Long accumulatedPauseSeconds = 0L;
 
   @ManyToOne(fetch = FetchType.LAZY)
   private RetroTemplate template;

@@ -18,6 +18,7 @@ import direct.reflect.facilitator.common.exception.InvalidSessionStateException;
 import direct.reflect.facilitator.common.exception.InvalidStepException;
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.common.exception.VoteLimitExceededException;
+import direct.reflect.facilitator.common.exception.InputLimitExceededException;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
@@ -97,6 +98,15 @@ public class ResponseService {
         }
 
         RetroStep step = getRetroStepById(stepId);
+
+        // Enforce 10-input limit for MULTI_COLUMN_BOARD (not for RATING_SCALE which has 1-per-participant)
+        if (step.getComponentType() == ComponentType.MULTI_COLUMN_BOARD) {
+            Long existingCount = responseRepository.countByParticipantSessionAndStep(participant, session, step);
+            int inputLimit = 10;
+            if (existingCount >= inputLimit) {
+                throw new InputLimitExceededException(existingCount, inputLimit);
+            }
+        }
 
         ParticipantResponse response;
 

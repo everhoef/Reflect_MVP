@@ -6,7 +6,7 @@
       "url": "https://api.githubcopilot.com/mcp",
       "enabled": true,
       "headers": {
-        "Authorization": "Bearer {env:GITHUB_PAT_CLAUDE_CODE}"
+        "Authorization": "Bearer {env:GITHUB_PAT_REFLECT}"
       }
     },
     "notion-hosted": {

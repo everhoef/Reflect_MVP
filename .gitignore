@@ -72,5 +72,6 @@ logs/
 *.sqlite
 *.sqlite3
 
-### Claude Code ###
+### AI Agents ###
 .claude/
+.sisyphus/
