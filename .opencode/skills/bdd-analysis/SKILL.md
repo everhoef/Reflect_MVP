@@ -128,6 +128,13 @@ Where:
 ./bdd-reports/6-Five step flow.md
 ```
 
+**Security - Path Sanitization:**
+Before building the filename, sanitize Notion-derived values to prevent path traversal:
+- Remove path separators (`/`, `\`)
+- Remove `..` sequences
+- Restrict to alphanumeric characters, spaces, hyphens, and underscores
+- Example: `"6-/../../../etc/passwd"` → `"6-etcpasswd"`
+
 **Steps:**
 1. Extract `userDefined:ID` from Notion page properties
 2. Extract story name from Notion page title

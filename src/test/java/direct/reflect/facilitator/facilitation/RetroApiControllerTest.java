@@ -24,6 +24,8 @@ import direct.reflect.facilitator.facilitation.dto.CreateRetroRequest;
 import direct.reflect.facilitator.facilitation.dto.JoinRetroRequest;
 import direct.reflect.facilitator.facilitation.response.ResponseService;
 import direct.reflect.facilitator.common.exception.InputLimitExceededException;
+import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
+import direct.reflect.facilitator.facilitation.dto.TimerStateDto;
 import direct.reflect.facilitator.auth.AuthService;
 
 import java.util.UUID;
@@ -459,5 +461,200 @@ public class RetroApiControllerTest {
                 .param("content", "Valid input under limit"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("HX-Trigger", "responseSubmitted"));
+    }
+
+    // ============================================================================
+    // Timer API Tests
+    // ============================================================================
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void getTimerState_ValidParticipant_ShouldReturnTimerState() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        TimerStateDto timerState = new TimerStateDto(300, false, "green");
+        
+        when(retroSessionService.getTimerState(retroId)).thenReturn(timerState);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/retro/{retroId}/timer", retroId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.remainingSeconds").value(300))
+                .andExpect(jsonPath("$.isPaused").value(false))
+                .andExpect(jsonPath("$.state").value("green"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void getTimerState_NoTimerForStep_ShouldReturnNoContent() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        
+        when(retroSessionService.getTimerState(retroId)).thenReturn(null);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/retro/{retroId}/timer", retroId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void getTimerState_NotParticipant_ShouldReturnForbidden() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        
+        when(participantService.getParticipantForSession(any(HttpServletRequest.class), eq(retroId)))
+            .thenThrow(new ParticipantNotFoundException("Not a participant"));
+
+        // Act & Assert
+        mockMvc.perform(get("/api/retro/{retroId}/timer", retroId))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getTimerState_Unauthenticated_ShouldReturnUnauthorized() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+
+        // Act & Assert
+        mockMvc.perform(get("/api/retro/{retroId}/timer", retroId)
+                .with(anonymous()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void pauseTimer_Facilitator_ShouldReturnOk() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        
+        when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
+            .thenReturn(true);
+
+        // Act & Assert
+        mockMvc.perform(post("/api/retro/{retroId}/timer/pause", retroId)
+                .with(csrf()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void pauseTimer_NonFacilitator_ShouldReturnForbidden() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        
+        when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
+            .thenReturn(false);
+
+        // Act & Assert
+        mockMvc.perform(post("/api/retro/{retroId}/timer/pause", retroId)
+                .with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void pauseTimer_Unauthenticated_ShouldReturnUnauthorized() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+
+        // Act & Assert
+        mockMvc.perform(post("/api/retro/{retroId}/timer/pause", retroId)
+                .with(anonymous())
+                .with(csrf()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void pauseTimer_WithoutCSRF_ShouldReturnForbidden() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+
+        // Act & Assert
+        mockMvc.perform(post("/api/retro/{retroId}/timer/pause", retroId))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void resumeTimer_Facilitator_ShouldReturnOk() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        
+        when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
+            .thenReturn(true);
+
+        // Act & Assert
+        mockMvc.perform(post("/api/retro/{retroId}/timer/resume", retroId)
+                .with(csrf()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void resumeTimer_NonFacilitator_ShouldReturnForbidden() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        
+        when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
+            .thenReturn(false);
+
+        // Act & Assert
+        mockMvc.perform(post("/api/retro/{retroId}/timer/resume", retroId)
+                .with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void resumeTimer_Unauthenticated_ShouldReturnUnauthorized() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+
+        // Act & Assert
+        mockMvc.perform(post("/api/retro/{retroId}/timer/resume", retroId)
+                .with(anonymous())
+                .with(csrf()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void resumeTimer_WithoutCSRF_ShouldReturnForbidden() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+
+        // Act & Assert
+        mockMvc.perform(post("/api/retro/{retroId}/timer/resume", retroId))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "GUEST")
+    void pauseTimer_GuestFacilitator_ShouldReturnOk() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        
+        when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
+            .thenReturn(true);
+
+        // Act & Assert - Guests can be facilitators
+        mockMvc.perform(post("/api/retro/{retroId}/timer/pause", retroId)
+                .with(csrf()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "GUEST")
+    void resumeTimer_GuestFacilitator_ShouldReturnOk() throws Exception {
+        // Arrange
+        UUID retroId = UUID.randomUUID();
+        
+        when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
+            .thenReturn(true);
+
+        // Act & Assert - Guests can be facilitators
+        mockMvc.perform(post("/api/retro/{retroId}/timer/resume", retroId)
+                .with(csrf()))
+                .andExpect(status().isOk());
     }
 }

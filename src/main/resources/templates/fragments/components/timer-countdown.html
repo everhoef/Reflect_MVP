@@ -1,5 +1,8 @@
 <div th:fragment="content"
-     id="timer-container">
+     id="timer-container"
+     th:attr="hx-get=@{/retro/{retroId}/timer-fragment(retroId=${retroSession.id})}"
+     hx-trigger="sse:timer_paused from:body, sse:timer_started from:body, sse:step_advanced from:body"
+     hx-swap="innerHTML">
     
     <!-- No timer for this step -->
     <div th:if="${timerState == null}" class="text-gray-500 text-sm">
