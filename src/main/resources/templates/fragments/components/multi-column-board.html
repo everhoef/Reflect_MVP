@@ -53,7 +53,7 @@
                 <!-- Cards List -->
                 <div th:id="'column-lane-' + ${column['title']}"
                      th:attr="hx-get=@{/retro/{r}/step/{s}/responses/column(r=${retroSession.id}, s=${currentStep.id}, columnId=${column['title']})}"
-                     hx-trigger="load, sse:note_added from:body, sse:responses_revealed from:body"
+                     hx-trigger="load, sse:note_added from:body, sse:responses_revealed from:body, sse:vote_added from:body, sse:vote_removed from:body"
                      hx-swap="innerHTML"
                      hx-target="this"
                      class="space-y-3">
