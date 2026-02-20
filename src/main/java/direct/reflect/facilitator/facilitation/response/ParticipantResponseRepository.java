@@ -97,4 +97,6 @@ public interface ParticipantResponseRepository extends JpaRepository<Participant
      * Used by the clustering feature to find unclustered responses.
      */
     List<ParticipantResponse> findByRetroStepIdAndClusterIdIsNull(Long stepId);
+
+    List<ParticipantResponse> findByRetroStepIdAndClusterIdIsNotNull(Long stepId);
 }
