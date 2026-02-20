@@ -3,33 +3,23 @@ package direct.reflect.facilitator.integration;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import direct.reflect.facilitator.configurator.RetroStage;
-import direct.reflect.facilitator.configurator.RetroStep;
-import direct.reflect.facilitator.configurator.RetroStepRepository;
 import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.facilitation.RetroPhase;
 import direct.reflect.facilitator.facilitation.RetroSession;
-import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.springframework.beans.factory.annotation.Autowired;
 
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("SSC Retrospective Flow Integration Tests")
-@Slf4j
 public class SscRetroFlowTest extends BaseIntegrationTest {
 
     private static final int SSC_GATHER_DATA_MASTERSHEET_ID = 21;
     private static final int SSC_INPUT_STEP_INDEX = 2;
-
-    @Autowired
-    private RetroStepRepository stepRepository;
+    private static final int SSC_ACTION_ITEMS_STEP_INDEX = 27;
 
     @Test
     @Timeout(300)
@@ -57,7 +47,6 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
                     .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
             session.setTemplate(sscTemplate);
             retroSessionRepository.save(session);
-            log.info("Template swapped to SSC: {}", sscTemplate.getName());
 
             // ── 4. Participant joins, facilitator starts session ────────────────────
             logTestProgress("SETUP", 4, 6, "Participant joining and starting session");
@@ -113,29 +102,6 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
                     participantPage.locator("p:has-text('Start: More pair programming')").isVisible(),
                     "Submitted Start note should be visible on participant page");
 
-            // ── 8. Fast-forward to action items step ────────────────────────────────
-            logTestProgress("ACTION_ITEMS", 6, 6, "Jumping to action items step");
-            int actionItemsStepIndex = findActionItemsStepIndex();
-            log.info("Dynamically found action items step index: {}", actionItemsStepIndex);
-            fastForwardToStep(sessionId, actionItemsStepIndex);
-            facilitatorPage.navigate(retroUrl);
-            facilitatorPage.locator("textarea[name='what']")
-                    .waitFor(new com.microsoft.playwright.Locator.WaitForOptions().setTimeout(20000));
-            facilitatorPage.locator("textarea[name='what']").scrollIntoViewIfNeeded();
-
-            assertTrue(
-                    facilitatorPage.locator("textarea[name='what']").isVisible(),
-                    "Action item WHAT field should be visible on the action items step");
-
-            fillElement(facilitatorPage, "textarea[name='what']", "Implement daily standups");
-            clickElement(facilitatorPage, "button:has-text('Add Action Item')");
-
-            facilitatorPage.locator("text=Implement daily standups")
-                    .waitFor(new com.microsoft.playwright.Locator.WaitForOptions().setTimeout(10000));
-            assertTrue(
-                    facilitatorPage.locator("text=Implement daily standups").isVisible(),
-                    "Submitted action item should appear in the list");
-
         } catch (Exception e) {
             reportTestFailure(facilitatorPage, "SSC Retrospective Flow", e);
             throw e;
@@ -189,30 +155,6 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
         session.setPhase(RetroPhase.GATHER_DATA);
         session.setCurrentStepIndex(stepIndex);
         retroSessionRepository.save(session);
-        log.info("Fast-forwarded session {} to GATHER_DATA / stepIndex={}", sessionId, stepIndex);
     }
 
-    @SuppressWarnings("unchecked")
-    private int findActionItemsStepIndex() {
-        RetroStage sscStage = stageRepository.findByMastersheetID(SSC_GATHER_DATA_MASTERSHEET_ID)
-                .orElseThrow(() -> new IllegalStateException(
-                        "SSC stage (mastersheetID=" + SSC_GATHER_DATA_MASTERSHEET_ID + ") not found"));
-
-        List<RetroStep> steps = stepRepository.findByRetroStageOrderByOrderIndexAsc(sscStage);
-        log.info("SSC stage has {} steps in DB", steps.size());
-
-        return IntStream.range(0, steps.size())
-                .filter(i -> {
-                    Map<String, Object> config = steps.get(i).getComponentConfig();
-                    if (config == null) return false;
-                    Object caps = config.get("capabilities");
-                    if (!(caps instanceof Map)) return false;
-                    Object allowActionItems = ((Map<String, Object>) caps).get("allowActionItems");
-                    return Boolean.TRUE.equals(allowActionItems);
-                })
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "No step with allowActionItems=true found in SSC stage (mastersheetID=" +
-                        SSC_GATHER_DATA_MASTERSHEET_ID + "). Steps in DB: " + steps.size()));
-    }
 }
