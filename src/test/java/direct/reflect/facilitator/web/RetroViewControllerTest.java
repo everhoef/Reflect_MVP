@@ -40,6 +40,7 @@ import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.facilitation.RetroSessionService;
 import direct.reflect.facilitator.facilitation.ParticipantService;
 import direct.reflect.facilitator.facilitation.response.ResponseService;
+import direct.reflect.facilitator.facilitation.actionitem.ActionItemService;
 import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.web.RetroViewController;
 
@@ -65,6 +66,9 @@ class RetroViewControllerTest {
 
     @MockitoBean
     private AuthService authenticationHelper;
+
+    @MockitoBean
+    private ActionItemService actionItemService;
 
     @Test
     @WithMockUser
