@@ -19,11 +19,10 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
 
     private static final int SSC_GATHER_DATA_MASTERSHEET_ID = 21;
     private static final int SSC_INPUT_STEP_INDEX = 2;
-    private static final int SSC_ACTION_ITEMS_STEP_INDEX = 27;
 
     @Test
     @Timeout(300)
-    @DisplayName("Should validate SSC retrospective flow: column colors, sticky notes, and action items")
+    @DisplayName("Should validate SSC retrospective flow: column colors and sticky notes")
     void shouldValidateSscRetroFlow() {
         BrowserContext facilitatorContext = createMonitoredContext();
         Page facilitatorPage = facilitatorContext.newPage();

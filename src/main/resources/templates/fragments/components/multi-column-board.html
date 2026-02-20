@@ -21,11 +21,11 @@
             <div class="flex-1 p-3 overflow-y-auto flex flex-col gap-3">
                 <!-- Inline Add Card Form (only if allowInput is true) -->
                 <div th:if="${capabilities.allowInput}">
-                    <form th:attr="hx-post=@{/api/retro/{retroId}/step/{stepId}/response/column(retroId=${retroSession.id}, stepId=${currentStep.id})}"
-                          hx-swap="none"
-                          hx-trigger="submit"
-                          hx-on::after-request="if(event.detail.successful) { this.reset(); } else if(event.detail.xhr.status === 400) { alert(event.detail.xhr.responseText); }"
-                          class="bg-white p-2 rounded-lg border border-gray-300 hover:border-blue-400 hover:shadow-md transition-all">
+                     <form th:attr="hx-post=@{/api/retro/{retroId}/step/{stepId}/response/column(retroId=${retroSession.id}, stepId=${currentStep.id})}"
+                           hx-swap="none"
+                           hx-trigger="submit"
+                           hx-on::after-request="if(event.detail.successful) { var colInput = this.querySelector('[name=columnId]'); var colId = colInput ? colInput.value : null; this.reset(); if(colId) { var lane = document.getElementById('column-lane-' + colId); if(lane) { htmx.trigger(lane, 'note-submitted'); } } } else if(event.detail.xhr.status === 400) { alert(event.detail.xhr.responseText); }"
+                           class="bg-white p-2 rounded-lg border border-gray-300 hover:border-blue-400 hover:shadow-md transition-all">
                         <!-- Hidden columnId field -->
                         <input type="hidden"
                                name="columnId"
@@ -53,7 +53,7 @@
                 <!-- Cards List -->
                 <div th:id="'column-lane-' + ${column['title']}"
                      th:attr="hx-get=@{/retro/{r}/step/{s}/responses/column(r=${retroSession.id}, s=${currentStep.id}, columnId=${column['title']})}"
-                     hx-trigger="load, sse:note_added from:body, sse:note_updated from:body, sse:responses_revealed from:body, sse:vote_added from:body, sse:vote_removed from:body"
+                     hx-trigger="load, note-submitted, sse:note_added from:body, sse:note_updated from:body, sse:responses_revealed from:body, sse:vote_added from:body, sse:vote_removed from:body"
                      hx-swap="innerHTML"
                      hx-target="this"
                      class="space-y-3">
@@ -110,7 +110,8 @@
 
         <div th:attr="hx-get=@{/retro/{retroId}/action-items(retroId=${retroSession.id})}"
              hx-trigger="load, sse:note_added from:body, sse:note_updated from:body, sse:note_deleted from:body"
-             hx-swap="innerHTML">
+             hx-swap="innerHTML"
+             hx-target="this">
             <p class="text-sm text-gray-400 text-center py-4">Loading...</p>
         </div>
     </div>
