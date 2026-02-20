@@ -85,4 +85,16 @@ public interface ParticipantResponseRepository extends JpaRepository<Participant
       */
      @Query("SELECT COUNT(r) FROM ParticipantResponse r WHERE r.participant = :participant AND r.participant.session = :session AND r.retroStep = :step")
      Long countByParticipantSessionAndStep(@Param("participant") Participant participant, @Param("session") RetroSession session, @Param("step") RetroStep step);
+
+    /**
+     * Find all responses for a specific step that belong to a given cluster.
+     * Used by the clustering feature to retrieve all responses within a cluster.
+     */
+    List<ParticipantResponse> findByRetroStepIdAndClusterId(Long stepId, UUID clusterId);
+
+    /**
+     * Find all responses for a specific step that have not yet been assigned to any cluster.
+     * Used by the clustering feature to find unclustered responses.
+     */
+    List<ParticipantResponse> findByRetroStepIdAndClusterIdIsNull(Long stepId);
 }
