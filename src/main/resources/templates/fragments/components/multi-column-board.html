@@ -114,6 +114,118 @@
             <p class="text-sm text-gray-400 text-center py-4">Loading...</p>
         </div>
     </div>
+
+    <div th:unless="${responses.empty or capabilities['allowMerging'] == true}"
+         class="space-y-2">
+
+        <div th:each="response : ${responses}"
+             th:with="isMyResponse=${response.participantId().toString() == currentParticipantId.toString()},
+                      canSeeContent=${isMyResponse or capabilities.showContent}">
+
+            <div th:id="'card-' + ${response.id()}"
+                 th:data-response-id="${response.id()}"
+                 class="bg-white border-2 rounded-lg p-3 shadow-sm transition-shadow"
+                 th:classappend="${isMyResponse} ? 'border-blue-400 bg-blue-50 hover:shadow-md cursor-pointer' : 'border-gray-200'">
+
+                <div th:id="'card-display-' + ${response.id()}"
+                     th:if="${isMyResponse}"
+                     onclick="
+                         const cardId = this.closest('[data-response-id]').dataset.responseId;
+                         document.getElementById('card-display-' + cardId).style.display='none';
+                         document.getElementById('card-edit-' + cardId).style.display='block';
+                         document.getElementById('edit-textarea-' + cardId).focus();
+                     "
+                     class="cursor-pointer">
+                    <p th:if="${canSeeContent}"
+                       class="text-sm text-gray-800 mb-2 whitespace-pre-wrap"
+                       th:text="${response.content()}">
+                        Note content
+                    </p>
+
+                    <p th:unless="${canSeeContent}"
+                       class="text-sm text-gray-400 italic mb-2">
+                        [Hidden until revealed]
+                    </p>
+
+                    <div class="flex items-center justify-between text-xs mt-2 pt-2 border-t border-gray-200">
+                        <div class="flex items-center gap-2">
+                            <span th:if="${showAuthor}" class="text-gray-600 font-medium" th:text="${response.participantName()}">User</span>
+                            <span th:if="${isMyResponse and !showAuthor}" class="text-blue-600 font-semibold">👤 You</span>
+                        </div>
+                        <button th:if="${capabilities.allowVoting}"
+                                type="button"
+                                th:attr="hx-post=@{/api/retro/{retroId}/response/{responseId}/vote(retroId=${retroSession.id}, responseId=${response.id()})}"
+                                hx-swap="none"
+                                class="flex items-center gap-1 px-2 py-1 rounded-full hover:bg-blue-50 transition-colors">
+                            <span class="text-blue-600">👍</span>
+                            <span th:if="${capabilities.showVotes}" class="text-gray-600 font-medium" th:text="${response.voteCount() ?: 0}">0</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div th:id="'card-display-' + ${response.id()}"
+                     th:unless="${isMyResponse}">
+                    <p th:if="${canSeeContent}"
+                       class="text-sm text-gray-800 mb-2 whitespace-pre-wrap"
+                       th:text="${response.content()}">
+                        Note content
+                    </p>
+
+                    <p th:unless="${canSeeContent}"
+                       class="text-sm text-gray-400 italic mb-2">
+                        [Hidden until revealed]
+                    </p>
+
+                    <div class="flex items-center justify-between text-xs mt-2 pt-2 border-t border-gray-200">
+                        <div class="flex items-center gap-2">
+                            <span th:if="${showAuthor}" class="text-gray-600 font-medium" th:text="${response.participantName()}">User</span>
+                            <span th:if="${isMyResponse and !showAuthor}" class="text-blue-600 font-semibold">👤 You</span>
+                        </div>
+                        <button th:if="${capabilities.allowVoting}"
+                                type="button"
+                                th:attr="hx-post=@{/api/retro/{retroId}/response/{responseId}/vote(retroId=${retroSession.id}, responseId=${response.id()})}"
+                                hx-swap="none"
+                                class="flex items-center gap-1 px-2 py-1 rounded-full hover:bg-blue-50 transition-colors">
+                            <span class="text-blue-600">👍</span>
+                            <span th:if="${capabilities.showVotes}" class="text-gray-600 font-medium" th:text="${response.voteCount() ?: 0}">0</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div th:if="${isMyResponse}"
+                     th:id="'card-edit-' + ${response.id()}"
+                     style="display: none;">
+                    <form th:attr="hx-put=@{/api/retro/{retroId}/response/{responseId}(retroId=${retroSession.id}, responseId=${response.id()})}"
+                          hx-swap="none"
+                          hx-trigger="submit"
+                          hx-on::after-request="document.getElementById('card-display-[[${response.id()}]]').style.display='block'; document.getElementById('card-edit-[[${response.id()}]]').style.display='none';">
+                        <textarea th:id="'edit-textarea-' + ${response.id()}"
+                                  name="content"
+                                  class="w-full p-2 border border-gray-300 rounded-md resize-none focus:ring-2 focus:ring-blue-400 focus:outline-none text-sm"
+                                  rows="3"
+                                  th:text="${response.content()}">Note content</textarea>
+                        <div class="flex justify-end gap-2 mt-2">
+                            <button type="button"
+                                    onclick="
+                                        const cardId = this.closest('[data-response-id]').dataset.responseId;
+                                        document.getElementById('card-display-' + cardId).style.display='block';
+                                        document.getElementById('card-edit-' + cardId).style.display='none';
+                                    "
+                                    class="text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded-full p-1.5 transition-colors text-sm"
+                                    title="Cancel">
+                                ✕
+                            </button>
+                            <button type="submit"
+                                    class="text-green-600 hover:text-green-700 hover:bg-green-50 rounded-full p-1.5 transition-colors"
+                                    title="Save">
+                                ✓
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Card Lane Content Fragment (loaded via HTMX) -->
@@ -123,13 +235,12 @@
         <p class="mt-2">Notes will appear here...</p>
     </div>
 
-    <div th:unless="${responses.empty}"
-         th:classappend="${capabilities['allowMerging'] ? 'sortable' : ''}"
-         th:attr="hx-post=${capabilities['allowMerging'] ? '/api/retro/' + retroSession.id + '/step/' + currentStep.id + '/cluster/merge' : null},
-                  hx-trigger=${capabilities['allowMerging'] ? 'end from:*' : null},
-                  hx-swap=${capabilities['allowMerging'] ? 'none' : null},
-                  hx-include=${capabilities['allowMerging'] ? '[name=\'responseId\']' : null}"
-         class="space-y-2">
+    <div th:if="${!responses.empty and capabilities['allowMerging'] == true}"
+         class="space-y-2 sortable"
+         th:attr="hx-post=@{/api/retro/{r}/step/{s}/cluster/merge(r=${retroSession.id},s=${currentStep.id})},
+                  hx-trigger='end from:*',
+                  hx-swap='none',
+                  hx-include='[name=''responseId'']'">
 
         <div th:each="response, responseStat : ${responses}"
              th:with="isMyResponse=${response.participantId().toString() == currentParticipantId.toString()},
@@ -140,14 +251,24 @@
             <div th:if="${isFirstInCluster}"
                  class="flex items-center gap-2 mt-3 mb-1 px-2">
                 <div class="h-px flex-1 bg-gray-300"></div>
-                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-                      th:text="${response.clusterName() != null ? response.clusterName() : 'Cluster'}">Cluster</span>
+                <form hx-ext="json-enc"
+                      th:attr="hx-put=@{/api/retro/{r}/step/{s}/cluster/{c}/name(r=${retroSession.id},s=${currentStep.id},c=${response.clusterId()})}"
+                      hx-swap="none"
+                      hx-trigger="blur from:find input, keyup[key=='Enter'] from:find input"
+                      class="flex items-center"
+                      onsubmit="return false;">
+                    <input type="text"
+                           name="name"
+                           th:value="${response.clusterName() != null ? response.clusterName() : 'Cluster'}"
+                           class="text-xs font-semibold text-gray-500 uppercase tracking-wide bg-transparent border-0 border-b border-transparent hover:border-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-0 text-center cursor-pointer transition-colors"
+                           style="min-width: 6rem; width: auto;"
+                           title="Click to rename cluster"
+                    />
+                </form>
                 <div class="h-px flex-1 bg-gray-300"></div>
             </div>
 
-            <!-- Hidden input for merge (only when allowMerging) -->
-            <input th:if="${capabilities['allowMerging']}"
-                   type="hidden"
+            <input type="hidden"
                    name="responseId"
                    th:value="${response.id()}"/>
 
