@@ -19,6 +19,8 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
 
     private static final int SSC_GATHER_DATA_MASTERSHEET_ID = 21;
     private static final int SSC_INPUT_STEP_INDEX = 2;
+    // orderIndex=28 (0-based index 27) is the first step with allowActionItems=true in stage 21
+    private static final int SSC_ACTION_ITEMS_STEP_INDEX = 27;
 
     @Test
     @Timeout(300)
@@ -100,6 +102,33 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
             assertTrue(
                     participantPage.locator("p:has-text('Start: More pair programming')").isVisible(),
                     "Submitted Start note should be visible on participant page");
+
+            // ── 8. Fast-forward to action items step and submit an action item ──────
+            logTestProgress("ACTION_ITEMS", 6, 6, "Fast-forwarding to action items step");
+            fastForwardToStep(sessionId, SSC_ACTION_ITEMS_STEP_INDEX);
+
+            facilitatorPage.waitForResponse(
+                    response -> response.url().contains("/" + sessionId + "/action-items") && response.status() == 200,
+                    () -> facilitatorPage.navigate(retroUrl));
+
+            facilitatorPage.waitForFunction("() => !!document.querySelector(\"textarea[name='what']\")");
+            facilitatorPage.evaluate("() => document.querySelector(\"textarea[name='what']\").scrollIntoView()");
+
+            facilitatorPage.evaluate(
+                    "() => { document.querySelector(\"textarea[name='what']\").value = 'Pair programming sessions every Tuesday'; }");
+
+            String whatValue = (String) facilitatorPage.evaluate(
+                    "() => document.querySelector(\"textarea[name='what']\").value");
+            assertEquals("Pair programming sessions every Tuesday", whatValue,
+                    "Action item 'what' textarea should have the correct value");
+
+            facilitatorPage.evaluate(
+                    "() => { const form = document.querySelector(\"form[hx-post*='action-items']\"); if (form) { htmx.trigger(form, 'submit'); } }");
+
+            waitForElement(facilitatorPage, "text=Pair programming sessions every Tuesday", 15000);
+            assertTrue(
+                    facilitatorPage.locator("text=Pair programming sessions every Tuesday").isVisible(),
+                    "Submitted action item should be visible on facilitator page");
 
         } catch (Exception e) {
             reportTestFailure(facilitatorPage, "SSC Retrospective Flow", e);
