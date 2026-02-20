@@ -114,8 +114,17 @@
             <p class="text-sm text-gray-400 text-center py-4">Loading...</p>
         </div>
     </div>
+</div>
 
-    <div th:unless="${responses.empty or capabilities['allowMerging'] == true}"
+<!-- Card Lane Content Fragment (loaded via HTMX) -->
+<div th:fragment="lane-content" class="space-y-2 min-h-[200px]">
+    <div th:if="${responses.empty}" class="text-center text-gray-400 text-sm py-8">
+        <p>💭</p>
+        <p class="mt-2">Notes will appear here...</p>
+    </div>
+
+    <!-- Non-merging cards (standard view) -->
+    <div th:unless="${responses.empty or (capabilities['allowMerging'] != null and capabilities['allowMerging'])}"
          class="space-y-2">
 
         <div th:each="response : ${responses}"
@@ -127,6 +136,7 @@
                  class="bg-white border-2 rounded-lg p-3 shadow-sm transition-shadow"
                  th:classappend="${isMyResponse} ? 'border-blue-400 bg-blue-50 hover:shadow-md cursor-pointer' : 'border-gray-200'">
 
+                <!-- Display Mode (my card - editable) -->
                 <div th:id="'card-display-' + ${response.id()}"
                      th:if="${isMyResponse}"
                      onclick="
@@ -138,15 +148,9 @@
                      class="cursor-pointer">
                     <p th:if="${canSeeContent}"
                        class="text-sm text-gray-800 mb-2 whitespace-pre-wrap"
-                       th:text="${response.content()}">
-                        Note content
-                    </p>
-
+                       th:text="${response.content()}">Note content</p>
                     <p th:unless="${canSeeContent}"
-                       class="text-sm text-gray-400 italic mb-2">
-                        [Hidden until revealed]
-                    </p>
-
+                       class="text-sm text-gray-400 italic mb-2">[Hidden until revealed]</p>
                     <div class="flex items-center justify-between text-xs mt-2 pt-2 border-t border-gray-200">
                         <div class="flex items-center gap-2">
                             <span th:if="${showAuthor}" class="text-gray-600 font-medium" th:text="${response.participantName()}">User</span>
@@ -163,19 +167,14 @@
                     </div>
                 </div>
 
+                <!-- Display Mode (other users - non-editable) -->
                 <div th:id="'card-display-' + ${response.id()}"
                      th:unless="${isMyResponse}">
                     <p th:if="${canSeeContent}"
                        class="text-sm text-gray-800 mb-2 whitespace-pre-wrap"
-                       th:text="${response.content()}">
-                        Note content
-                    </p>
-
+                       th:text="${response.content()}">Note content</p>
                     <p th:unless="${canSeeContent}"
-                       class="text-sm text-gray-400 italic mb-2">
-                        [Hidden until revealed]
-                    </p>
-
+                       class="text-sm text-gray-400 italic mb-2">[Hidden until revealed]</p>
                     <div class="flex items-center justify-between text-xs mt-2 pt-2 border-t border-gray-200">
                         <div class="flex items-center gap-2">
                             <span th:if="${showAuthor}" class="text-gray-600 font-medium" th:text="${response.participantName()}">User</span>
@@ -192,6 +191,7 @@
                     </div>
                 </div>
 
+                <!-- Edit Mode (hidden by default) -->
                 <div th:if="${isMyResponse}"
                      th:id="'card-edit-' + ${response.id()}"
                      style="display: none;">
@@ -212,27 +212,15 @@
                                         document.getElementById('card-edit-' + cardId).style.display='none';
                                     "
                                     class="text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded-full p-1.5 transition-colors text-sm"
-                                    title="Cancel">
-                                ✕
-                            </button>
+                                    title="Cancel">✕</button>
                             <button type="submit"
                                     class="text-green-600 hover:text-green-700 hover:bg-green-50 rounded-full p-1.5 transition-colors"
-                                    title="Save">
-                                ✓
-                            </button>
+                                    title="Save">✓</button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- Card Lane Content Fragment (loaded via HTMX) -->
-<div th:fragment="lane-content" class="space-y-2 min-h-[200px]">
-    <div th:if="${responses.empty}" class="text-center text-gray-400 text-sm py-8">
-        <p>💭</p>
-        <p class="mt-2">Notes will appear here...</p>
     </div>
 
     <div th:if="${!responses.empty and capabilities['allowMerging'] == true}"
