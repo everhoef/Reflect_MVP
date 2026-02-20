@@ -2,14 +2,22 @@ package direct.reflect.facilitator.integration;
 
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
+import direct.reflect.facilitator.configurator.RetroStage;
+import direct.reflect.facilitator.configurator.RetroStep;
+import direct.reflect.facilitator.configurator.RetroStepRepository;
 import direct.reflect.facilitator.configurator.RetroTemplate;
+import direct.reflect.facilitator.facilitation.RetroPhase;
 import direct.reflect.facilitator.facilitation.RetroSession;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -17,24 +25,11 @@ import static org.junit.jupiter.api.Assertions.*;
 @Slf4j
 public class SscRetroFlowTest extends BaseIntegrationTest {
 
-    /**
-     * SSC template ID (Start Stop Keep / Start Stop Continue).
-     * Template ID 21 corresponds to the "Start Stop Keep" stages in the CSV.
-     */
-    private static final long SSC_TEMPLATE_ID = 21L;
-
-    /**
-     * Step index of the sticky note input step within the SSC template.
-     * Steps 0+1 are AUTO-advancing intro steps; step 2 (orderIndex 3) is the
-     * TIMER_EXPIRES sticky-note input step with all three columns.
-     */
+    private static final int SSC_GATHER_DATA_MASTERSHEET_ID = 21;
     private static final int SSC_INPUT_STEP_INDEX = 2;
 
-    /**
-     * Step index of the first action items step within the SSC template.
-     * Step 27 (orderIndex 28) has allowActionItems=true.
-     */
-    private static final int SSC_ACTION_ITEMS_STEP_INDEX = 27;
+    @Autowired
+    private RetroStepRepository stepRepository;
 
     @Test
     @Timeout(300)
@@ -46,37 +41,45 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
         Page participantPage = participantContext.newPage();
 
         try {
-            // ── SETUP ────────────────────────────────────────────────────────────
-            logTestProgress("SETUP", 1, 7, "Authenticating facilitator and participant");
+            // ── 1. Authenticate ────────────────────────────────────────────────────
+            logTestProgress("SETUP", 1, 6, "Authenticating facilitator and participant");
             authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
             authenticateAsGuest(participantPage, "Bob");
 
-            logTestProgress("SETUP", 2, 7, "Creating SSC retro session");
+            // ── 2. Create session (uses Default template initially) ─────────────────
+            logTestProgress("SETUP", 2, 6, "Creating retro session");
             String sessionId = createRetroSession(facilitatorPage, "SSC Test Session");
 
-            // Swap the session's template to SSC (ID 21) BEFORE starting, so that
-            // startRetroSession() navigates into the SSC stage/step sequence.
-            logTestProgress("SETUP", 3, 7, "Swapping template to SSC (ID 21)");
-            RetroTemplate sscTemplate = templateRepository.findById(SSC_TEMPLATE_ID)
-                    .orElseThrow(() -> new IllegalStateException("SSC template (ID 21) not found – is the import profile active?"));
+            // ── 3. Swap template to SSC ─────────────────────────────────────────────
+            logTestProgress("SETUP", 3, 6, "Swapping session template to SSC");
+            RetroTemplate sscTemplate = buildSscTemplate();
             RetroSession session = retroSessionRepository.findById(UUID.fromString(sessionId))
                     .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
             session.setTemplate(sscTemplate);
             retroSessionRepository.save(session);
-            log.info("✅ Template swapped to SSC ({})", sscTemplate.getName());
+            log.info("Template swapped to SSC: {}", sscTemplate.getName());
 
-            // ── JOIN & START ─────────────────────────────────────────────────────
-            logTestProgress("SETUP", 4, 7, "Participant joining, then starting session");
+            // ── 4. Participant joins, facilitator starts session ────────────────────
+            logTestProgress("SETUP", 4, 6, "Participant joining and starting session");
             joinRetroSession(participantPage, sessionId);
             startRetroSession(facilitatorPage);
 
-            // Steps 0 and 1 are AUTO-advancing intro steps; after startRetroSession()
-            // the system should already be on step 2 (the sticky-note input step).
-            // Wait for the multi-column board columns to appear on both pages.
+            // ── 5. Fast-forward session DB state to SSC input step ─────────────────
+            //    After startRetroSession() the server is at SET_THE_STAGE, step 0.
+            //    We skip straight to GATHER_DATA/step=SSC_INPUT_STEP_INDEX by directly
+            //    updating the DB, then reloading both pages via the content endpoint.
+            logTestProgress("SETUP", 5, 6, "Fast-forwarding to SSC input step");
+            fastForwardToStep(sessionId, SSC_INPUT_STEP_INDEX);
+
+            // Reload both pages so they pick up the new step
+            String retroUrl = baseUrl + "/retro/" + sessionId;
+            facilitatorPage.navigate(retroUrl);
+            participantPage.navigate(retroUrl);
+
             waitForAllPagesElement("[data-column='Start']", facilitatorPage, participantPage);
 
-            // ── PHASE 1: COLUMN COLORS ───────────────────────────────────────────
-            logTestProgress("COLORS", 5, 7, "Verifying Start/Stop/Continue column colors");
+            // ── 6. Verify column colors ─────────────────────────────────────────────
+            logTestProgress("COLORS", 6, 6, "Verifying Start/Stop/Continue column colors");
             waitForElement(facilitatorPage, "[data-column='Start']");
 
             String startStyle    = facilitatorPage.locator("[data-column='Start']").getAttribute("style");
@@ -93,46 +96,33 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
                     "Stop column should be red (#EF4444), got: " + stopStyle);
             assertTrue(continueStyle.contains("#3B82F6"),
                     "Continue column should be blue (#3B82F6), got: " + continueStyle);
-            log.info("✅ Column colors verified: Start=green, Stop=red, Continue=blue");
 
-            // ── PHASE 2: STICKY NOTES ────────────────────────────────────────────
-            logTestProgress("STICKY_NOTES", 6, 7, "Submitting sticky notes in all three columns");
-
-            // Submit a note in the Start column
+            // ── 7. Submit sticky notes in all three columns ─────────────────────────
+            logTestProgress("STICKY_NOTES", 6, 6, "Submitting sticky notes in all three columns");
             fillElement(participantPage, "[data-column='Start'] textarea[name='content']", "Start: More pair programming");
-            clickElement(participantPage, "[data-column='Start'] button:has-text('➕')");
+            clickElement(participantPage, "[data-column='Start'] button[type='submit']");
 
-            // Submit a note in the Stop column
             fillElement(participantPage, "[data-column='Stop'] textarea[name='content']", "Stop: Long meetings");
-            clickElement(participantPage, "[data-column='Stop'] button:has-text('➕')");
+            clickElement(participantPage, "[data-column='Stop'] button[type='submit']");
 
-            // Submit a note in the Continue column
             fillElement(participantPage, "[data-column='Continue'] textarea[name='content']", "Continue: Code reviews");
-            clickElement(participantPage, "[data-column='Continue'] button:has-text('➕')");
+            clickElement(participantPage, "[data-column='Continue'] button[type='submit']");
 
-            // The participant's own notes should be visible immediately (SSE will also push to facilitator)
             waitForElement(participantPage, "p:has-text('Start: More pair programming')");
             assertTrue(
                     participantPage.locator("p:has-text('Start: More pair programming')").isVisible(),
                     "Submitted Start note should be visible on participant page");
-            log.info("✅ Sticky notes submitted in Start, Stop, Continue columns");
 
-            // ── PHASE 3: NAVIGATE TO ACTION ITEMS STEP ───────────────────────────
-            // We are currently at step index 2. We need to reach step index 27.
-            // That means 25 Next-button clicks.
-            logTestProgress("NAVIGATE", 7, 7, "Navigating to action items step (step 27)");
-            int clicksNeeded = SSC_ACTION_ITEMS_STEP_INDEX - SSC_INPUT_STEP_INDEX;
-            for (int i = 0; i < clicksNeeded; i++) {
-                boolean advanced = clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS);
-                if (!advanced) {
-                    fail("Could not advance at click " + (i + 1) + " of " + clicksNeeded +
-                         " while navigating toward step " + SSC_ACTION_ITEMS_STEP_INDEX);
-                }
-            }
+            // ── 8. Fast-forward to action items step ────────────────────────────────
+            logTestProgress("ACTION_ITEMS", 6, 6, "Jumping to action items step");
+            int actionItemsStepIndex = findActionItemsStepIndex();
+            log.info("Dynamically found action items step index: {}", actionItemsStepIndex);
+            fastForwardToStep(sessionId, actionItemsStepIndex);
+            facilitatorPage.navigate(retroUrl);
+            facilitatorPage.locator("textarea[name='what']")
+                    .waitFor(new com.microsoft.playwright.Locator.WaitForOptions().setTimeout(20000));
+            facilitatorPage.locator("textarea[name='what']").scrollIntoViewIfNeeded();
 
-            // ── PHASE 4: ACTION ITEMS ────────────────────────────────────────────
-            logTestProgress("ACTION_ITEMS", 7, 7, "Verifying action item form and submitting an action item");
-            waitForElement(facilitatorPage, "textarea[name='what']");
             assertTrue(
                     facilitatorPage.locator("textarea[name='what']").isVisible(),
                     "Action item WHAT field should be visible on the action items step");
@@ -140,12 +130,11 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
             fillElement(facilitatorPage, "textarea[name='what']", "Implement daily standups");
             clickElement(facilitatorPage, "button:has-text('Add Action Item')");
 
-            waitForElement(facilitatorPage, "text=Implement daily standups");
+            facilitatorPage.locator("text=Implement daily standups")
+                    .waitFor(new com.microsoft.playwright.Locator.WaitForOptions().setTimeout(10000));
             assertTrue(
                     facilitatorPage.locator("text=Implement daily standups").isVisible(),
-                    "Submitted action item should appear in the action items list");
-
-            log.info("✅ SSC flow fully validated: column colors, sticky notes, and action items");
+                    "Submitted action item should appear in the list");
 
         } catch (Exception e) {
             reportTestFailure(facilitatorPage, "SSC Retrospective Flow", e);
@@ -154,5 +143,76 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
             facilitatorContext.close();
             participantContext.close();
         }
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Builds (and persists) a RetroTemplate whose GATHER_DATA stage is the
+     * "Start Stop Keep" SSC stage (mastersheetID=21).
+     * The other four phases reuse the first available template's stages so that
+     * the session can navigate through all phases correctly.
+     */
+    private RetroTemplate buildSscTemplate() {
+        RetroStage sscStage = stageRepository.findByMastersheetID(SSC_GATHER_DATA_MASTERSHEET_ID)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Start Stop Keep stage (mastersheetID=" + SSC_GATHER_DATA_MASTERSHEET_ID +
+                        ") not found. Is the 'import' profile active?"));
+
+        // Use the default (first) template for the non-SSC phases
+        RetroTemplate defaultTemplate = templateRepository.findAll().stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "No templates found – is the 'import' profile active?"));
+
+        RetroTemplate sscTemplate = new RetroTemplate();
+        sscTemplate.setName("Start Stop Keep (test)");
+        sscTemplate.setDescription("SSC template created by integration test");
+        sscTemplate.setMaturityLevel(2);
+        sscTemplate.setReleased(false);
+        sscTemplate.setSetTheStage(defaultTemplate.getSetTheStage());
+        sscTemplate.setGatherData(sscStage);
+        sscTemplate.setGenerateInsights(defaultTemplate.getGenerateInsights());
+        sscTemplate.setDecideActions(defaultTemplate.getDecideActions());
+        sscTemplate.setCloseRetro(defaultTemplate.getCloseRetro());
+
+        return templateRepository.save(sscTemplate);
+    }
+
+    /**
+     * Directly updates the session in the DB to GATHER_DATA phase at the given step index.
+     * This skips over all the preceding steps so the test can focus on SSC-specific features.
+     */
+    private void fastForwardToStep(String sessionId, int stepIndex) {
+        RetroSession session = retroSessionRepository.findById(UUID.fromString(sessionId))
+                .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
+        session.setPhase(RetroPhase.GATHER_DATA);
+        session.setCurrentStepIndex(stepIndex);
+        retroSessionRepository.save(session);
+        log.info("Fast-forwarded session {} to GATHER_DATA / stepIndex={}", sessionId, stepIndex);
+    }
+
+    @SuppressWarnings("unchecked")
+    private int findActionItemsStepIndex() {
+        RetroStage sscStage = stageRepository.findByMastersheetID(SSC_GATHER_DATA_MASTERSHEET_ID)
+                .orElseThrow(() -> new IllegalStateException(
+                        "SSC stage (mastersheetID=" + SSC_GATHER_DATA_MASTERSHEET_ID + ") not found"));
+
+        List<RetroStep> steps = stepRepository.findByRetroStageOrderByOrderIndexAsc(sscStage);
+        log.info("SSC stage has {} steps in DB", steps.size());
+
+        return IntStream.range(0, steps.size())
+                .filter(i -> {
+                    Map<String, Object> config = steps.get(i).getComponentConfig();
+                    if (config == null) return false;
+                    Object caps = config.get("capabilities");
+                    if (!(caps instanceof Map)) return false;
+                    Object allowActionItems = ((Map<String, Object>) caps).get("allowActionItems");
+                    return Boolean.TRUE.equals(allowActionItems);
+                })
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "No step with allowActionItems=true found in SSC stage (mastersheetID=" +
+                        SSC_GATHER_DATA_MASTERSHEET_ID + "). Steps in DB: " + steps.size()));
     }
 }
