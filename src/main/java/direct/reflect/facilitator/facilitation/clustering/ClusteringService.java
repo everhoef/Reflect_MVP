@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -78,7 +79,7 @@ public class ClusteringService {
         Map<UUID, List<ColumnResponseDto>> clustered = new LinkedHashMap<>();
         responseRepository.findByRetroStepIdAndClusterIdIsNotNull(stepId)
                 .forEach(r -> clustered
-                        .computeIfAbsent(r.getClusterId(), k -> new java.util.ArrayList<>())
+                        .computeIfAbsent(r.getClusterId(), k -> new ArrayList<>())
                         .add(ColumnResponseDto.from(r)));
 
         return new ClusterGroupsDto(clustered, unclustered);
