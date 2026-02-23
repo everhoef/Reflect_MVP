@@ -31,7 +31,37 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
         BrowserContext participantContext = createMonitoredContext();
         Page participantPage = participantContext.newPage();
 
+        facilitatorPage.setDefaultNavigationTimeout(30_000);
+        participantPage.setDefaultNavigationTimeout(30_000);
+
         try {
+            // Block external CDN resources that cause the Playwright `load` event to hang
+            // indefinitely when there is no internet access or slow DNS. layout.html loads:
+            //   - fonts.googleapis.com / fonts.gstatic.com  (Google Fonts)
+            //   - cdn.tailwindcss.com                       (Tailwind CSS)
+            //   - cdn.jsdelivr.net                          (SortableJS)
+            for (BrowserContext ctx : new BrowserContext[]{facilitatorContext, participantContext}) {
+                ctx.route(java.util.regex.Pattern.compile(".*fonts\\.googleapis\\.com.*"), route -> route.abort());
+                ctx.route(java.util.regex.Pattern.compile(".*fonts\\.gstatic\\.com.*"), route -> route.abort());
+                ctx.route(java.util.regex.Pattern.compile(".*cdn\\.tailwindcss\\.com.*"), route -> route.abort());
+                ctx.route(java.util.regex.Pattern.compile(".*cdn\\.jsdelivr\\.net.*"), route -> route.abort());
+            }
+
+            // Wait for server to be ready (handles cold-start when run in isolation)
+            long deadline = System.currentTimeMillis() + 30_000;
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
+                        new java.net.URL(baseUrl + "/login").openConnection();
+                    conn.setConnectTimeout(1000);
+                    conn.setReadTimeout(3000);
+                    int status = conn.getResponseCode();
+                    conn.disconnect();
+                    if (status < 500) break;
+                } catch (Exception ignored) {}
+                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+            }
+
             // ── 1. Authenticate ────────────────────────────────────────────────────
             logTestProgress("SETUP", 1, 6, "Authenticating facilitator and participant");
             authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
