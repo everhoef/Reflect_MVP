@@ -31,22 +31,7 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
         BrowserContext participantContext = createMonitoredContext();
         Page participantPage = participantContext.newPage();
 
-        facilitatorPage.setDefaultNavigationTimeout(30_000);
-        participantPage.setDefaultNavigationTimeout(30_000);
-
         try {
-            // Block external CDN resources that cause the Playwright `load` event to hang
-            // indefinitely when there is no internet access or slow DNS. layout.html loads:
-            //   - fonts.googleapis.com / fonts.gstatic.com  (Google Fonts)
-            //   - cdn.tailwindcss.com                       (Tailwind CSS)
-            //   - cdn.jsdelivr.net                          (SortableJS)
-            for (BrowserContext ctx : new BrowserContext[]{facilitatorContext, participantContext}) {
-                ctx.route(java.util.regex.Pattern.compile(".*fonts\\.googleapis\\.com.*"), route -> route.abort());
-                ctx.route(java.util.regex.Pattern.compile(".*fonts\\.gstatic\\.com.*"), route -> route.abort());
-                ctx.route(java.util.regex.Pattern.compile(".*cdn\\.tailwindcss\\.com.*"), route -> route.abort());
-                ctx.route(java.util.regex.Pattern.compile(".*cdn\\.jsdelivr\\.net.*"), route -> route.abort());
-            }
-
             // Wait for server to be ready (handles cold-start when run in isolation)
             long deadline = System.currentTimeMillis() + 30_000;
             while (System.currentTimeMillis() < deadline) {

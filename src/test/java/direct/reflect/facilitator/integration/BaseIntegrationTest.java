@@ -49,6 +49,7 @@ import java.time.format.DateTimeFormatter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.Files;
+import java.util.regex.Pattern;
 
 import direct.reflect.facilitator.configurator.RetroTemplateRepository;
 import direct.reflect.facilitator.configurator.RetroStageRepository;
@@ -338,7 +339,15 @@ public abstract class BaseIntegrationTest {
         newContext.setDefaultNavigationTimeout(DEFAULT_TIMEOUT_MS);
 
         setupConsoleAndNetworkMonitoring(newContext);
+        blockExternalCdnResources(newContext);
         return newContext;
+    }
+
+    private void blockExternalCdnResources(BrowserContext ctx) {
+        ctx.route(Pattern.compile(".*fonts\\.googleapis\\.com.*"), route -> route.abort());
+        ctx.route(Pattern.compile(".*fonts\\.gstatic\\.com.*"), route -> route.abort());
+        ctx.route(Pattern.compile(".*cdn\\.tailwindcss\\.com.*"), route -> route.abort());
+        ctx.route(Pattern.compile(".*cdn\\.jsdelivr\\.net.*"), route -> route.abort());
     }
 
     @BeforeEach
@@ -376,6 +385,8 @@ public abstract class BaseIntegrationTest {
 
         // Set up console and network monitoring (Playwright native listeners)
         setupConsoleAndNetworkMonitoring(context);
+
+        blockExternalCdnResources(context);
 
         // Enable Playwright tracing in debug mode for local debugging
         if (debugMode) {
