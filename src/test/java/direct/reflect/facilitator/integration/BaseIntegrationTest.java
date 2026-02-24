@@ -17,13 +17,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import com.redis.testcontainers.RedisContainer;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.annotation.DirtiesContext.ClassMode;
@@ -60,6 +60,7 @@ import direct.reflect.facilitator.facilitation.ParticipantRepository;
 import direct.reflect.facilitator.facilitation.RetroSessionRepository;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponseRepository;
 
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -84,6 +85,7 @@ import java.util.stream.Collectors;
 })
 @DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 @Slf4j
+
 public abstract class BaseIntegrationTest {
 
     // ==================== PLAYWRIGHT CONFIGURATION ====================
@@ -94,29 +96,24 @@ public abstract class BaseIntegrationTest {
      */
     protected static final int DEFAULT_TIMEOUT_MS = 5000;   // Navigation, elements, SSE - use for 95% of cases
     protected static final int SHORT_TIMEOUT_MS = 2000;     // Quick checks when element should already exist
+    protected static final int SSE_PROPAGATION_TIMEOUT_MS = 15000;  // SSE events may need time to propagate across multiple browser contexts
 
     @LocalServerPort
     protected int port;
 
     @Container
+    @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17-alpine")
             .withDatabaseName("facilitator_test")
             .withUsername("test")
             .withPassword("test");
 
     @Container
-    static GenericContainer<?> redis = new GenericContainer<>("redis:alpine")
+    @ServiceConnection
+    @SuppressWarnings("resource")
+    static RedisContainer redis = new RedisContainer("redis:alpine")
             .withExposedPorts(6379)
             .waitingFor(Wait.forLogMessage(".*Ready to accept connections.*", 1));
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.data.redis.host", redis::getHost);
-        registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
-    }
 
     protected Playwright playwright;
     protected Browser browser;
@@ -378,13 +375,10 @@ public abstract class BaseIntegrationTest {
     void setUp(TestInfo testInfo) {
         // Store test info for later use (tracing, error reporting)
         currentTestInfo = testInfo;
-
         // Clear activity trail for clean state at start of each test
         clearActivityTrail();
-
         baseUrl = "http://localhost:" + port;
         playwright = Playwright.create();
-
         // Enable visual debugging: set PLAYWRIGHT_DEBUG=true for headful mode + slow motion
         boolean debugMode = Boolean.parseBoolean(System.getenv("PLAYWRIGHT_DEBUG"));
         BrowserType.LaunchOptions launchOptions = new BrowserType.LaunchOptions()
@@ -399,19 +393,14 @@ public abstract class BaseIntegrationTest {
         }
 
         browser = playwright.chromium().launch(launchOptions);
-
         // Create browser context and set up monitoring
         context = browser.newContext();
-
         // Set default timeout to prevent indefinite waits (Playwright's default is 30s, but we want faster failures)
         context.setDefaultTimeout(DEFAULT_TIMEOUT_MS);
         context.setDefaultNavigationTimeout(DEFAULT_TIMEOUT_MS);
-
         // Set up console and network monitoring (Playwright native listeners)
         setupConsoleAndNetworkMonitoring(context);
-
         blockExternalCdnResources(context);
-
         // Enable Playwright tracing in debug mode for local debugging
         if (debugMode) {
             context.tracing().start(new Tracing.StartOptions()
@@ -421,12 +410,9 @@ public abstract class BaseIntegrationTest {
             log.info("📊 Playwright tracing enabled");
         }
     }
-
     @AfterEach
     void tearDown(TestInfo testInfo) {
         boolean debugMode = Boolean.parseBoolean(System.getenv("PLAYWRIGHT_DEBUG"));
-
-        // Save Playwright trace on failure (debug mode only)
         // Note: We save trace for all tests in debug mode since JUnit 5 doesn't provide
         // easy failure detection in @AfterEach without custom extensions
         if (debugMode && context != null) {
@@ -434,9 +420,7 @@ public abstract class BaseIntegrationTest {
                 String testName = testInfo.getDisplayName().replaceAll("[^a-zA-Z0-9]", "_");
                 Path tracePath = Paths.get("target/traces/" + testName + ".zip");
                 Files.createDirectories(tracePath.getParent());
-
                 context.tracing().stop(new Tracing.StopOptions().setPath(tracePath));
-
                 log.info("📊 Playwright trace saved: {}", tracePath);
                 log.info("   View with: mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args='show-trace {}'", tracePath);
             } catch (Exception e) {
@@ -1482,7 +1466,7 @@ public abstract class BaseIntegrationTest {
      * @param expectedParticipants Exact list of expected participant names (order doesn't matter)
      */
     protected void waitForParticipantList(Page page, String... expectedParticipants) {
-        waitForParticipantList(page, DEFAULT_TIMEOUT_MS, expectedParticipants);
+        waitForParticipantList(page, SSE_PROPAGATION_TIMEOUT_MS, expectedParticipants);
     }
 
     protected void waitForParticipantList(Page page, int timeoutMs, String... expectedParticipants) {
@@ -1494,7 +1478,8 @@ public abstract class BaseIntegrationTest {
                 "(expectedParticipants) => {" +
                 "  const participantElements = document.querySelectorAll('ul#participants-list li');" +
                 "  const actualParticipants = Array.from(participantElements)" +
-                "    .map(li => li.querySelector('span:first-child').textContent.trim())" +
+                "    .map(li => (li.querySelector('span:first-child')?.textContent || '').trim())" +
+                "    .filter(Boolean)" +
                 "    .sort();" +
                 "  const expected = expectedParticipants.slice().sort();" +
                 "  return JSON.stringify(actualParticipants) === JSON.stringify(expected);" +
@@ -1576,7 +1561,7 @@ public abstract class BaseIntegrationTest {
      * @param pages All pages that should show the same participant list
      */
     protected void waitForAllPagesParticipantList(String[] expectedParticipants, Page... pages) {
-        waitForAllPagesParticipantList(expectedParticipants, DEFAULT_TIMEOUT_MS, pages);
+        waitForAllPagesParticipantList(expectedParticipants, SSE_PROPAGATION_TIMEOUT_MS, pages);
     }
 
     protected void waitForAllPagesParticipantList(String[] expectedParticipants, int timeoutMs, Page... pages) {

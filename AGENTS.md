@@ -419,6 +419,9 @@ The `system-ui/` folder contains UI design screenshots with mock data that illus
 - Use `@SpringBootTest` with appropriate test slices
 - **CRITICAL - DO NOT HIDE PROBLEMS WITH TIMEOUTS**: When tests fail with timeouts, investigate the root cause. Don't increase timeout duration - that only masks problems.
 - **Test failures are feedback** - they tell you something is wrong with the implementation, not the test
+- **NEVER skip, disable, or ignore failing tests**: If a test fails, it is your responsibility to fix the root cause. Do not use `@Disabled`, `@Ignore`, `@Tag("flaky")`, or any mechanism to skip tests. Do not increase timeout durations to mask underlying problems — investigate WHY the timeout is insufficient.
+- **Flaky tests are bugs**: A flaky test indicates a real problem — race condition, missing synchronization, incorrect assumptions. Treat flaky tests as P1 bugs and fix immediately.
+- **Test reliability is non-negotiable**: All tests must pass reliably on every run. If a test passes "most of the time", it is broken and must be fixed.
 
 ### Security Considerations
 - Always validate user permissions before operations

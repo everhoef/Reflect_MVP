@@ -2,6 +2,7 @@ package direct.reflect.facilitator.integration;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
 import org.springframework.test.annotation.DirtiesContext;
 
 import com.microsoft.playwright.BrowserContext;
@@ -33,6 +34,7 @@ public class SSEConnectionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName("Should maintain stable SSE connection without reconnecting")
+
     @DirtiesContext // Clean up after this 30-second SSE test to prevent contamination
     void shouldMaintainStableSSEConnection() throws InterruptedException {
         BrowserContext context = createMonitoredContext();

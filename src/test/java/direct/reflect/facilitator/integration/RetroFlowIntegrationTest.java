@@ -62,7 +62,7 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
 
             // Wait for participant pages to transition to retro (startRetroSession only waits for facilitator)
             log.info("Waiting for participant pages to transition to retro...");
-            waitForAllPagesElement("h2:has-text('Stage')", bobPage, carolPage);
+            waitForAllPagesElement("h2:has-text('Stage')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
 
             // ===== PHASE 1: SET_THE_STAGE - Happiness Histogram (4 steps) =====
             log.info("\n┌─ PHASE 1: SET_THE_STAGE (Happiness Histogram)");
@@ -172,7 +172,7 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             log.info("  ├─ Verifying responses visible after reveal...");
 
             // Wait for all pages to show revealed content (use p selector to avoid edit mode textarea)
-            waitForAllPagesElement("[data-column=\"Glad\"] p:has-text('Carol Glad: Great teamwork')", bobPage, carolPage, facilitatorPage);
+            waitForAllPagesElement("[data-column=\"Glad\"] p:has-text('Carol Glad: Great teamwork')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage, facilitatorPage);
 
             assertTrue(bobPage.locator("[data-column=\"Glad\"] p:has-text('Carol Glad: Great teamwork')").isVisible(),
                 "Bob should see Carol's response after reveal");
@@ -238,8 +238,8 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
 
             // Wait for responses to appear on both pages
             // Use p:has-text() to only match the visible <p> tag, not the hidden <textarea> in edit mode
-            waitForAllPagesElement("p:has-text('Bob Q1: Good code reviews')", bobPage, carolPage);
-            waitForAllPagesElement("p:has-text('Carol Q1: Strong testing')", bobPage, carolPage);
+            waitForAllPagesElement("p:has-text('Bob Q1: Good code reviews')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
+            waitForAllPagesElement("p:has-text('Carol Q1: Strong testing')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
 
             // Verify Q1 responses visible
             assertTrue(bobPage.locator("p:has-text('Bob Q1: Good code reviews')").isVisible());
@@ -256,7 +256,7 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             clickElement(bobPage, "button[type='submit']");
 
             // Wait for Q2 response to appear
-            waitForAllPagesElement("p:has-text('Bob Q2: Docker networking')", bobPage, carolPage);
+            waitForAllPagesElement("p:has-text('Bob Q2: Docker networking')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
 
             // CRITICAL: Q2 visible, Q1 NOT visible
             assertTrue(bobPage.locator("p:has-text('Bob Q2: Docker networking')").isVisible(),
@@ -295,7 +295,7 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             clickElement(carolPage, "button[type='submit']");
 
             // Wait for Q4 response to appear
-            waitForAllPagesElement("p:has-text('Carol Q4: Performance bottleneck')", bobPage, carolPage);
+            waitForAllPagesElement("p:has-text('Carol Q4: Performance bottleneck')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
 
             // CRITICAL: Q4 visible, Q1/Q2/Q3 NOT visible
             assertTrue(carolPage.locator("p:has-text('Carol Q4: Performance bottleneck')").isVisible());
