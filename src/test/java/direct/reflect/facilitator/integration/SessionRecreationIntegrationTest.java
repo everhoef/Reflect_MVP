@@ -39,7 +39,7 @@ public class SessionRecreationIntegrationTest extends BaseIntegrationTest {
     public void shouldMarkOldSessionAsLeftWhenUserCreatesNewSession() {
         log.info("🧪 TEST: User creates new session while having active session");
 
-        BrowserContext context = browser.newContext();
+        BrowserContext context = createMonitoredContext();
         Page page = context.newPage();
 
         try {
@@ -130,8 +130,8 @@ public class SessionRecreationIntegrationTest extends BaseIntegrationTest {
     public void shouldPreserveResponsesWhenUserLeavesSession() {
         log.info("🧪 TEST: Responses preserved when user leaves session");
 
-        BrowserContext facilitatorContext = browser.newContext();
-        BrowserContext participantContext = browser.newContext();
+        BrowserContext facilitatorContext = createMonitoredContext();
+        BrowserContext participantContext = createMonitoredContext();
         Page facilitatorPage = facilitatorContext.newPage();
         Page participantPage = participantContext.newPage();
 

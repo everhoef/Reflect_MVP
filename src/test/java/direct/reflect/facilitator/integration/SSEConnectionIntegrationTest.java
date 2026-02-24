@@ -35,7 +35,7 @@ public class SSEConnectionIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Should maintain stable SSE connection without reconnecting")
     @DirtiesContext // Clean up after this 30-second SSE test to prevent contamination
     void shouldMaintainStableSSEConnection() throws InterruptedException {
-        BrowserContext context = browser.newContext();
+        BrowserContext context = createMonitoredContext();
         Page page = context.newPage();
 
         authenticateAsGuest(page, "SSE Test User");
@@ -72,7 +72,7 @@ public class SSEConnectionIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Should broadcast participant_joined event to all participants in session")
     void shouldBroadcastParticipantJoinedToAllParticipants() throws InterruptedException {
-        BrowserContext context1 = browser.newContext();
+        BrowserContext context1 = createMonitoredContext();
         Page facilitatorPage = context1.newPage();
 
         authenticateAsGuest(facilitatorPage, "Facilitator");
@@ -84,7 +84,7 @@ public class SSEConnectionIntegrationTest extends BaseIntegrationTest {
         // Verify facilitator sees itself in participant list
         waitForParticipantList(facilitatorPage, "Facilitator");
 
-        BrowserContext context2 = browser.newContext();
+        BrowserContext context2 = createMonitoredContext();
         Page participantPage = context2.newPage();
 
         authenticateAsGuest(participantPage, "Participant");
@@ -103,10 +103,10 @@ public class SSEConnectionIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Should broadcast session_started event to all participants")
     void shouldBroadcastSessionStartedEventToAllParticipants() throws InterruptedException {
-        BrowserContext context1 = browser.newContext();
+        BrowserContext context1 = createMonitoredContext();
         Page facilitatorPage = context1.newPage();
 
-        BrowserContext context2 = browser.newContext();
+        BrowserContext context2 = createMonitoredContext();
         Page participantPage = context2.newPage();
 
         authenticateAsGuest(facilitatorPage, "Facilitator");

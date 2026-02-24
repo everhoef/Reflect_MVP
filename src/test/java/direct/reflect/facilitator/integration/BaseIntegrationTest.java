@@ -128,6 +128,21 @@ public abstract class BaseIntegrationTest {
     private List<ConsoleMessage> consoleErrors = new ArrayList<>();
     private List<String> networkFailures = new ArrayList<>();
 
+    /**
+     * CDN domains intentionally blocked in tests via blockExternalCdnResources().
+     * Network failures for these domains are expected and must not be logged as errors.
+     */
+    private static final Set<String> BLOCKED_CDN_DOMAINS = Set.of(
+        "fonts.googleapis.com",
+        "fonts.gstatic.com",
+        "cdn.tailwindcss.com",
+        "cdn.jsdelivr.net"
+    );
+
+    private boolean isBlockedCdnUrl(String url) {
+        return BLOCKED_CDN_DOMAINS.stream().anyMatch(url::contains);
+    }
+
     @Autowired
     protected RetroTemplateRepository templateRepository;
 
@@ -246,45 +261,54 @@ public abstract class BaseIntegrationTest {
 
     // ==================== CONSOLE AND NETWORK MONITORING ====================
 
+
     /**
      * Sets up Playwright's native console and network listeners on the browser context.
      * This automatically applies to all pages created from this context.
      *
-     * Uses Playwright's built-in listeners for:
-     * - Console error messages (logged immediately and stored for summary)
-     * - Network request failures (connection errors, timeouts)
-     * - HTTP error responses (4xx, 5xx status codes)
+     * LOGGING TAXONOMY:
+     *   [BROWSER_MONITOR] — Real-time observations during test execution (WARN level).
+     *                       These fire continuously and do NOT indicate test failure.
+     *   [CDN_BLOCKED]     — Intentionally blocked CDN resources (DEBUG level, hidden by default).
+     *   [TEST_FAILURE_REPORT] — Only used by reportTestFailure() when a test actually fails.
+     *
+     * CDN resources (fonts.googleapis.com, cdn.tailwindcss.com, etc.) are intentionally
+     * aborted by blockExternalCdnResources() and silently filtered here.
      */
     private void setupConsoleAndNetworkMonitoring(BrowserContext context) {
         // Clear previous test's errors
         consoleErrors.clear();
         networkFailures.clear();
-
-        // ✅ Use Playwright's native console message listener
+        // Console error listener — captures browser-side JavaScript errors
         context.onConsoleMessage(msg -> {
             if (msg.type().equals("error")) {
-                // Immediately log AND store for later summary reporting
-                log.error("[TEST_FAILURE_REPORT] 🔴 Browser Console: {}", msg.text());
+                log.warn("[BROWSER_MONITOR] Browser console error: {}", msg.text());
                 consoleErrors.add(msg);
             }
         });
 
-        // ✅ Use Playwright's native network failure listener
+        // Network failure listener — captures connection errors, aborted requests
+        // Silently skips intentionally blocked CDN resources (expected behavior)
         context.onRequestFailed(request -> {
+            if (isBlockedCdnUrl(request.url())) {
+                log.debug("[CDN_BLOCKED] {} {} (expected — blocked by test infrastructure)",
+                    request.method(), request.url());
+                return;
+            }
             String failure = String.format("%s %s - %s",
                 request.method(), request.url(), request.failure());
-            log.error("[TEST_FAILURE_REPORT] ❌ Network Failed: {}", failure);
+            log.warn("[BROWSER_MONITOR] Network failure: {}", failure);
             networkFailures.add(failure);
         });
 
-        // ✅ Use Playwright's native response listener for HTTP errors
+        // HTTP error response listener — captures 4xx/5xx status codes
         context.onResponse(response -> {
             if (response.status() >= 400) {
                 String failure = String.format("HTTP %d: %s %s",
                     response.status(),
                     response.request().method(),
                     response.url());
-                log.error("[TEST_FAILURE_REPORT] ❌ {}", failure);
+                log.warn("[BROWSER_MONITOR] {}", failure);
                 networkFailures.add(failure);
             }
         });
@@ -530,7 +554,7 @@ public abstract class BaseIntegrationTest {
                 throw new RuntimeException("OAuth2 authentication failed - user was redirected to login page");
             } else {
                 log.info("✅ OAuth2 authentication completed successfully, final URL: {}", finalUrl);
-                debugPageState(page, "OAuth2 authentication success");
+
             }
 
         } catch (Exception e) {
