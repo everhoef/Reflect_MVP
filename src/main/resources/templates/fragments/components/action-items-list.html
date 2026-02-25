@@ -14,5 +14,8 @@
                 📅 <span th:text="${#temporals.format(item.whenDate, 'dd MMM yyyy')}">Date</span>
             </span>
         </div>
+        <p th:if="${item.successCriteria != null}" class="text-xs text-gray-500 mt-1">
+            ✓ <span th:text="${item.successCriteria}">Criteria</span>
+        </p>
     </div>
 </div>

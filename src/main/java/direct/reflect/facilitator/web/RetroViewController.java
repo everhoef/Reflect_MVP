@@ -279,6 +279,7 @@ public class RetroViewController {
             model.addAttribute("currentParticipantId", currentParticipantId);
             model.addAttribute("showAuthor", showAuthor);
             model.addAttribute("capabilities", capabilities != null ? capabilities : Map.of());
+            model.addAttribute("currentStep", step);
 
             return "fragments/components/multi-column-board :: lane-content";
 
