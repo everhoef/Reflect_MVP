@@ -430,6 +430,90 @@ The `system-ui/` folder contains UI design screenshots with mock data that illus
 
 ---
 
+
+## Feature Delivery & Quality Framework
+
+This section defines how features MUST be delivered, verified, and handed off. ALL rules here are MANDATORY for every feature delivery.
+
+### Delivery Pipeline
+
+Every feature delivery MUST follow this 5-step process:
+
+1. **PLAN**: User and AI discuss scope via Prometheus interview (~15 min). User defines what to build; AI creates the work plan.
+
+2. **BUILD**: AI agents execute the plan autonomously. No user involvement during this phase. Agent writes BOTH implementation code AND test code (integration tests + Playwright E2E tests).
+
+3. **VERIFY**: Automated gate — ALL of the following MUST pass:
+   - `./mvnw clean test` — zero failures. This single command runs ALL tests: unit tests, integration tests, AND Playwright E2E tests. There is NO separate Playwright step.
+   - BDD "Critical" scenarios from the Notion story guide test coverage (but NOT 1:1 mapping — see BDD Verification subsection below)
+   - After all tests pass, AI agent MUST update the Notion story status to `Needs review` via MCP tool call: `mcp_notion-hosted_notion-update-page` with `command: update_properties`, property `Status: Needs review`
+
+4. **REVIEW**: User reviews delivery artifacts:
+   - Playwright screenshots/evidence (visual verification without running browser)
+   - `git diff` of all changes
+   - BDD verification report (which scenarios are covered, with evidence)
+   - User moves Notion story to `Complete` after satisfaction, or requests changes
+
+5. **MERGE**: User merges the feature branch with confidence. All gates passed, all evidence reviewed.
+
+### Definition of Done
+
+A feature is READY FOR REVIEW when ALL of the following conditions are true:
+
+- [ ] All BDD "Critical" scenarios from the Notion story are covered by tests (NOT necessarily 1:1 — a single test may cover multiple scenarios)
+- [ ] Every new API/View/Event endpoint has an integration test
+- [ ] All frontend functionality is verified via Playwright E2E tests (tests MUST live in `src/test/java/.../integration/`)
+- [ ] `./mvnw clean test` passes with zero failures (this runs everything: unit + integration + Playwright)
+- [ ] No `@Disabled`, `@Ignore`, or `@Tag("flaky")` annotations added
+- [ ] No suppressed errors (`@SuppressWarnings`, empty catch blocks, `as any`)
+- [ ] Notion story status updated to `Needs review`
+- [ ] Code follows existing patterns in this AGENTS.md (GRASP, controller separation, Lombok, etc.)
+
+### Test Requirements
+
+**Cross-reference**: See Testing Patterns in Code Conventions above for test reliability rules (no `@Disabled`, no flaky tests, etc.). The rules there are MANDATORY and are NOT repeated here.
+
+Additional REQUIRED rules for feature delivery:
+
+- **Integration tests**: REQUIRED for every new endpoint (API, View, or Event controller). Use `@SpringBootTest` + Testcontainers. Follow patterns in existing test classes.
+- **Playwright E2E tests**: REQUIRED for every user-facing feature. Tests MUST live in `src/test/java/.../integration/` alongside existing tests (e.g., `SscRetroFlowTest`). MUST capture screenshot evidence.
+- **Regression gate**: `./mvnw clean test` MUST show zero failures TOTAL — not just new tests passing, but ALL existing tests still passing.
+
+**Definitions**:
+- **User-facing feature**: Any change visible in the browser UI (new page, new component, changed behavior, new interaction). REQUIRES Playwright E2E tests.
+- **Backend endpoint**: API endpoint, service logic, or data model change with no direct UI impact. REQUIRES integration test only (no Playwright required).
+- **Pure refactor**: No behavior change. Existing tests MUST still pass. New tests ONLY if coverage gaps are discovered.
+
+### BDD Verification
+
+- Notion is the **source of truth** for BDD scenarios (declared in this file's header)
+- Before BUILD begins, agent MUST fetch the Notion story and read ALL BDD scenarios
+- Scenarios tagged `("Critical")` are the MANDATORY acceptance contract — every Critical scenario MUST be covered by at least one test
+- There is NO required 1:1 mapping between BDD scenarios and Playwright tests. A single test class may verify multiple BDD scenarios. The goal is: all frontend functionality verified via Playwright, all Critical BDD scenarios covered.
+- Non-critical scenarios SHOULD have test coverage but are NOT blocking delivery
+- If a Notion story has NO BDD scenarios: agent MUST flag this to the user and MUST NOT proceed without clarification
+- If a BDD scenario conflicts with technical constraints: agent MUST document the conflict and ask the user for resolution before proceeding
+
+### Notion Workflow
+
+- **Notion database**: User Stories (source of truth for stories and roadmap)
+- **Status flow**: `To do` → `In progress` → `Needs review` → `Complete`
+- AI agent MUST set status to `In progress` at the start of BUILD phase
+- AI agent MUST set status to `Needs review` at the end of VERIFY phase (after ALL gates pass)
+- User sets status to `Complete` after REVIEW phase approval
+- If Notion MCP is unavailable: delivery proceeds, agent MUST inform user to update Notion status manually
+- **Tool call pattern**: `mcp_notion-hosted_notion-update-page(page_id, command: update_properties, properties: {Status: 'Needs review'})`
+
+### Edge Cases
+
+- **Story with no BDD scenarios**: MUST NOT build. Agent MUST flag this to user. BDD is the acceptance contract.
+- **Pure backend story (no UI)**: Integration tests only. No Playwright E2E required.
+- **Story spanning multiple commits**: Set `Needs review` ONLY on final delivery, NOT on partial deliveries.
+- **Notion MCP unavailable**: Proceed with delivery. Agent MUST notify user to update status manually.
+- **BDD scenario technically infeasible**: Agent MUST document the conflict and ask user for resolution before proceeding.
+
+---
+
 ## Key Technical Rules
 
 ### Thymeleaf Reserved Words
