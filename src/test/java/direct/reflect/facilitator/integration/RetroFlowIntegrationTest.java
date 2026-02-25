@@ -92,13 +92,12 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS);
 
             // Wait for histogram to load (replaces "Loading histogram..." placeholder)
-            waitForElement(facilitatorPage, "text=rating(s) submitted", DEFAULT_TIMEOUT_MS);
+            waitForElement(facilitatorPage, "text=3 rating(s) submitted", DEFAULT_TIMEOUT_MS);
 
             // Verify histogram visualization
             logTestProgress("PHASE_1", 6, 24, "Validating histogram and comments display");
             log.info("  ├─ Validating histogram visualization...");
-            assertTrue(facilitatorPage.locator("text=3 rating(s) submitted").isVisible() ||
-                       facilitatorPage.locator("text=Total: 3").isVisible(),
+            assertTrue(facilitatorPage.locator("text=3 rating(s) submitted").isVisible(),
                 "Histogram should show 3 ratings submitted");
 
             // Verify comments are displayed

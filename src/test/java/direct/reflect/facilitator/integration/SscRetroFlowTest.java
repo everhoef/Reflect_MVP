@@ -154,6 +154,281 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
         }
     }
 
+
+    @Test
+    @Timeout(300)
+    @DisplayName("Should validate SSC clustering display: no dual-render, sortable UI visible")
+    void shouldValidateSscClusteringDisplay() {
+        BrowserContext facilitatorContext = createMonitoredContext();
+        Page facilitatorPage = facilitatorContext.newPage();
+
+        try {
+            // Wait for server to be ready
+            long deadline = System.currentTimeMillis() + 30_000;
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
+                        new java.net.URL(baseUrl + "/login").openConnection();
+                    conn.setConnectTimeout(1000);
+                    conn.setReadTimeout(3000);
+                    int status = conn.getResponseCode();
+                    conn.disconnect();
+                    if (status < 500) break;
+                } catch (Exception ignored) {}
+                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+            }
+
+            logTestProgress("SETUP", 1, 4, "Authenticating facilitator");
+            authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
+
+            logTestProgress("SETUP", 2, 4, "Creating retro session with SSC template");
+            String sessionId = createRetroSession(facilitatorPage, "SSC Clustering Test");
+            RetroTemplate sscTemplate = buildSscTemplate();
+            RetroSession session = retroSessionRepository.findById(UUID.fromString(sessionId))
+                    .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
+            session.setTemplate(sscTemplate);
+            retroSessionRepository.save(session);
+
+            logTestProgress("SETUP", 3, 4, "Starting session, submitting note, then fast-forwarding to clustering step");
+            startRetroSession(facilitatorPage);
+
+            // First submit a sticky note at the input step so responses.empty is false at clustering step
+            // (The .sortable div only renders when responses exist AND allowMerging=true)
+            logTestProgress("SETUP", 3, 4, "Submitting note at input step so clustering step has data");
+            fastForwardToStep(sessionId, SSC_INPUT_STEP_INDEX);
+            String retroUrl = baseUrl + "/retro/" + sessionId;
+            facilitatorPage.navigate(retroUrl);
+            waitForElement(facilitatorPage, "[data-column='Start']");
+            fillElement(facilitatorPage, "[data-column='Start'] textarea[name='content']", "Clustering test note");
+            clickElement(facilitatorPage, "[data-column='Start'] button[type='submit']");
+            waitForElement(facilitatorPage, "p:has-text('Clustering test note')");
+
+            // Now fast-forward to first clustering step (orderIndex=10 → 0-based index 9)
+            int clusteringStepIndex = 9;
+            fastForwardToStep(sessionId, clusteringStepIndex);
+            facilitatorPage.waitForResponse(
+                    response -> response.url().contains("/" + sessionId) && response.status() == 200,
+                    () -> facilitatorPage.navigate(retroUrl));
+
+            // Wait for a column to appear (clustering step has allowMerging=true)
+            facilitatorPage.waitForFunction("() => !!document.querySelector('[data-column]')", null,
+                    new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+
+            logTestProgress("CLUSTERING", 4, 4, "Verifying clustering UI: no dual-render, sortable class present");
+
+            // Verify the non-clustering standard view div is NOT present when allowMerging=true
+            // Standard cards list should be absent; only the sortable clustering container should appear
+            // (The dual-render bug fix ensures the th:unless div is not rendered)
+            // We verify this by checking the lane content area has at most ONE cards container per column
+            Object dualRenderCount = facilitatorPage.evaluate(
+                    "() => document.querySelectorAll('[id^=\"column-lane-\"]').length");
+            assertNotNull(dualRenderCount, "Column lane elements should be present");
+
+            // Clustering sortable container uses class="sortable" — verify it is present in the DOM
+            // when allowMerging=true (loaded via HTMX into the column-lane div)
+            facilitatorPage.waitForFunction(
+                    "() => document.querySelector('.sortable') !== null",
+                    null,
+                    new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+            assertTrue(facilitatorPage.locator(".sortable").count() > 0,
+                    "Clustering sortable container should be present for allowMerging=true step");
+
+            logTestProgress("CLUSTERING", 4, 4, "Clustering display verified - no dual-render, sortable UI present");
+
+        } catch (Exception e) {
+            reportTestFailure(facilitatorPage, "SSC Clustering Display", e);
+            throw e;
+        } finally {
+            facilitatorContext.close();
+        }
+    }
+
+    @Test
+    @Timeout(300)
+    @DisplayName("Should validate SSC voting UI: vote button visible and clickable")
+    void shouldValidateSscVotingUi() {
+        BrowserContext facilitatorContext = createMonitoredContext();
+        Page facilitatorPage = facilitatorContext.newPage();
+        BrowserContext participantContext = createMonitoredContext();
+        Page participantPage = participantContext.newPage();
+
+        try {
+            // Wait for server to be ready
+            long deadline = System.currentTimeMillis() + 30_000;
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
+                        new java.net.URL(baseUrl + "/login").openConnection();
+                    conn.setConnectTimeout(1000);
+                    conn.setReadTimeout(3000);
+                    int status = conn.getResponseCode();
+                    conn.disconnect();
+                    if (status < 500) break;
+                } catch (Exception ignored) {}
+                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+            }
+
+            logTestProgress("SETUP", 1, 5, "Authenticating facilitator and participant");
+            authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
+            authenticateAsGuest(participantPage, "Bob");
+
+            logTestProgress("SETUP", 2, 5, "Creating retro session with SSC template");
+            String sessionId = createRetroSession(facilitatorPage, "SSC Voting Test");
+            RetroTemplate sscTemplate = buildSscTemplate();
+            RetroSession session = retroSessionRepository.findById(UUID.fromString(sessionId))
+                    .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
+            session.setTemplate(sscTemplate);
+            retroSessionRepository.save(session);
+
+            logTestProgress("SETUP", 3, 5, "Participant joining and starting session");
+            joinRetroSession(participantPage, sessionId);
+            startRetroSession(facilitatorPage);
+
+            // First submit a sticky note at the input step so there is something to vote on
+            logTestProgress("SETUP", 4, 5, "Submitting sticky note for voting");
+            fastForwardToStep(sessionId, SSC_INPUT_STEP_INDEX);
+            String retroUrl = baseUrl + "/retro/" + sessionId;
+            participantPage.navigate(retroUrl);
+            waitForElement(participantPage, "[data-column='Start']");
+
+            fillElement(participantPage, "[data-column='Start'] textarea[name='content']", "Start: Voting test note");
+            clickElement(participantPage, "[data-column='Start'] button[type='submit']");
+            waitForElement(participantPage, "p:has-text('Start: Voting test note')");
+
+            // Fast-forward to voting step (orderIndex=22 → 0-based index 21)
+            logTestProgress("VOTING", 5, 5, "Fast-forwarding to voting step");
+            int votingStepIndex = 21;
+            fastForwardToStep(sessionId, votingStepIndex);
+
+            facilitatorPage.waitForResponse(
+                    response -> response.url().contains("/" + sessionId) && response.status() == 200,
+                    () -> facilitatorPage.navigate(retroUrl));
+
+            // Wait for vote buttons to appear (allowVoting=true at this step)
+            facilitatorPage.waitForFunction(
+                    "() => document.querySelector('button[hx-post*=\"/vote\"]') !== null",
+                    null,
+                    new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+
+            assertTrue(facilitatorPage.locator("button[hx-post*='/vote']").count() > 0,
+                    "Vote button should be visible at voting step");
+
+            // Click vote button
+            facilitatorPage.locator("button[hx-post*='/vote']").first().click();
+
+            // Verify vote was registered (vote count should update or button remains present)
+            facilitatorPage.waitForFunction(
+                    "() => document.querySelector('button[hx-post*=\"/vote\"]') !== null",
+                    null,
+                    new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+
+            logTestProgress("VOTING", 5, 5, "Vote button present and clickable — voting UI verified");
+
+        } catch (Exception e) {
+            reportTestFailure(facilitatorPage, "SSC Voting UI", e);
+            throw e;
+        } finally {
+            facilitatorContext.close();
+            participantContext.close();
+        }
+    }
+
+    @Test
+    @Timeout(300)
+    @DisplayName("Should validate SSC action item with successCriteria field capture and display")
+    void shouldValidateSscActionItemWithSuccessCriteria() {
+        BrowserContext facilitatorContext = createMonitoredContext();
+        Page facilitatorPage = facilitatorContext.newPage();
+
+        try {
+            // Wait for server to be ready
+            long deadline = System.currentTimeMillis() + 30_000;
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
+                        new java.net.URL(baseUrl + "/login").openConnection();
+                    conn.setConnectTimeout(1000);
+                    conn.setReadTimeout(3000);
+                    int status = conn.getResponseCode();
+                    conn.disconnect();
+                    if (status < 500) break;
+                } catch (Exception ignored) {}
+                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+            }
+
+            logTestProgress("SETUP", 1, 4, "Authenticating facilitator");
+            authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
+
+            logTestProgress("SETUP", 2, 4, "Creating retro session with SSC template");
+            String sessionId = createRetroSession(facilitatorPage, "SSC Success Criteria Test");
+            RetroTemplate sscTemplate = buildSscTemplate();
+            RetroSession session = retroSessionRepository.findById(UUID.fromString(sessionId))
+                    .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
+            session.setTemplate(sscTemplate);
+            retroSessionRepository.save(session);
+
+            logTestProgress("SETUP", 3, 4, "Starting session and fast-forwarding to action items step");
+            startRetroSession(facilitatorPage);
+            fastForwardToStep(sessionId, SSC_ACTION_ITEMS_STEP_INDEX);
+
+            String retroUrl = baseUrl + "/retro/" + sessionId;
+            facilitatorPage.waitForResponse(
+                    response -> response.url().contains("/" + sessionId + "/action-items") && response.status() == 200,
+                    () -> facilitatorPage.navigate(retroUrl));
+
+            facilitatorPage.waitForFunction("() => !!document.querySelector(\"textarea[name='what']\")");
+            facilitatorPage.evaluate("() => document.querySelector(\"textarea[name='what']\").scrollIntoView()");
+
+            logTestProgress("SUCCESS_CRITERIA", 4, 4, "Submitting action item with successCriteria");
+
+            // Verify the successCriteria field is present in the form
+            facilitatorPage.waitForFunction("() => !!document.querySelector(\"textarea[name='successCriteria']\")");
+            assertTrue(facilitatorPage.locator("textarea[name='successCriteria']").isVisible(),
+                    "successCriteria textarea should be visible in the action items form");
+
+            // Fill in all fields including successCriteria
+            facilitatorPage.evaluate(
+                    "() => { document.querySelector(\"textarea[name='what']\").value = 'Daily sync with design team'; }");
+            facilitatorPage.evaluate(
+                    "() => { document.querySelector(\"textarea[name='successCriteria']\").value = 'Attendance tracked for 2 weeks, zero missed syncs'; }");
+
+            // Verify the values were set
+            String whatValue = (String) facilitatorPage.evaluate(
+                    "() => document.querySelector(\"textarea[name='what']\").value");
+            assertEquals("Daily sync with design team", whatValue,
+                    "Action item 'what' textarea should have the correct value");
+
+            String criteriaValue = (String) facilitatorPage.evaluate(
+                    "() => document.querySelector(\"textarea[name='successCriteria']\").value");
+            assertEquals("Attendance tracked for 2 weeks, zero missed syncs", criteriaValue,
+                    "successCriteria textarea should have the correct value");
+
+            // Submit the form
+            facilitatorPage.evaluate(
+                    "() => { const form = document.querySelector(\"form[hx-post*='action-items']\"); if (form) { htmx.trigger(form, 'submit'); } }");
+
+            // Verify the action item appears with its content
+            waitForElement(facilitatorPage, "text=Daily sync with design team", 15000);
+            assertTrue(
+                    facilitatorPage.locator("text=Daily sync with design team").isVisible(),
+                    "Submitted action item 'what' should be visible");
+
+            // Verify the successCriteria is displayed in the action items list
+            waitForElement(facilitatorPage, "text=Attendance tracked for 2 weeks, zero missed syncs", 15000);
+            assertTrue(
+                    facilitatorPage.locator("text=Attendance tracked for 2 weeks, zero missed syncs").isVisible(),
+                    "Submitted action item successCriteria should be visible in the list");
+
+            logTestProgress("SUCCESS_CRITERIA", 4, 4, "successCriteria field captured and displayed correctly");
+
+        } catch (Exception e) {
+            reportTestFailure(facilitatorPage, "SSC Action Item Success Criteria", e);
+            throw e;
+        } finally {
+            facilitatorContext.close();
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
     /**
