@@ -9,7 +9,9 @@ import com.microsoft.playwright.options.WaitForSelectorState;
 import com.microsoft.playwright.options.SelectOption;
 import com.microsoft.playwright.options.RequestOptions;
 import com.microsoft.playwright.options.FormData;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -115,8 +117,8 @@ public abstract class BaseIntegrationTest {
             .withExposedPorts(6379)
             .waitingFor(Wait.forLogMessage(".*Ready to accept connections.*", 1));
 
-    protected Playwright playwright;
-    protected Browser browser;
+    protected static Playwright playwright;
+    protected static Browser browser;
     protected BrowserContext context;
     protected String baseUrl;
 
@@ -371,6 +373,28 @@ public abstract class BaseIntegrationTest {
         ctx.route(Pattern.compile(".*cdn\\.jsdelivr\\.net.*"), route -> route.abort());
     }
 
+    @BeforeAll
+    static void setUpPlaywright() {
+        boolean debugMode = Boolean.parseBoolean(System.getenv("PLAYWRIGHT_DEBUG"));
+        BrowserType.LaunchOptions launchOptions = new BrowserType.LaunchOptions()
+            .setHeadless(!debugMode)
+            .setSlowMo(debugMode ? 500 : 0);
+
+        if (debugMode) {
+            log.info("🐛 PLAYWRIGHT DEBUG MODE ENABLED");
+            log.info("   - Headful browser (you can see what's happening)");
+            log.info("   - 500ms delay between actions");
+            log.info("   - Screenshots will be saved on failures");
+        }
+        playwright = Playwright.create();
+        browser = playwright.chromium().launch(launchOptions);
+    }
+
+    @AfterAll
+    static void tearDownPlaywright() {
+        if (browser != null) browser.close();
+        if (playwright != null) playwright.close();
+    }
     @BeforeEach
     void setUp(TestInfo testInfo) {
         // Store test info for later use (tracing, error reporting)
@@ -378,21 +402,6 @@ public abstract class BaseIntegrationTest {
         // Clear activity trail for clean state at start of each test
         clearActivityTrail();
         baseUrl = "http://localhost:" + port;
-        playwright = Playwright.create();
-        // Enable visual debugging: set PLAYWRIGHT_DEBUG=true for headful mode + slow motion
-        boolean debugMode = Boolean.parseBoolean(System.getenv("PLAYWRIGHT_DEBUG"));
-        BrowserType.LaunchOptions launchOptions = new BrowserType.LaunchOptions()
-            .setHeadless(!debugMode);
-
-        if (debugMode) {
-            launchOptions.setSlowMo(1000); // 1 second delay between actions
-            log.info("🐛 PLAYWRIGHT DEBUG MODE ENABLED");
-            log.info("   - Headful browser (you can see what's happening)");
-            log.info("   - 1 second delay between actions");
-            log.info("   - Screenshots will be saved on failures");
-        }
-
-        browser = playwright.chromium().launch(launchOptions);
         // Create browser context and set up monitoring
         context = browser.newContext();
         // Set default timeout to prevent indefinite waits (Playwright's default is 30s, but we want faster failures)
@@ -402,6 +411,7 @@ public abstract class BaseIntegrationTest {
         setupConsoleAndNetworkMonitoring(context);
         blockExternalCdnResources(context);
         // Enable Playwright tracing in debug mode for local debugging
+        boolean debugMode = Boolean.parseBoolean(System.getenv("PLAYWRIGHT_DEBUG"));
         if (debugMode) {
             context.tracing().start(new Tracing.StartOptions()
                 .setScreenshots(true)
@@ -428,12 +438,8 @@ public abstract class BaseIntegrationTest {
             }
         }
 
-        // Close Playwright resources first (before database cleanup)
+        // Close browser context (browser and playwright are closed in @AfterAll)
         if (context != null) context.close();
-        if (browser != null) browser.close();
-        if (playwright != null) playwright.close();
-
-        // Clean database state between tests
         // Use @DirtiesContext instead of manual cleanup to avoid connection pool issues
         clearActivityTrail();
     }
