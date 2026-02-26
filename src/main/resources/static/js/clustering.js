@@ -1,10 +1,11 @@
-var activeSortables = [];
-
 function initSortables(content) {
     let sortables = content.querySelectorAll('.sortable');
-    let instances = [];
     for (let i = 0; i < sortables.length; i++) {
         let el = sortables[i];
+        // Skip if already initialized
+        if (el._sortableInstance) {
+            continue;
+        }
         let sortableInstance = new Sortable(el, {
             animation: 150,
             group: 'shared',
@@ -14,20 +15,24 @@ function initSortables(content) {
                 return evt.related.className.indexOf('htmx-indicator') === -1;
             },
             onEnd: function (evt) {
-                sortableInstance.option('disabled', true);
+                let instance = evt.from._sortableInstance;
+                if (instance) {
+                    instance.option('disabled', true);
+                }
                 htmx.trigger(evt.item, 'end');
             }
         });
-        instances.push(sortableInstance);
+        el._sortableInstance = sortableInstance;
 
         el.addEventListener('htmx:afterSwap', function () {
-            sortableInstance.option('disabled', false);
+            let instance = this._sortableInstance;
+            if (instance) {
+                instance.option('disabled', false);
+            }
         });
     }
-    return instances;
 }
 
 htmx.onLoad(function (content) {
-    activeSortables.forEach(function (s) { s.destroy(); });
-    activeSortables = initSortables(content);
+    initSortables(content);
 });

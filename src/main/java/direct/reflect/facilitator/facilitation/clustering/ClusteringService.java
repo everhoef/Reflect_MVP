@@ -83,12 +83,11 @@ public class ClusteringService {
         }
     }
 
-    /**
-     * Returns all clustered and unclustered responses for the given step.
-     *
-     * @param stepId the ID of the retro step
-     * @return a DTO containing clustered groups and unclustered responses
-     */
+/**
+ * Retrieves all responses for a step, grouped into clusters and unclustered items.
+ * Clustered responses are grouped by cluster ID; unclustered responses have no cluster assignment.
+ * Performance note: executes two queries — one for unclustered, one for clustered responses.
+ */
     @Transactional(readOnly = true)
     public ClusterGroupsDto getClusters(Long stepId) {
         List<ColumnResponseDto> unclustered = responseRepository.findByRetroStepIdAndClusterIdIsNull(stepId)

@@ -20,7 +20,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
+import direct.reflect.facilitator.facilitation.ParticipantService;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -76,6 +80,9 @@ class ActionItemApiIntegrationTest {
     @Autowired
     private RetroStepRepository stepRepository;
 
+    @MockitoBean
+    private ParticipantService participantService;
+
     private RetroSession testSession;
     private Participant testParticipant;
     private RetroStep testStep;
@@ -94,6 +101,7 @@ class ActionItemApiIntegrationTest {
         testParticipant = participantRepository.save(participant);
 
         testStep = stepRepository.findAll().get(0);
+        when(participantService.canAccessRetro(any(UUID.class))).thenReturn(true);
     }
 
     @AfterEach
