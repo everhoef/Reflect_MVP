@@ -69,6 +69,9 @@ public class ActionItemService {
         }
 
         if (dto.getWhat() != null) {
+            if (dto.getWhat().isBlank()) {
+                throw new IllegalArgumentException("Action item 'what' field must not be blank");
+            }
             actionItem.setWhat(dto.getWhat());
         }
         actionItem.setAssignedToParticipantId(dto.getAssignedToParticipantId());
@@ -143,6 +146,8 @@ public class ActionItemService {
                 .collect(Collectors.toList());
     }
 
+    // Single-item context: called only from create/update (single-item operations),
+    // so one DB lookup per call is intentional — not an N+1 pattern.
     private ActionItemDto toDto(ActionItem actionItem) {
         String assignedToDisplayName = null;
         if (actionItem.getAssignedToParticipantId() != null) {

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,7 +31,7 @@ public class ActionItemApiController {
     public ResponseEntity<ActionItemDto> createActionItem(
             @PathVariable UUID retroId,
             @PathVariable Long stepId,
-            @RequestBody ActionItemDto dto) {
+            @RequestBody @Valid ActionItemDto dto) {
         ActionItemDto created = actionItemService.createActionItem(retroId, stepId, dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
@@ -40,7 +41,7 @@ public class ActionItemApiController {
     public ResponseEntity<ActionItemDto> updateActionItem(
             @PathVariable UUID retroId,
             @PathVariable UUID id,
-            @RequestBody ActionItemDto dto) {
+            @RequestBody @Valid ActionItemDto dto) {
         ActionItemDto updated = actionItemService.updateActionItem(retroId, id, dto);
         return ResponseEntity.ok(updated);
     }
