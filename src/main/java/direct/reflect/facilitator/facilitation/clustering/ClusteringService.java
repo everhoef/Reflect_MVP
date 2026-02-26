@@ -18,6 +18,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+/**
+ * Manages clustering of participant responses within retrospective steps.
+ * Supports merging responses into clusters, unmerging, renaming clusters,
+ * and retrieving clustered/unclustered response groups.
+ */
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -30,6 +35,15 @@ public class ClusteringService {
     public UUID mergeResponses(UUID retroId, Long stepId, List<UUID> responseIds) {
         UUID clusterId = Generators.timeBasedEpochGenerator().generate();
         List<ParticipantResponse> responses = responseRepository.findAllById(responseIds);
+        if (responses.size() != responseIds.size()) {
+            throw new IllegalArgumentException("Some response IDs were not found");
+        }
+        // Validate all responses belong to the specified step
+        responses.forEach(r -> {
+            if (!r.getRetroStep().getId().equals(stepId)) {
+                throw new IllegalArgumentException("Response " + r.getId() + " does not belong to step " + stepId);
+            }
+        });
         responses.forEach(r -> {
             r.setClusterId(clusterId);
         });
@@ -69,6 +83,12 @@ public class ClusteringService {
         }
     }
 
+    /**
+     * Returns all clustered and unclustered responses for the given step.
+     *
+     * @param stepId the ID of the retro step
+     * @return a DTO containing clustered groups and unclustered responses
+     */
     @Transactional(readOnly = true)
     public ClusterGroupsDto getClusters(Long stepId) {
         List<ColumnResponseDto> unclustered = responseRepository.findByRetroStepIdAndClusterIdIsNull(stepId)

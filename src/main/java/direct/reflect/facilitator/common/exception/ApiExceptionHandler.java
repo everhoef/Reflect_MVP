@@ -152,7 +152,7 @@ public class ApiExceptionHandler {
     public ResponseEntity<String> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("Invalid request argument: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .body(ex.getMessage());
+            .body("Invalid request");
     }
 
     @ExceptionHandler(Exception.class)

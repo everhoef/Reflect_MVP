@@ -11,8 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -59,9 +60,13 @@ public class ActionItemService {
         return toDto(saved);
     }
 
-    public ActionItemDto updateActionItem(UUID actionItemId, ActionItemDto dto) {
+    public ActionItemDto updateActionItem(UUID retroId, UUID actionItemId, ActionItemDto dto) {
         ActionItem actionItem = actionItemRepository.findById(actionItemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Action item not found: " + actionItemId));
+
+        if (!actionItem.getRetroSessionId().equals(retroId)) {
+            throw new ResourceNotFoundException("Action item not found: " + actionItemId);
+        }
 
         if (dto.getWhat() != null) {
             actionItem.setWhat(dto.getWhat());
@@ -88,9 +93,13 @@ public class ActionItemService {
         return toDto(saved);
     }
 
-    public void deleteActionItem(UUID actionItemId) {
+    public void deleteActionItem(UUID retroId, UUID actionItemId) {
         ActionItem actionItem = actionItemRepository.findById(actionItemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Action item not found: " + actionItemId));
+
+        if (!actionItem.getRetroSessionId().equals(retroId)) {
+            throw new ResourceNotFoundException("Action item not found: " + actionItemId);
+        }
 
         UUID retroSessionId = actionItem.getRetroSessionId();
         actionItemRepository.delete(actionItem);
@@ -111,9 +120,26 @@ public class ActionItemService {
 
     @Transactional(readOnly = true)
     public List<ActionItemDto> getActionItemsBySession(UUID retroSessionId) {
-        return actionItemRepository.findByRetroSessionId(retroSessionId)
+        List<ActionItem> items = actionItemRepository.findByRetroSessionId(retroSessionId);
+
+        // Collect all assignedToParticipantIds to resolve display names in a single query (avoid N+1)
+        List<UUID> assignedIds = items.stream()
+                .map(ActionItem::getAssignedToParticipantId)
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+
+        Map<UUID, String> displayNameByParticipantId = participantRepository
+                .findByParticipantIdIn(assignedIds)
                 .stream()
-                .map(this::toDto)
+                .collect(Collectors.toMap(
+                        Participant::getParticipantId,
+                        Participant::getDisplayName,
+                        (a, b) -> a  // keep first if duplicate participantId across sessions
+                ));
+
+        return items.stream()
+                .map(item -> toDto(item, displayNameByParticipantId))
                 .collect(Collectors.toList());
     }
 
@@ -126,6 +152,25 @@ public class ActionItemService {
                 assignedToDisplayName = participants.get(0).getDisplayName();
             }
         }
+
+        return ActionItemDto.builder()
+                .id(actionItem.getId())
+                .what(actionItem.getWhat())
+                .assignedToParticipantId(actionItem.getAssignedToParticipantId())
+                .assignedToDisplayName(assignedToDisplayName)
+                .whenDate(actionItem.getWhenDate())
+                .successCriteria(actionItem.getSuccessCriteria())
+                .retroSessionId(actionItem.getRetroSessionId())
+                .retroStepId(actionItem.getRetroStepId())
+                .createdByParticipantId(actionItem.getCreatedByParticipantId())
+                .createdAt(actionItem.getCreatedAt())
+                .build();
+    }
+
+    private ActionItemDto toDto(ActionItem actionItem, Map<UUID, String> displayNameByParticipantId) {
+        String assignedToDisplayName = actionItem.getAssignedToParticipantId() != null
+                ? displayNameByParticipantId.get(actionItem.getAssignedToParticipantId())
+                : null;
 
         return ActionItemDto.builder()
                 .id(actionItem.getId())

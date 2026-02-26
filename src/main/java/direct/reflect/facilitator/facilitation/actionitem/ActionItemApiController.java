@@ -26,39 +26,36 @@ public class ActionItemApiController {
     private final ActionItemService actionItemService;
 
     @PostMapping("/step/{stepId}/action-items")
-    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    @PreAuthorize("@participantService.canAccessRetro(#retroId)")
     public ResponseEntity<ActionItemDto> createActionItem(
             @PathVariable UUID retroId,
             @PathVariable Long stepId,
             @RequestBody ActionItemDto dto) {
-        if (dto.getWhat() == null || dto.getWhat().isBlank()) {
-            throw new IllegalArgumentException("Action item 'what' field must not be blank");
-        }
         ActionItemDto created = actionItemService.createActionItem(retroId, stepId, dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PutMapping("/action-items/{id}")
-    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    @PreAuthorize("@participantService.canAccessRetro(#retroId)")
     public ResponseEntity<ActionItemDto> updateActionItem(
             @PathVariable UUID retroId,
             @PathVariable UUID id,
             @RequestBody ActionItemDto dto) {
-        ActionItemDto updated = actionItemService.updateActionItem(id, dto);
+        ActionItemDto updated = actionItemService.updateActionItem(retroId, id, dto);
         return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/action-items/{id}")
-    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    @PreAuthorize("@participantService.canAccessRetro(#retroId)")
     public ResponseEntity<Void> deleteActionItem(
             @PathVariable UUID retroId,
             @PathVariable UUID id) {
-        actionItemService.deleteActionItem(id);
+        actionItemService.deleteActionItem(retroId, id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/action-items")
-    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    @PreAuthorize("@participantService.canAccessRetro(#retroId)")
     public ResponseEntity<List<ActionItemDto>> getActionItemsBySession(
             @PathVariable UUID retroId) {
         List<ActionItemDto> items = actionItemService.getActionItemsBySession(retroId);

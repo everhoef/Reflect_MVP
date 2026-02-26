@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,6 +23,8 @@ public interface ParticipantRepository extends JpaRepository<Participant, Partic
     Optional<Participant> findByUsername(String username);
 
     List<Participant> findByParticipantId(UUID participantId);
+
+    List<Participant> findByParticipantIdIn(Collection<UUID> participantIds);
 
     /**
      * Find participant records for a specific user filtered by status.

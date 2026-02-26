@@ -1,8 +1,11 @@
+var activeSortables = [];
+
 function initSortables(content) {
-    var sortables = content.querySelectorAll('.sortable');
-    for (var i = 0; i < sortables.length; i++) {
-        var el = sortables[i];
-        var sortableInstance = new Sortable(el, {
+    let sortables = content.querySelectorAll('.sortable');
+    let instances = [];
+    for (let i = 0; i < sortables.length; i++) {
+        let el = sortables[i];
+        let sortableInstance = new Sortable(el, {
             animation: 150,
             group: 'shared',
             ghostClass: 'sortable-ghost',
@@ -15,13 +18,16 @@ function initSortables(content) {
                 htmx.trigger(evt.item, 'end');
             }
         });
+        instances.push(sortableInstance);
 
         el.addEventListener('htmx:afterSwap', function () {
             sortableInstance.option('disabled', false);
         });
     }
+    return instances;
 }
 
 htmx.onLoad(function (content) {
-    initSortables(content);
+    activeSortables.forEach(function (s) { s.destroy(); });
+    activeSortables = initSortables(content);
 });
