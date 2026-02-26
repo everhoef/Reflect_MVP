@@ -11,6 +11,7 @@ import com.microsoft.playwright.Response;
 import com.microsoft.playwright.options.LoadState;
 
 import static org.junit.jupiter.api.Assertions.*;
+import java.util.UUID;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -33,7 +34,7 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
     @Test
     @Timeout(600) // 10 minutes max - flow test has many steps with multi-page sync
     @DisplayName("Should validate complete retro flow with columnId isolation")
-    void shouldValidateCompleteRetroFlowWithColumnIsolation() {
+    void shouldValidateCompleteRetroFlowWithColumnIsolation() throws InterruptedException {
         BrowserContext facilitatorContext = createMonitoredContext();
         Page facilitatorPage = facilitatorContext.newPage();
 
@@ -58,11 +59,21 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             String sessionId = createRetroSession(facilitatorPage, "Complete Flow Test");
             joinRetroSession(bobPage, sessionId);
             joinRetroSession(carolPage, sessionId);
+
+            // Wait for SSE connections on participant pages before starting session
+            // Without this, session_started event may fire before SSE is ready
+            log.info("Waiting for SSE connections on participant lobby pages...");
+            waitForSseConnection(bobPage, UUID.fromString(sessionId));
+            waitForSseConnection(carolPage, UUID.fromString(sessionId));
+            log.info("\u2705 SSE connections established on all participant pages");
+            // Brief pause to ensure server-side SSE emitter registration is complete
+            // before starting session (avoids race between readyState=1 and localEmitters.put)
+            Thread.sleep(500);
             startRetroSession(facilitatorPage);
 
             // Wait for participant pages to transition to retro (startRetroSession only waits for facilitator)
             log.info("Waiting for participant pages to transition to retro...");
-            waitForAllPagesElement("h2:has-text('Stage')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
+            waitForAllPagesElement("h2:has-text('Step')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
 
             // ===== PHASE 1: SET_THE_STAGE - Happiness Histogram (4 steps) =====
             log.info("\n┌─ PHASE 1: SET_THE_STAGE (Happiness Histogram)");
@@ -491,6 +502,13 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             String sessionId = createRetroSession(facilitatorPage, "SSE Test Session");
             joinRetroSession(participant1Page, sessionId);
 
+            // Wait for SSE connection on participant page before starting session
+            log.info("Waiting for SSE connection on participant lobby page...");
+            waitForSseConnection(participant1Page, UUID.fromString(sessionId));
+            log.info("\u2705 SSE connection established on participant page");
+            // Brief pause to ensure server-side SSE emitter registration is complete
+            Thread.sleep(500);
+
             // Start the session to activate SSE connections
             Response startResponse = facilitatorPage.waitForResponse(
                 response -> response.url().contains("/start") && response.request().method().equals("POST"),
@@ -500,9 +518,9 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             log.info("Waiting for facilitator page to transition to retro...");
             waitForAllPagesTransition("Session Lobby", "button:has-text('Next')", facilitatorPage);
 
-            // Wait for participant to transition to retro with stage heading (visible to all users)
+            // Wait for participant to transition to retro with step heading (visible to all users)
             log.info("Waiting for participant page to transition to retro...");
-            waitForAllPagesTransition("Session Lobby", "h2:has-text('Stage')", participant1Page);
+            waitForAllPagesTransition("Session Lobby", "h2:has-text('Step')", SSE_PROPAGATION_TIMEOUT_MS, participant1Page);
 
             // Wait for SSE connections to be established after page transition
             log.info("Waiting for SSE connections to be established...");
