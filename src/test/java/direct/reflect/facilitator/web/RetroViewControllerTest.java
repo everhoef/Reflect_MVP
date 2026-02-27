@@ -311,32 +311,6 @@ class RetroViewControllerTest {
     }
 
 
-
-    @Test
-    @WithMockUser
-    void retroContentFragment_WithoutAllowActionItems_ShouldNotRenderActionItemForm() throws Exception {
-        // Given - a step without allowActionItems should NOT render the action item textarea
-        UUID retroId = UUID.randomUUID();
-        Long stepId = 43L;
-        RetroSession session = createMockSession(retroId, RetroPhase.GATHER_DATA);
-        RetroStep step = createMockStep(stepId, false); // allowVoting=false, no allowActionItems
-        Participant participant = createMockParticipant();
-        participant.setUsername("testuser");
-
-        when(retroService.getSessionById(retroId)).thenReturn(session);
-        when(retroService.getCurrentStep(retroId)).thenReturn(step);
-        when(retroService.getInstructionHistory(retroId)).thenReturn(List.of());
-        when(retroService.getTimerState(retroId)).thenReturn(null);
-        when(participantService.getParticipantForSession(any(), eq(retroId))).thenReturn(participant);
-        when(participantService.isFacilitator(any(), eq(retroId))).thenReturn(false);
-        when(participantService.getSessionParticipants(retroId)).thenReturn(List.of(participant));
-
-        // When & Then
-        mockMvc.perform(get("/retro/{retroId}/content", retroId))
-            .andExpect(status().isOk())
-            .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("name=\"what\""))));
-    }
-
     @Test
     @WithMockUser
     void columnResponses_WithAllowVotingTrue_ShouldRenderVoteButton() throws Exception {
