@@ -29,8 +29,6 @@ import direct.reflect.facilitator.facilitation.dto.RatingResponseDto;
 import direct.reflect.facilitator.facilitation.dto.ColumnResponseDto;
 import direct.reflect.facilitator.facilitation.dto.StageProgressDto;
 import direct.reflect.facilitator.facilitation.dto.TimerStateDto;
-import direct.reflect.facilitator.facilitation.actionitem.ActionItemService;
-import direct.reflect.facilitator.facilitation.actionitem.ActionItemDto;
 import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.configurator.RetroStep;
@@ -48,7 +46,6 @@ public class RetroViewController {
     private final ParticipantService participantService;
     private final ResponseService responseService;
     private final AuthService authenticationHelper;
-    private final ActionItemService actionItemService;
 
     @GetMapping("/")
     public String home(Model model, HttpServletRequest request) {
@@ -393,37 +390,5 @@ public class RetroViewController {
          }
      }
 
-     @PostMapping("/retro/{retroId}/step/{stepId}/action-items/form")
-     @PreAuthorize("@participantService.canAccessRetro(#retroId)")
-     public ResponseEntity<Void> createActionItemForm(
-             @PathVariable UUID retroId,
-             @PathVariable Long stepId,
-             @ModelAttribute ActionItemDto dto,
-             HttpServletRequest request) {
-
-         UUID participantId = authenticationHelper.getParticipantId(request);
-         dto.setCreatedByParticipantId(participantId);
-         actionItemService.createActionItem(retroId, stepId, dto);
-         return ResponseEntity.noContent().build();
-     }
-
-     @GetMapping("/retro/{retroId}/action-items")
-     @PreAuthorize("@participantService.canAccessRetro(#retroId)")
-     public String getActionItemsList(
-             @PathVariable UUID retroId,
-             Model model) {
-
-         log.debug("Getting action items list for retro: {}", retroId);
-
-         try {
-             List<ActionItemDto> actionItems = actionItemService.getActionItemsBySession(retroId);
-             model.addAttribute("actionItems", actionItems);
-             return "fragments/components/action-items-list :: content";
-
-         } catch (Exception e) {
-             log.error("Error fetching action items list: ", e);
-             return "fragments/common-fragments :: error";
-         }
-     }
 
  }

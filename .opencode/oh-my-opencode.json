@@ -5,13 +5,13 @@
       "model": "opencode/glm-4.7-free"
     },
     "explore": {
-      "model": "github-copilot/gemini-3-flash"
+      "model": "github-copilot/gemini-3-flash-preview"
     },
     "oracle": {
       "model": "github-copilot/gpt-5.2"
     },
     "multimodal-looker": {
-      "model": "github-copilot/gemini-3-flash"
+      "model": "github-copilot/gemini-3-flash-preview"
     },
     "sisyphus-junior": {
       "model": "github-copilot/claude-sonnet-4.6"

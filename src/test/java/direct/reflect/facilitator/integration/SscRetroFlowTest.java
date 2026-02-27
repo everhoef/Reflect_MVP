@@ -19,8 +19,6 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
 
     private static final int SSC_GATHER_DATA_MASTERSHEET_ID = 21;
     private static final int SSC_INPUT_STEP_INDEX = 2;
-    // orderIndex=28 (0-based index 27) is the first step with allowActionItems=true in stage 21
-    private static final int SSC_ACTION_ITEMS_STEP_INDEX = 27;
 
     @Test
     @Timeout(300)
@@ -117,33 +115,6 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
             assertTrue(
                     participantPage.locator("p:has-text('Start: More pair programming')").isVisible(),
                     "Submitted Start note should be visible on participant page");
-
-            // ── 8. Fast-forward to action items step and submit an action item ──────
-            logTestProgress("ACTION_ITEMS", 6, 6, "Fast-forwarding to action items step");
-            fastForwardToStep(sessionId, SSC_ACTION_ITEMS_STEP_INDEX);
-
-            facilitatorPage.waitForResponse(
-                    response -> response.url().contains("/" + sessionId + "/action-items") && response.status() == 200,
-                    () -> facilitatorPage.navigate(retroUrl));
-
-            facilitatorPage.waitForFunction("() => !!document.querySelector(\"textarea[name='what']\")");
-            facilitatorPage.evaluate("() => document.querySelector(\"textarea[name='what']\").scrollIntoView()");
-
-            facilitatorPage.evaluate(
-                    "() => { document.querySelector(\"textarea[name='what']\").value = 'Pair programming sessions every Tuesday'; }");
-
-            String whatValue = (String) facilitatorPage.evaluate(
-                    "() => document.querySelector(\"textarea[name='what']\").value");
-            assertEquals("Pair programming sessions every Tuesday", whatValue,
-                    "Action item 'what' textarea should have the correct value");
-
-            facilitatorPage.evaluate(
-                    "() => { const form = document.querySelector(\"form[hx-post*='action-items']\"); if (form) { htmx.trigger(form, 'submit'); } }");
-
-            waitForElement(facilitatorPage, "text=Pair programming sessions every Tuesday", 15000);
-            assertTrue(
-                    facilitatorPage.locator("text=Pair programming sessions every Tuesday").isVisible(),
-                    "Submitted action item should be visible on facilitator page");
 
         } catch (Exception e) {
             reportTestFailure(facilitatorPage, "SSC Retrospective Flow", e);
@@ -333,101 +304,6 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
         }
     }
 
-    @Test
-    @Timeout(300)
-    @DisplayName("Should validate SSC action item with successCriteria field capture and display")
-    void shouldValidateSscActionItemWithSuccessCriteria() {
-        BrowserContext facilitatorContext = createMonitoredContext();
-        Page facilitatorPage = facilitatorContext.newPage();
-
-        try {
-            // Wait for server to be ready
-            long deadline = System.currentTimeMillis() + 30_000;
-            while (System.currentTimeMillis() < deadline) {
-                try {
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
-                        new java.net.URL(baseUrl + "/login").openConnection();
-                    conn.setConnectTimeout(1000);
-                    conn.setReadTimeout(3000);
-                    int status = conn.getResponseCode();
-                    conn.disconnect();
-                    if (status < 500) break;
-                } catch (Exception ignored) {}
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
-            }
-
-            logTestProgress("SETUP", 1, 4, "Authenticating facilitator");
-            authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
-
-            logTestProgress("SETUP", 2, 4, "Creating retro session with SSC template");
-            String sessionId = createRetroSession(facilitatorPage, "SSC Success Criteria Test");
-            RetroTemplate sscTemplate = buildSscTemplate();
-            RetroSession session = retroSessionRepository.findById(UUID.fromString(sessionId))
-                    .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
-            session.setTemplate(sscTemplate);
-            retroSessionRepository.save(session);
-
-            logTestProgress("SETUP", 3, 4, "Starting session and fast-forwarding to action items step");
-            startRetroSession(facilitatorPage);
-            fastForwardToStep(sessionId, SSC_ACTION_ITEMS_STEP_INDEX);
-
-            String retroUrl = baseUrl + "/retro/" + sessionId;
-            facilitatorPage.waitForResponse(
-                    response -> response.url().contains("/" + sessionId + "/action-items") && response.status() == 200,
-                    () -> facilitatorPage.navigate(retroUrl));
-
-            facilitatorPage.waitForFunction("() => !!document.querySelector(\"textarea[name='what']\")");
-            facilitatorPage.evaluate("() => document.querySelector(\"textarea[name='what']\").scrollIntoView()");
-
-            logTestProgress("SUCCESS_CRITERIA", 4, 4, "Submitting action item with successCriteria");
-
-            // Verify the successCriteria field is present in the form
-            facilitatorPage.waitForFunction("() => !!document.querySelector(\"textarea[name='successCriteria']\")");
-            assertTrue(facilitatorPage.locator("textarea[name='successCriteria']").isVisible(),
-                    "successCriteria textarea should be visible in the action items form");
-
-            // Fill in all fields including successCriteria
-            facilitatorPage.evaluate(
-                    "() => { document.querySelector(\"textarea[name='what']\").value = 'Daily sync with design team'; }");
-            facilitatorPage.evaluate(
-                    "() => { document.querySelector(\"textarea[name='successCriteria']\").value = 'Attendance tracked for 2 weeks, zero missed syncs'; }");
-
-            // Verify the values were set
-            String whatValue = (String) facilitatorPage.evaluate(
-                    "() => document.querySelector(\"textarea[name='what']\").value");
-            assertEquals("Daily sync with design team", whatValue,
-                    "Action item 'what' textarea should have the correct value");
-
-            String criteriaValue = (String) facilitatorPage.evaluate(
-                    "() => document.querySelector(\"textarea[name='successCriteria']\").value");
-            assertEquals("Attendance tracked for 2 weeks, zero missed syncs", criteriaValue,
-                    "successCriteria textarea should have the correct value");
-
-            // Submit the form
-            facilitatorPage.evaluate(
-                    "() => { const form = document.querySelector(\"form[hx-post*='action-items']\"); if (form) { htmx.trigger(form, 'submit'); } }");
-
-            // Verify the action item appears with its content
-            waitForElement(facilitatorPage, "text=Daily sync with design team", 15000);
-            assertTrue(
-                    facilitatorPage.locator("text=Daily sync with design team").isVisible(),
-                    "Submitted action item 'what' should be visible");
-
-            // Verify the successCriteria is displayed in the action items list
-            waitForElement(facilitatorPage, "text=Attendance tracked for 2 weeks, zero missed syncs", 15000);
-            assertTrue(
-                    facilitatorPage.locator("text=Attendance tracked for 2 weeks, zero missed syncs").isVisible(),
-                    "Submitted action item successCriteria should be visible in the list");
-
-            logTestProgress("SUCCESS_CRITERIA", 4, 4, "successCriteria field captured and displayed correctly");
-
-        } catch (Exception e) {
-            reportTestFailure(facilitatorPage, "SSC Action Item Success Criteria", e);
-            throw e;
-        } finally {
-            facilitatorContext.close();
-        }
-    }
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 

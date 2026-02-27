@@ -40,7 +40,6 @@ import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.facilitation.RetroSessionService;
 import direct.reflect.facilitator.facilitation.ParticipantService;
 import direct.reflect.facilitator.facilitation.response.ResponseService;
-import direct.reflect.facilitator.facilitation.actionitem.ActionItemService;
 import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.web.RetroViewController;
 
@@ -67,8 +66,6 @@ class RetroViewControllerTest {
     @MockitoBean
     private AuthService authenticationHelper;
 
-    @MockitoBean
-    private ActionItemService actionItemService;
 
     @Test
     @WithMockUser
@@ -314,30 +311,6 @@ class RetroViewControllerTest {
     }
 
 
-    @Test
-    @WithMockUser
-    void retroContentFragment_WithAllowActionItems_ShouldRenderActionItemForm() throws Exception {
-        // Given - a step with allowActionItems: true should render the action item textarea
-        UUID retroId = UUID.randomUUID();
-        Long stepId = 42L;
-        RetroSession session = createMockSession(retroId, RetroPhase.GATHER_DATA);
-        RetroStep step = createMockStepWithActionItems(stepId);
-        Participant participant = createMockParticipant();
-        participant.setUsername("testuser");
-
-        when(retroService.getSessionById(retroId)).thenReturn(session);
-        when(retroService.getCurrentStep(retroId)).thenReturn(step);
-        when(retroService.getInstructionHistory(retroId)).thenReturn(List.of());
-        when(retroService.getTimerState(retroId)).thenReturn(null);
-        when(participantService.getParticipantForSession(any(), eq(retroId))).thenReturn(participant);
-        when(participantService.isFacilitator(any(), eq(retroId))).thenReturn(false);
-        when(participantService.getSessionParticipants(retroId)).thenReturn(List.of(participant));
-
-        // When & Then
-        mockMvc.perform(get("/retro/{retroId}/content", retroId))
-            .andExpect(status().isOk())
-            .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"what\"")));
-    }
 
     @Test
     @WithMockUser
@@ -443,27 +416,6 @@ class RetroViewControllerTest {
         return participant;
     }
 
-    private RetroStep createMockStepWithActionItems(Long stepId) {
-        RetroStep step = new RetroStep();
-        step.setId(stepId);
-        step.setComponentType(ComponentType.MULTI_COLUMN_BOARD);
-        Map<String, Object> capabilities = new HashMap<>();
-        capabilities.put("allowVoting", false);
-        capabilities.put("allowInput", true);
-        capabilities.put("showContent", true);
-        capabilities.put("showVotes", false);
-        capabilities.put("allowActionItems", true);
-        capabilities.put("maxLength", 500);
-        Map<String, Object> config = new HashMap<>();
-        config.put("capabilities", capabilities);
-        config.put("columns", List.of(
-            Map.of("id", "start", "title", "Start", "color", "#10B981"),
-            Map.of("id", "stop", "title", "Stop", "color", "#EF4444"),
-            Map.of("id", "keep", "title", "Keep", "color", "#3B82F6")
-        ));
-        step.setComponentConfig(config);
-        return step;
-    }
 
     private RetroStep createMockStep(Long stepId, boolean allowVoting) {
         RetroStep step = new RetroStep();
