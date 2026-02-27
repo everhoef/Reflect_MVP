@@ -66,12 +66,12 @@
 
 <!-- Card Lane Content Fragment (loaded via HTMX) -->
 <div th:fragment="lane-content" class="space-y-2 min-h-[200px]">
-    <div th:if="${responses.empty}" class="text-center text-gray-400 text-sm py-8">
+    <div th:if="${responses == null or responses.empty}" class="text-center text-gray-400 text-sm py-8">
         <p>💭</p>
         <p class="mt-2">Notes will appear here...</p>
     </div>
 
-    <div th:unless="${responses.empty or capabilities['allowMerging'] == true}" class="space-y-2">
+    <div th:unless="${responses == null or responses.empty or capabilities['allowMerging'] == true}" class="space-y-2">
 
         <div th:each="response : ${responses}"
              th:with="isMyResponse=${response.participantId().toString() == currentParticipantId.toString()},
@@ -169,7 +169,7 @@
         </div>
     </div>
 
-    <div th:if="${!responses.empty and capabilities['allowMerging'] == true}"
+    <div th:if="${responses != null and !responses.empty and capabilities['allowMerging'] == true}"
          class="space-y-2 sortable"
          th:hx-post="@{/api/retro/{r}/step/{s}/cluster/merge(r=${retroSession.id},s=${currentStep.id})}"
          hx-trigger="end from:*"
