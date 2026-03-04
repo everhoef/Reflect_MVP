@@ -104,14 +104,16 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             logTestProgress("PHASE_1", 5, 24, "Advancing to histogram visualization");
             clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS);
 
-            // Wait for histogram to load (replaces "Loading histogram..." placeholder)
-            waitForElement(facilitatorPage, "text=3 rating(s) submitted", DEFAULT_TIMEOUT_MS);
+            // Wait for histogram HTMX fragment to load - use a submitted comment as the signal
+            // (the histogram-data fragment is loaded asynchronously via HTMX; comments appear
+            //  only after the fragment loads and responses are revealed)
+            waitForElement(facilitatorPage, "p:has-text('Excellent team collaboration')", DEFAULT_TIMEOUT_MS);
 
             // Verify histogram visualization
             logTestProgress("PHASE_1", 6, 24, "Validating histogram and comments display");
             log.info("  ├─ Validating histogram visualization...");
-            assertTrue(facilitatorPage.locator("text=3 rating(s) submitted").isVisible(),
-                "Histogram should show 3 ratings submitted");
+            assertTrue(facilitatorPage.locator("p:has-text('Excellent team collaboration')").isVisible(),
+                "Histogram should show facilitator's comment once responses are revealed");
 
             // Verify comments are displayed
             log.info("  ├─ Validating comments display...");
@@ -531,6 +533,11 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
                 "Participant1 MUST receive PARTICIPANT_JOINED event via SSE");
 
             // Verify participant2 also gets SSE connection after joining
+            // Wait for SSE to connect (async) before checking readyState - same pattern as facilitator/participant1 above
+            participant2Page.waitForFunction(
+                "() => window.eventSource && window.eventSource.readyState === 1",
+                null,
+                new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
             Object participant2SSEResult = participant2Page.evaluate("() => window.eventSource ? (window.eventSource.readyState === 1) : false");
             boolean participant2SSE = participant2SSEResult != null && (Boolean) participant2SSEResult;
             assertTrue(participant2SSE, "Participant2 should have active SSE connection after joining");
