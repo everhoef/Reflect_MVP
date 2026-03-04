@@ -15,6 +15,7 @@ import tools.jackson.databind.exc.InvalidFormatException;
 
 import direct.reflect.facilitator.common.exception.NotAuthenticatedException;
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
+import direct.reflect.facilitator.common.exception.ResourceNotFoundException;
 import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException;
 import direct.reflect.facilitator.common.exception.RetroTemplateNotFoundException;
 import direct.reflect.facilitator.common.exception.InvalidSessionStateException;
@@ -36,6 +37,13 @@ public class ApiExceptionHandler {
         log.error("ResponseStatusException: {}", ex.getMessage());
         return ResponseEntity.status(ex.getStatusCode())
             .body("Request failed");
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<String> handleResourceNotFound(ResourceNotFoundException ex) {
+        log.error("Resource not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body("Resource not found");
     }
 
     @ExceptionHandler(RetroSessionNotFoundException.class)
@@ -138,6 +146,13 @@ public class ApiExceptionHandler {
         log.warn("Vote limit exceeded: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
             .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<String> handleIllegalArgument(IllegalArgumentException ex) {
+        log.warn("Invalid request argument: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body("Invalid request");
     }
 
     @ExceptionHandler(Exception.class)

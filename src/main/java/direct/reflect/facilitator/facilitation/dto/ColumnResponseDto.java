@@ -37,7 +37,9 @@ public record ColumnResponseDto(
     Boolean visible,
     String participantName,
     UUID participantId,
-    Integer voteCount
+    Integer voteCount,
+    UUID clusterId,
+    String clusterName
 ) implements ComponentResponseDto {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -69,7 +71,9 @@ public record ColumnResponseDto(
             response.getIsVisible(),
             response.getParticipant().getDisplayName(),
             response.getParticipant().getParticipantId(),
-            voteCount
+            voteCount,
+            response.getClusterId(),
+            response.getClusterName()
         );
     }
 

@@ -88,7 +88,7 @@ class CsvImporterServiceTest {
         assertEquals("The Original Four", defaultTemplate.getGenerateInsights().getName());
 
         assertNotNull(defaultTemplate.getDecideActions());
-        assertEquals("Circle of Questions", defaultTemplate.getDecideActions().getName());
+        assertEquals("Start Stop Keep", defaultTemplate.getDecideActions().getName());
 
         assertNotNull(defaultTemplate.getCloseRetro());
         assertEquals("Feedback Door Smiley's", defaultTemplate.getCloseRetro().getName());
@@ -137,8 +137,8 @@ class CsvImporterServiceTest {
 
         // For debugging, let's verify the expected total matches what we imported
         assertTrue(totalSteps > 0, "Should have imported some steps");
-        assertEquals(24, totalSteps, "Should have imported all 24 steps from CSV");
-        assertEquals(22, boardSteps, "Should have 22 MULTI_COLUMN_BOARD steps");
+        assertEquals(64, totalSteps, "Should have imported all 64 steps from CSV");
+        assertEquals(62, boardSteps, "Should have 62 MULTI_COLUMN_BOARD steps");
         assertEquals(1, ratingSteps, "Should have 1 RATING_SCALE step");
         assertEquals(1, histogramSteps, "Should have 1 HISTOGRAM_CHART step");
 

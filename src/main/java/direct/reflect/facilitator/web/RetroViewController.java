@@ -6,10 +6,13 @@ import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -273,6 +276,7 @@ public class RetroViewController {
             model.addAttribute("currentParticipantId", currentParticipantId);
             model.addAttribute("showAuthor", showAuthor);
             model.addAttribute("capabilities", capabilities != null ? capabilities : Map.of());
+            model.addAttribute("currentStep", step);
 
             return "fragments/components/multi-column-board :: lane-content";
 
@@ -385,5 +389,6 @@ public class RetroViewController {
              return "fragments/common-fragments :: error";
          }
      }
+
 
  }

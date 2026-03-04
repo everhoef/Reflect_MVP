@@ -69,6 +69,20 @@ public class ParticipantResponse {
     private Integer displayOrder = 0;
 
     /**
+     * Cluster identifier for grouping related responses together.
+     * Null means the response has not been assigned to any cluster yet.
+     */
+    @Column(name = "cluster_id")
+    private UUID clusterId;
+
+    /**
+     * Human-readable display name for the cluster this response belongs to.
+     * Null when not yet clustered.
+     */
+    @Column(name = "cluster_name")
+    private String clusterName;
+
+    /**
      * Response data stored as PostgreSQL JSONB.
      * Structure is flexible and determined by the RetroStep's componentType configuration.
      *

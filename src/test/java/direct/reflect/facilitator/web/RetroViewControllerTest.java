@@ -9,6 +9,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -27,9 +30,12 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import direct.reflect.facilitator.facilitation.RetroSession;
 import direct.reflect.facilitator.configurator.RetroTemplate;
+import direct.reflect.facilitator.configurator.RetroStep;
+import direct.reflect.facilitator.configurator.ComponentType;
 import direct.reflect.facilitator.facilitation.Participant;
 import direct.reflect.facilitator.facilitation.ParticipantRole;
 import direct.reflect.facilitator.facilitation.RetroPhase;
+import direct.reflect.facilitator.facilitation.response.ParticipantResponse;
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.facilitation.RetroSessionService;
 import direct.reflect.facilitator.facilitation.ParticipantService;
@@ -59,6 +65,7 @@ class RetroViewControllerTest {
 
     @MockitoBean
     private AuthService authenticationHelper;
+
 
     @Test
     @WithMockUser
@@ -304,6 +311,56 @@ class RetroViewControllerTest {
     }
 
 
+    @Test
+    @WithMockUser
+    void columnResponses_WithAllowVotingTrue_ShouldRenderVoteButton() throws Exception {
+        // Given
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+        RetroSession session = createMockSession(retroId, RetroPhase.GATHER_DATA);
+        RetroStep step = createMockStep(stepId, true);
+        ParticipantResponse response = createMockColumnResponse("Mad", "This is frustrating");
+        UUID participantId = response.getParticipant().getParticipantId();
+
+        when(participantService.canAccessRetro(retroId)).thenReturn(true);
+        when(retroService.getSessionById(retroId)).thenReturn(session);
+        when(retroService.getCurrentStep(retroId)).thenReturn(step);
+        when(responseService.getResponsesForStageComponentType(any(), any(), eq(ComponentType.MULTI_COLUMN_BOARD)))
+            .thenReturn(List.of(response));
+        when(authenticationHelper.getParticipantId(any())).thenReturn(participantId);
+
+        // When & Then
+        mockMvc.perform(get("/retro/{retroId}/step/{stepId}/responses/column", retroId, stepId)
+                .param("columnId", "Mad"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("👍")));
+    }
+
+    @Test
+    @WithMockUser
+    void columnResponses_WithAllowVotingFalse_ShouldNotRenderVoteButton() throws Exception {
+        // Given
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+        RetroSession session = createMockSession(retroId, RetroPhase.GATHER_DATA);
+        RetroStep step = createMockStep(stepId, false);
+        ParticipantResponse response = createMockColumnResponse("Mad", "This is frustrating");
+        UUID participantId = response.getParticipant().getParticipantId();
+
+        when(participantService.canAccessRetro(retroId)).thenReturn(true);
+        when(retroService.getSessionById(retroId)).thenReturn(session);
+        when(retroService.getCurrentStep(retroId)).thenReturn(step);
+        when(responseService.getResponsesForStageComponentType(any(), any(), eq(ComponentType.MULTI_COLUMN_BOARD)))
+            .thenReturn(List.of(response));
+        when(authenticationHelper.getParticipantId(any())).thenReturn(participantId);
+
+        // When & Then
+        mockMvc.perform(get("/retro/{retroId}/step/{stepId}/responses/column", retroId, stepId)
+                .param("columnId", "Mad"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("👍"))));
+    }
+
     // Helper methods
     private RetroSession createMockSession(UUID retroId, RetroPhase phase) {
         RetroSession session = new RetroSession();
@@ -331,5 +388,44 @@ class RetroViewControllerTest {
         participant.setUsername("testuser");
         participant.setRole(ParticipantRole.PARTICIPANT);
         return participant;
+    }
+
+
+    private RetroStep createMockStep(Long stepId, boolean allowVoting) {
+        RetroStep step = new RetroStep();
+        step.setId(stepId);
+        step.setComponentType(ComponentType.MULTI_COLUMN_BOARD);
+        Map<String, Object> capabilities = new HashMap<>();
+        capabilities.put("allowVoting", allowVoting);
+        capabilities.put("allowInput", true);
+        capabilities.put("showContent", true);
+        capabilities.put("showVotes", true);
+        capabilities.put("maxLength", 500);
+        Map<String, Object> config = new HashMap<>();
+        config.put("capabilities", capabilities);
+        config.put("columns", List.of(
+            Map.of("id", "mad", "title", "Mad", "color", "#EF4444"),
+            Map.of("id", "sad", "title", "Sad", "color", "#3B82F6"),
+            Map.of("id", "glad", "title", "Glad", "color", "#10B981")
+        ));
+        step.setComponentConfig(config);
+        return step;
+    }
+
+    private ParticipantResponse createMockColumnResponse(String columnId, String content) {
+        Participant participant = new Participant();
+        participant.setParticipantId(UUID.randomUUID());
+        participant.setDisplayName("Test User");
+        participant.setRole(ParticipantRole.PARTICIPANT);
+
+        ParticipantResponse response = new ParticipantResponse();
+        response.setId(UUID.randomUUID());
+        response.setParticipant(participant);
+        response.setIsVisible(true);
+        Map<String, Object> data = new HashMap<>();
+        data.put("columnId", columnId);
+        data.put("content", content);
+        response.setResponseData(data);
+        return response;
     }
 }

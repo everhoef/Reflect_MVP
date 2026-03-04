@@ -83,7 +83,7 @@
             <div class="p-8">
                 <!-- Stage Header -->
                 <div class="text-center mb-8">
-                    <h2 class="text-3xl font-bold mb-2" th:text="'Stage ' + ${retroSession.currentStepIndex >= 0 ? retroSession.currentStepIndex + 1 : 1} + ': ' + ${currentStep.retroStage?.name ?: 'Current Stage'}">Stage 2: Mad Sad Glad</h2>
+                    <h2 class="text-3xl font-bold mb-2" th:text="'Step ' + ${retroSession.currentStepIndex >= 0 ? retroSession.currentStepIndex + 1 : 1} + ': ' + ${currentStep.retroStage?.name ?: 'Current Stage'}">Step 2: Mad Sad Glad</h2>
                     
                     <!-- Dynamic Timer Countdown Component -->
                     <div id="timer-fragment"

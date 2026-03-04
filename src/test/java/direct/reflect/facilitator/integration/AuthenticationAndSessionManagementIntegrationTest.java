@@ -35,8 +35,8 @@ public class AuthenticationAndSessionManagementIntegrationTest extends BaseInteg
         @DisplayName("Should support both OAuth2 and guest authentication flows")
         void shouldSupportOAuth2AndGuestAuthentication() {
             // Create browser contexts for different user types
-            BrowserContext oauth2Context = browser.newContext();
-            BrowserContext guestContext = browser.newContext();
+            BrowserContext oauth2Context = createMonitoredContext();
+            BrowserContext guestContext = createMonitoredContext();
             
             Page oauth2Page = oauth2Context.newPage();
             Page guestPage = guestContext.newPage();
@@ -75,10 +75,10 @@ public class AuthenticationAndSessionManagementIntegrationTest extends BaseInteg
         @DisplayName("Should allow multi-user session creation and joining with mixed authentication")
         void shouldAllowMultiUserSessionCreationAndJoining() {
             // Create contexts for 4 users: 1 OAuth2 facilitator + 3 guest participants
-            BrowserContext facilitatorContext = browser.newContext();
-            BrowserContext participant1Context = browser.newContext();
-            BrowserContext participant2Context = browser.newContext();
-            BrowserContext participant3Context = browser.newContext();
+            BrowserContext facilitatorContext = createMonitoredContext();
+            BrowserContext participant1Context = createMonitoredContext();
+            BrowserContext participant2Context = createMonitoredContext();
+            BrowserContext participant3Context = createMonitoredContext();
             
             Page facilitatorPage = facilitatorContext.newPage();
             Page participant1Page = participant1Context.newPage();
@@ -138,9 +138,9 @@ public class AuthenticationAndSessionManagementIntegrationTest extends BaseInteg
         @DisplayName("Should handle session switching between multiple users")
         void shouldHandleSessionSwitchingBetweenMultipleUsers() {
             // Create contexts for 3 users
-            BrowserContext aliceContext = browser.newContext();
-            BrowserContext bobContext = browser.newContext();
-            BrowserContext charlieContext = browser.newContext();
+            BrowserContext aliceContext = createMonitoredContext();
+            BrowserContext bobContext = createMonitoredContext();
+            BrowserContext charlieContext = createMonitoredContext();
             
             Page alicePage = aliceContext.newPage();
             Page bobPage = bobContext.newPage();
@@ -209,7 +209,7 @@ public class AuthenticationAndSessionManagementIntegrationTest extends BaseInteg
             List<Page> testPages = new ArrayList<>();
             
             for (int i = 0; i < 4; i++) {
-                BrowserContext context = browser.newContext();
+                BrowserContext context = createMonitoredContext();
                 Page page = context.newPage();
                 testContexts.add(context);
                 testPages.add(page);
@@ -282,7 +282,7 @@ public class AuthenticationAndSessionManagementIntegrationTest extends BaseInteg
         @Test
         @DisplayName("Should handle invalid session IDs gracefully")
         void shouldHandleInvalidSessionIDs() {
-            BrowserContext userContext = browser.newContext();
+            BrowserContext userContext = createMonitoredContext();
             Page userPage = userContext.newPage();
 
             try {

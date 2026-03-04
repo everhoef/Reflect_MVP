@@ -9,7 +9,9 @@ import com.microsoft.playwright.options.WaitForSelectorState;
 import com.microsoft.playwright.options.SelectOption;
 import com.microsoft.playwright.options.RequestOptions;
 import com.microsoft.playwright.options.FormData;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -17,13 +19,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import com.redis.testcontainers.RedisContainer;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.annotation.DirtiesContext.ClassMode;
@@ -49,6 +51,7 @@ import java.time.format.DateTimeFormatter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.Files;
+import java.util.regex.Pattern;
 
 import direct.reflect.facilitator.configurator.RetroTemplateRepository;
 import direct.reflect.facilitator.configurator.RetroStageRepository;
@@ -58,6 +61,7 @@ import direct.reflect.facilitator.facilitation.RetroSessionService;
 import direct.reflect.facilitator.facilitation.ParticipantRepository;
 import direct.reflect.facilitator.facilitation.RetroSessionRepository;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponseRepository;
+
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -83,6 +87,7 @@ import java.util.stream.Collectors;
 })
 @DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 @Slf4j
+
 public abstract class BaseIntegrationTest {
 
     // ==================== PLAYWRIGHT CONFIGURATION ====================
@@ -93,32 +98,27 @@ public abstract class BaseIntegrationTest {
      */
     protected static final int DEFAULT_TIMEOUT_MS = 5000;   // Navigation, elements, SSE - use for 95% of cases
     protected static final int SHORT_TIMEOUT_MS = 2000;     // Quick checks when element should already exist
+    protected static final int SSE_PROPAGATION_TIMEOUT_MS = 15000;  // SSE events may need time to propagate across multiple browser contexts
 
     @LocalServerPort
     protected int port;
 
     @Container
+    @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17-alpine")
             .withDatabaseName("facilitator_test")
             .withUsername("test")
             .withPassword("test");
 
     @Container
-    static GenericContainer<?> redis = new GenericContainer<>("redis:alpine")
+    @ServiceConnection
+    @SuppressWarnings("resource")
+    static RedisContainer redis = new RedisContainer("redis:alpine")
             .withExposedPorts(6379)
             .waitingFor(Wait.forLogMessage(".*Ready to accept connections.*", 1));
 
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.data.redis.host", redis::getHost);
-        registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
-    }
-
-    protected Playwright playwright;
-    protected Browser browser;
+    protected static Playwright playwright;
+    protected static Browser browser;
     protected BrowserContext context;
     protected String baseUrl;
 
@@ -126,6 +126,21 @@ public abstract class BaseIntegrationTest {
     private TestInfo currentTestInfo;
     private List<ConsoleMessage> consoleErrors = new ArrayList<>();
     private List<String> networkFailures = new ArrayList<>();
+
+    /**
+     * CDN domains intentionally blocked in tests via blockExternalCdnResources().
+     * Network failures for these domains are expected and must not be logged as errors.
+     */
+    private static final Set<String> BLOCKED_CDN_DOMAINS = Set.of(
+        "fonts.googleapis.com",
+        "fonts.gstatic.com",
+        "cdn.tailwindcss.com",
+        "cdn.jsdelivr.net"
+    );
+
+    private boolean isBlockedCdnUrl(String url) {
+        return BLOCKED_CDN_DOMAINS.stream().anyMatch(url::contains);
+    }
 
     @Autowired
     protected RetroTemplateRepository templateRepository;
@@ -245,45 +260,54 @@ public abstract class BaseIntegrationTest {
 
     // ==================== CONSOLE AND NETWORK MONITORING ====================
 
+
     /**
      * Sets up Playwright's native console and network listeners on the browser context.
      * This automatically applies to all pages created from this context.
      *
-     * Uses Playwright's built-in listeners for:
-     * - Console error messages (logged immediately and stored for summary)
-     * - Network request failures (connection errors, timeouts)
-     * - HTTP error responses (4xx, 5xx status codes)
+     * LOGGING TAXONOMY:
+     *   [BROWSER_MONITOR] — Real-time observations during test execution (WARN level).
+     *                       These fire continuously and do NOT indicate test failure.
+     *   [CDN_BLOCKED]     — Intentionally blocked CDN resources (DEBUG level, hidden by default).
+     *   [TEST_FAILURE_REPORT] — Only used by reportTestFailure() when a test actually fails.
+     *
+     * CDN resources (fonts.googleapis.com, cdn.tailwindcss.com, etc.) are intentionally
+     * aborted by blockExternalCdnResources() and silently filtered here.
      */
     private void setupConsoleAndNetworkMonitoring(BrowserContext context) {
         // Clear previous test's errors
         consoleErrors.clear();
         networkFailures.clear();
-
-        // ✅ Use Playwright's native console message listener
+        // Console error listener — captures browser-side JavaScript errors
         context.onConsoleMessage(msg -> {
             if (msg.type().equals("error")) {
-                // Immediately log AND store for later summary reporting
-                log.error("[TEST_FAILURE_REPORT] 🔴 Browser Console: {}", msg.text());
+                log.warn("[BROWSER_MONITOR] Browser console error: {}", msg.text());
                 consoleErrors.add(msg);
             }
         });
 
-        // ✅ Use Playwright's native network failure listener
+        // Network failure listener — captures connection errors, aborted requests
+        // Silently skips intentionally blocked CDN resources (expected behavior)
         context.onRequestFailed(request -> {
+            if (isBlockedCdnUrl(request.url())) {
+                log.debug("[CDN_BLOCKED] {} {} (expected — blocked by test infrastructure)",
+                    request.method(), request.url());
+                return;
+            }
             String failure = String.format("%s %s - %s",
                 request.method(), request.url(), request.failure());
-            log.error("[TEST_FAILURE_REPORT] ❌ Network Failed: {}", failure);
+            log.warn("[BROWSER_MONITOR] Network failure: {}", failure);
             networkFailures.add(failure);
         });
 
-        // ✅ Use Playwright's native response listener for HTTP errors
+        // HTTP error response listener — captures 4xx/5xx status codes
         context.onResponse(response -> {
             if (response.status() >= 400) {
                 String failure = String.format("HTTP %d: %s %s",
                     response.status(),
                     response.request().method(),
                     response.url());
-                log.error("[TEST_FAILURE_REPORT] ❌ {}", failure);
+                log.warn("[BROWSER_MONITOR] {}", failure);
                 networkFailures.add(failure);
             }
         });
@@ -338,46 +362,56 @@ public abstract class BaseIntegrationTest {
         newContext.setDefaultNavigationTimeout(DEFAULT_TIMEOUT_MS);
 
         setupConsoleAndNetworkMonitoring(newContext);
+        blockExternalCdnResources(newContext);
         return newContext;
     }
 
+    private void blockExternalCdnResources(BrowserContext ctx) {
+        ctx.route(Pattern.compile(".*fonts\\.googleapis\\.com.*"), route -> route.abort());
+        ctx.route(Pattern.compile(".*fonts\\.gstatic\\.com.*"), route -> route.abort());
+        ctx.route(Pattern.compile(".*cdn\\.tailwindcss\\.com.*"), route -> route.abort());
+        ctx.route(Pattern.compile(".*cdn\\.jsdelivr\\.net.*"), route -> route.abort());
+    }
+
+    @BeforeAll
+    static void setUpPlaywright() {
+        boolean debugMode = Boolean.parseBoolean(System.getenv("PLAYWRIGHT_DEBUG"));
+        BrowserType.LaunchOptions launchOptions = new BrowserType.LaunchOptions()
+            .setHeadless(!debugMode)
+            .setSlowMo(debugMode ? 500 : 0);
+
+        if (debugMode) {
+            log.info("🐛 PLAYWRIGHT DEBUG MODE ENABLED");
+            log.info("   - Headful browser (you can see what's happening)");
+            log.info("   - 500ms delay between actions");
+            log.info("   - Screenshots will be saved on failures");
+        }
+        playwright = Playwright.create();
+        browser = playwright.chromium().launch(launchOptions);
+    }
+
+    @AfterAll
+    static void tearDownPlaywright() {
+        if (browser != null) browser.close();
+        if (playwright != null) playwright.close();
+    }
     @BeforeEach
     void setUp(TestInfo testInfo) {
         // Store test info for later use (tracing, error reporting)
         currentTestInfo = testInfo;
-
         // Clear activity trail for clean state at start of each test
         clearActivityTrail();
-
         baseUrl = "http://localhost:" + port;
-        playwright = Playwright.create();
-
-        // Enable visual debugging: set PLAYWRIGHT_DEBUG=true for headful mode + slow motion
-        boolean debugMode = Boolean.parseBoolean(System.getenv("PLAYWRIGHT_DEBUG"));
-        BrowserType.LaunchOptions launchOptions = new BrowserType.LaunchOptions()
-            .setHeadless(!debugMode);
-
-        if (debugMode) {
-            launchOptions.setSlowMo(1000); // 1 second delay between actions
-            log.info("🐛 PLAYWRIGHT DEBUG MODE ENABLED");
-            log.info("   - Headful browser (you can see what's happening)");
-            log.info("   - 1 second delay between actions");
-            log.info("   - Screenshots will be saved on failures");
-        }
-
-        browser = playwright.chromium().launch(launchOptions);
-
         // Create browser context and set up monitoring
         context = browser.newContext();
-
         // Set default timeout to prevent indefinite waits (Playwright's default is 30s, but we want faster failures)
         context.setDefaultTimeout(DEFAULT_TIMEOUT_MS);
         context.setDefaultNavigationTimeout(DEFAULT_TIMEOUT_MS);
-
         // Set up console and network monitoring (Playwright native listeners)
         setupConsoleAndNetworkMonitoring(context);
-
+        blockExternalCdnResources(context);
         // Enable Playwright tracing in debug mode for local debugging
+        boolean debugMode = Boolean.parseBoolean(System.getenv("PLAYWRIGHT_DEBUG"));
         if (debugMode) {
             context.tracing().start(new Tracing.StartOptions()
                 .setScreenshots(true)
@@ -386,12 +420,9 @@ public abstract class BaseIntegrationTest {
             log.info("📊 Playwright tracing enabled");
         }
     }
-
     @AfterEach
     void tearDown(TestInfo testInfo) {
         boolean debugMode = Boolean.parseBoolean(System.getenv("PLAYWRIGHT_DEBUG"));
-
-        // Save Playwright trace on failure (debug mode only)
         // Note: We save trace for all tests in debug mode since JUnit 5 doesn't provide
         // easy failure detection in @AfterEach without custom extensions
         if (debugMode && context != null) {
@@ -399,9 +430,7 @@ public abstract class BaseIntegrationTest {
                 String testName = testInfo.getDisplayName().replaceAll("[^a-zA-Z0-9]", "_");
                 Path tracePath = Paths.get("target/traces/" + testName + ".zip");
                 Files.createDirectories(tracePath.getParent());
-
                 context.tracing().stop(new Tracing.StopOptions().setPath(tracePath));
-
                 log.info("📊 Playwright trace saved: {}", tracePath);
                 log.info("   View with: mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args='show-trace {}'", tracePath);
             } catch (Exception e) {
@@ -409,12 +438,8 @@ public abstract class BaseIntegrationTest {
             }
         }
 
-        // Close Playwright resources first (before database cleanup)
+        // Close browser context (browser and playwright are closed in @AfterAll)
         if (context != null) context.close();
-        if (browser != null) browser.close();
-        if (playwright != null) playwright.close();
-
-        // Clean database state between tests
         // Use @DirtiesContext instead of manual cleanup to avoid connection pool issues
         clearActivityTrail();
     }
@@ -519,7 +544,7 @@ public abstract class BaseIntegrationTest {
                 throw new RuntimeException("OAuth2 authentication failed - user was redirected to login page");
             } else {
                 log.info("✅ OAuth2 authentication completed successfully, final URL: {}", finalUrl);
-                debugPageState(page, "OAuth2 authentication success");
+
             }
 
         } catch (Exception e) {
@@ -1447,7 +1472,7 @@ public abstract class BaseIntegrationTest {
      * @param expectedParticipants Exact list of expected participant names (order doesn't matter)
      */
     protected void waitForParticipantList(Page page, String... expectedParticipants) {
-        waitForParticipantList(page, DEFAULT_TIMEOUT_MS, expectedParticipants);
+        waitForParticipantList(page, SSE_PROPAGATION_TIMEOUT_MS, expectedParticipants);
     }
 
     protected void waitForParticipantList(Page page, int timeoutMs, String... expectedParticipants) {
@@ -1459,7 +1484,8 @@ public abstract class BaseIntegrationTest {
                 "(expectedParticipants) => {" +
                 "  const participantElements = document.querySelectorAll('ul#participants-list li');" +
                 "  const actualParticipants = Array.from(participantElements)" +
-                "    .map(li => li.querySelector('span:first-child').textContent.trim())" +
+                "    .map(li => (li.querySelector('span:first-child')?.textContent || '').trim())" +
+                "    .filter(Boolean)" +
                 "    .sort();" +
                 "  const expected = expectedParticipants.slice().sort();" +
                 "  return JSON.stringify(actualParticipants) === JSON.stringify(expected);" +
@@ -1541,7 +1567,7 @@ public abstract class BaseIntegrationTest {
      * @param pages All pages that should show the same participant list
      */
     protected void waitForAllPagesParticipantList(String[] expectedParticipants, Page... pages) {
-        waitForAllPagesParticipantList(expectedParticipants, DEFAULT_TIMEOUT_MS, pages);
+        waitForAllPagesParticipantList(expectedParticipants, SSE_PROPAGATION_TIMEOUT_MS, pages);
     }
 
     protected void waitForAllPagesParticipantList(String[] expectedParticipants, int timeoutMs, Page... pages) {

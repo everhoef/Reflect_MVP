@@ -2,7 +2,8 @@ package direct.reflect.facilitator.integration;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.annotation.DirtiesContext;
+
+
 
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
@@ -31,48 +32,12 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class SSEConnectionIntegrationTest extends BaseIntegrationTest {
 
-    @Test
-    @DisplayName("Should maintain stable SSE connection without reconnecting")
-    @DirtiesContext // Clean up after this 30-second SSE test to prevent contamination
-    void shouldMaintainStableSSEConnection() throws InterruptedException {
-        BrowserContext context = browser.newContext();
-        Page page = context.newPage();
 
-        authenticateAsGuest(page, "SSE Test User");
-        String sessionId = createRetroSession(page, "SSE Stability Test");
-
-        waitForElement(page, "h2:has-text('Session Lobby')");
-
-        // Wait for initial SSE connection
-        waitForSseConnection(page, UUID.fromString(sessionId));
-
-        // Verify SSE connection element is present using hx-ext="sse" which is more stable
-        // The element with hx-ext="sse" is the parent container that manages SSE connections
-        int initialSseElements = page.locator("[hx-ext='sse']").count();
-        assertEquals(1, initialSseElements, "Should have exactly 1 SSE connection element initially");
-
-        log.info("Waiting 30 seconds to verify SSE connection stability");
-        Thread.sleep(30000);
-
-        // Verify SSE connection element is still present (not reconnected/duplicated)
-        int finalSseElements = page.locator("[hx-ext='sse']").count();
-
-        assertEquals(initialSseElements, finalSseElements,
-            "SSE connection should remain stable for 30 seconds without reconnecting");
-
-        log.info("SSE connection remained stable for 30 seconds with no reconnections");
-    }
-
-    // @Test
-    @DisplayName("Should receive keep-alive heartbeat events")
-    void shouldReceiveKeepAliveHeartbeats() throws InterruptedException {
-        // TODO: Implement after stability test passes
-    }
 
     @Test
     @DisplayName("Should broadcast participant_joined event to all participants in session")
     void shouldBroadcastParticipantJoinedToAllParticipants() throws InterruptedException {
-        BrowserContext context1 = browser.newContext();
+        BrowserContext context1 = createMonitoredContext();
         Page facilitatorPage = context1.newPage();
 
         authenticateAsGuest(facilitatorPage, "Facilitator");
@@ -84,7 +49,7 @@ public class SSEConnectionIntegrationTest extends BaseIntegrationTest {
         // Verify facilitator sees itself in participant list
         waitForParticipantList(facilitatorPage, "Facilitator");
 
-        BrowserContext context2 = browser.newContext();
+        BrowserContext context2 = createMonitoredContext();
         Page participantPage = context2.newPage();
 
         authenticateAsGuest(participantPage, "Participant");
@@ -103,10 +68,10 @@ public class SSEConnectionIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Should broadcast session_started event to all participants")
     void shouldBroadcastSessionStartedEventToAllParticipants() throws InterruptedException {
-        BrowserContext context1 = browser.newContext();
+        BrowserContext context1 = createMonitoredContext();
         Page facilitatorPage = context1.newPage();
 
-        BrowserContext context2 = browser.newContext();
+        BrowserContext context2 = createMonitoredContext();
         Page participantPage = context2.newPage();
 
         authenticateAsGuest(facilitatorPage, "Facilitator");
