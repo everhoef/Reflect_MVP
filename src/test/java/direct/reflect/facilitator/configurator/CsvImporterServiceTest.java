@@ -88,7 +88,7 @@ class CsvImporterServiceTest {
         assertEquals("The Original Four", defaultTemplate.getGenerateInsights().getName());
 
         assertNotNull(defaultTemplate.getDecideActions());
-        assertEquals("Circle of Questions", defaultTemplate.getDecideActions().getName());
+        assertEquals("Start Stop Keep", defaultTemplate.getDecideActions().getName());
 
         assertNotNull(defaultTemplate.getCloseRetro());
         assertEquals("Feedback Door Smiley's", defaultTemplate.getCloseRetro().getName());
