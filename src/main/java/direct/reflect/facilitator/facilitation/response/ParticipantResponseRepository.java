@@ -92,6 +92,9 @@ public interface ParticipantResponseRepository extends JpaRepository<Participant
      */
     List<ParticipantResponse> findByRetroStepIdAndClusterId(Long stepId, UUID clusterId);
 
+    @Query("SELECT r FROM ParticipantResponse r WHERE r.participant.session.id = :retroId AND r.clusterId = :clusterId")
+    List<ParticipantResponse> findByRetroIdAndClusterId(@Param("retroId") UUID retroId, @Param("clusterId") UUID clusterId);
+
     /**
      * Find all responses for a specific step that have not yet been assigned to any cluster.
      * Used by the clustering feature to find unclustered responses.
@@ -99,4 +102,10 @@ public interface ParticipantResponseRepository extends JpaRepository<Participant
     List<ParticipantResponse> findByRetroStepIdAndClusterIdIsNull(Long stepId);
 
     List<ParticipantResponse> findByRetroStepIdAndClusterIdIsNotNull(Long stepId);
+
+    @Query("SELECT r FROM ParticipantResponse r WHERE r.participant.session.id = :retroId AND r.clusterId IS NULL ORDER BY r.displayOrder ASC, r.submittedAt ASC")
+    List<ParticipantResponse> findByRetroIdAndClusterIdIsNull(@Param("retroId") UUID retroId);
+
+    @Query("SELECT r FROM ParticipantResponse r WHERE r.participant.session.id = :retroId AND r.clusterId IS NOT NULL ORDER BY r.displayOrder ASC, r.submittedAt ASC")
+    List<ParticipantResponse> findByRetroIdAndClusterIdIsNotNull(@Param("retroId") UUID retroId);
 }

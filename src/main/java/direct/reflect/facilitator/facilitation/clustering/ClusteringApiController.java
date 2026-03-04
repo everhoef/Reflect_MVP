@@ -71,6 +71,6 @@ public class ClusteringApiController {
     public ResponseEntity<ClusterGroupsDto> getClusters(
             @PathVariable UUID retroId,
             @PathVariable Long stepId) {
-        return ResponseEntity.ok(clusteringService.getClusters(stepId));
+        return ResponseEntity.ok(clusteringService.getClusters(retroId));
     }
 }

@@ -38,15 +38,12 @@ public class ClusteringService {
         if (responses.size() != responseIds.size()) {
             throw new IllegalArgumentException("Some response IDs were not found");
         }
-        // Validate all responses belong to the specified step
         responses.forEach(r -> {
-            if (!r.getRetroStep().getId().equals(stepId)) {
-                throw new IllegalArgumentException("Response " + r.getId() + " does not belong to step " + stepId);
+            if (!r.getParticipant().getSession().getId().equals(retroId)) {
+                throw new IllegalArgumentException("Response " + r.getId() + " does not belong to retro " + retroId);
             }
         });
-        responses.forEach(r -> {
-            r.setClusterId(clusterId);
-        });
+        responses.forEach(r -> r.setClusterId(clusterId));
         responseRepository.saveAll(responses);
         try {
             eventService.publish(RetroEvent.responsesRevealed(retroId, "facilitator", stepId));
@@ -70,7 +67,7 @@ public class ClusteringService {
     }
 
     public void renameCluster(UUID retroId, Long stepId, UUID clusterId, String newName) {
-        List<ParticipantResponse> responses = responseRepository.findByRetroStepIdAndClusterId(stepId, clusterId);
+        List<ParticipantResponse> responses = responseRepository.findByRetroIdAndClusterId(retroId, clusterId);
         if (responses.isEmpty()) {
             throw new ResourceNotFoundException("Cluster not found: " + clusterId);
         }
@@ -83,20 +80,15 @@ public class ClusteringService {
         }
     }
 
-/**
- * Retrieves all responses for a step, grouped into clusters and unclustered items.
- * Clustered responses are grouped by cluster ID; unclustered responses have no cluster assignment.
- * Performance note: executes two queries — one for unclustered, one for clustered responses.
- */
     @Transactional(readOnly = true)
-    public ClusterGroupsDto getClusters(Long stepId) {
-        List<ColumnResponseDto> unclustered = responseRepository.findByRetroStepIdAndClusterIdIsNull(stepId)
+    public ClusterGroupsDto getClusters(UUID retroId) {
+        List<ColumnResponseDto> unclustered = responseRepository.findByRetroIdAndClusterIdIsNull(retroId)
                 .stream()
                 .map(ColumnResponseDto::from)
                 .collect(Collectors.toList());
 
         Map<UUID, List<ColumnResponseDto>> clustered = new LinkedHashMap<>();
-        responseRepository.findByRetroStepIdAndClusterIdIsNotNull(stepId)
+        responseRepository.findByRetroIdAndClusterIdIsNotNull(retroId)
                 .forEach(r -> clustered
                         .computeIfAbsent(r.getClusterId(), k -> new ArrayList<>())
                         .add(ColumnResponseDto.from(r)));

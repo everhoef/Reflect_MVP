@@ -19,12 +19,15 @@
     <script th:inline="javascript">
         /*<![CDATA[*/
 
+        /*[# th:if="${_csrf != null}" ]*/
+        window._csrfHeader = /*[[${_csrf.headerName}]]*/ 'X-CSRF-Token';
+        window._csrfToken = /*[[${_csrf.token}]]*/ '';
+        /*[/]*/
+
         document.body.addEventListener('htmx:configRequest', (event) => {
-            /*[# th:if="${_csrf != null}" ]*/
-            const csrfHeader = /*[[${_csrf.headerName}]]*/ 'X-CSRF-Token';
-            const csrfToken = /*[[${_csrf.token}]]*/ 'csrf-token';
-            event.detail.headers[csrfHeader] = csrfToken;
-            /*[/]*/
+            if (window._csrfHeader && window._csrfToken) {
+                event.detail.headers[window._csrfHeader] = window._csrfToken;
+            }
         });
 
         /*]]>*/

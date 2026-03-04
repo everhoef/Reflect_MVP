@@ -171,10 +171,7 @@
 
     <div th:if="${responses != null and !responses.empty and capabilities['allowMerging'] == true}"
          class="space-y-2 sortable"
-         th:hx-post="@{/api/retro/{r}/step/{s}/cluster/merge(r=${retroSession.id},s=${currentStep.id})}"
-         hx-trigger="end from:*"
-         hx-swap="none"
-         hx-include="[name='responseId']">
+         th:data-merge-url="@{/api/retro/{r}/step/{s}/cluster/merge(r=${retroSession.id},s=${currentStep.id})}">
 
         <div th:each="response, responseStat : ${responses}"
              th:with="isMyResponse=${response.participantId().toString() == currentParticipantId.toString()},
