@@ -43,6 +43,12 @@ spring:
             user-info-uri: https://api.github.com/user
             user-name-attribute: login
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
 logging:
   level:
     direct.reflect.facilitator: "debug"

@@ -76,6 +76,9 @@ public class SecurityConfig {
                 // Health checks for monitoring
                 .requestMatchers("/actuator/health/**").permitAll()
                 
+                // OpenAPI / Swagger UI - no auth required
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                
                 // Mixed endpoints - require authentication (either OIDC or guest session)
                 // Service layer handles business logic authorization  
                 .requestMatchers("/api/retro/*/join").authenticated()

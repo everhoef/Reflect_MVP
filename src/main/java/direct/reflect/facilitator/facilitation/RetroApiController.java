@@ -27,6 +27,8 @@ import direct.reflect.facilitator.common.exception.VoteLimitExceededException;
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.common.exception.InputLimitExceededException;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import jakarta.validation.Valid;
 
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,7 @@ import java.util.List;
 @RequestMapping("/api/retro")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Retro API", description = "Retrospective session management and participant responses")
 public class RetroApiController {
     private final RetroSessionService retroService;
     private final ParticipantService participantService;
