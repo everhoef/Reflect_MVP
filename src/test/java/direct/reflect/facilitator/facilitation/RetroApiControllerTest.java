@@ -77,6 +77,9 @@ public class RetroApiControllerTest {
     @MockitoBean
     private AuthService authHelper;
 
+    @MockitoBean
+    private direct.reflect.facilitator.configurator.RetroStepRepository stepRepository;
+
     @BeforeEach
     void setUpDefaultMocks() {
         ParticipantResponse defaultResponse = new ParticipantResponse();

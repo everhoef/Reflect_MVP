@@ -23,9 +23,14 @@ import direct.reflect.facilitator.facilitation.dto.SubmitResponseResult;
 import direct.reflect.facilitator.facilitation.dto.VoteResult;
 import direct.reflect.facilitator.facilitation.dto.RevealResult;
 import direct.reflect.facilitator.facilitation.dto.UpdateResponseResult;
+import direct.reflect.facilitator.facilitation.dto.RetroStateDto;
+import direct.reflect.facilitator.facilitation.dto.StepSummaryDto;
+import direct.reflect.facilitator.facilitation.dto.ParticipantDto;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponse;
 import direct.reflect.facilitator.facilitation.response.ResponseService;
 import direct.reflect.facilitator.configurator.RetroStep;
+import direct.reflect.facilitator.configurator.RetroStage;
+import direct.reflect.facilitator.configurator.RetroStepRepository;
 import direct.reflect.facilitator.configurator.ComponentType;
 import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException;
 import direct.reflect.facilitator.common.exception.VoteLimitExceededException;
@@ -41,8 +46,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.UUID;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/retro")
@@ -54,6 +61,7 @@ public class RetroApiController {
     private final ParticipantService participantService;
     private final EventService eventService;
     private final ResponseService responseService;
+    private final RetroStepRepository stepRepository;
 
     @PostMapping(value = "/create", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
@@ -316,6 +324,41 @@ public class RetroApiController {
         }
     }
 
+    @GetMapping("/{retroId}/step/{stepId}/response/rating")
+    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    @Operation(summary = "Get rating responses for histogram", description = "Returns all rating responses for the stage containing this step (used by HISTOGRAM_CHART component)")
+    @ApiResponse(responseCode = "200", description = "Rating responses returned")
+    public ResponseEntity<List<RatingResponseDto>> getRatingResponses(
+            @PathVariable UUID retroId,
+            @PathVariable Long stepId,
+            HttpServletRequest httpRequest) {
+
+        try {
+            participantService.getParticipantForSession(httpRequest, retroId);
+            RetroSession session = retroService.getSessionById(retroId);
+
+            RetroStep step = stepRepository.findById(stepId)
+                .orElseThrow(() -> new IllegalArgumentException("Step not found: " + stepId));
+            RetroStage stage = step.getRetroStage();
+
+            List<RatingResponseDto> dtos = responseService
+                .getResponsesForStageComponentType(session, stage, ComponentType.RATING_SCALE)
+                .stream()
+                .map(RatingResponseDto::from)
+                .toList();
+
+            return ResponseEntity.ok(dtos);
+
+        } catch (ParticipantNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (RetroSessionNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error fetching rating responses for retro {}, step {}: ", retroId, stepId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     @PutMapping("/{retroId}/response/{responseId}")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Update a response", description = "Updates the content of an existing participant response")
@@ -477,7 +520,7 @@ public class RetroApiController {
          }
      }
 
-     @PostMapping("/{retroId}/timer/resume")
+      @PostMapping("/{retroId}/timer/resume")
      @PreAuthorize("hasAnyRole('USER', 'GUEST')")
      @Operation(summary = "Resume the session timer", description = "Resumes the countdown timer for the current step; facilitator-only action")
      @ApiResponse(responseCode = "200", description = "Timer resumed successfully")
@@ -502,5 +545,121 @@ public class RetroApiController {
              return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
          }
      }
+
+    @GetMapping("/{retroId}/state")
+    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    public ResponseEntity<RetroStateDto> getRetroState(
+            @PathVariable UUID retroId,
+            HttpServletRequest httpRequest) {
+
+        try {
+            Participant currentParticipant = participantService.getParticipantForSession(httpRequest, retroId);
+            RetroSession session = retroService.getSessionById(retroId);
+
+            RetroPhase[] activePhases = {
+                RetroPhase.SET_THE_STAGE,
+                RetroPhase.GATHER_DATA,
+                RetroPhase.GENERATE_INSIGHTS,
+                RetroPhase.DECIDE_ACTIONS,
+                RetroPhase.CLOSE_RETRO
+            };
+
+            List<StepSummaryDto> steps = new ArrayList<>();
+            for (RetroPhase phase : activePhases) {
+                RetroStage stage = session.getTemplate().getStageForPhase(phase);
+                if (stage == null) continue;
+                List<RetroStep> stageSteps = stepRepository.findByRetroStageOrderByOrderIndexAsc(stage);
+                for (RetroStep step : stageSteps) {
+                    steps.add(new StepSummaryDto(
+                        step.getId(),
+                        deriveTitleFromStep(step),
+                        step.getComponentType().name(),
+                        step.getAdvancementTrigger().name(),
+                        step.getDurationSeconds() == 0 ? null : step.getDurationSeconds(),
+                        step.getComponentConfig(),
+                        step.getInstructions()
+                    ));
+                }
+            }
+
+            RetroStep currentStep = retroService.getCurrentStep(retroId);
+            Long currentStepId = currentStep != null ? currentStep.getId() : null;
+
+            List<Participant> activeParticipants = participantService.getSessionParticipants(retroId);
+            UUID facilitatorId = activeParticipants.stream()
+                .filter(p -> p.getRole() == ParticipantRole.FACILITATOR)
+                .map(Participant::getParticipantId)
+                .findFirst()
+                .orElse(null);
+
+            boolean isFacilitator = currentParticipant.getRole() == ParticipantRole.FACILITATOR;
+
+            RetroStateDto dto = new RetroStateDto(
+                session.getId(),
+                session.getPhase().name(),
+                currentStepId,
+                session.getCurrentStepIndex(),
+                steps,
+                facilitatorId,
+                isFacilitator,
+                activeParticipants.size()
+            );
+
+            return ResponseEntity.ok(dto);
+
+        } catch (ParticipantNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (RetroSessionNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error getting retro state for {}: ", retroId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GetMapping("/{retroId}/participants")
+    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    public ResponseEntity<List<ParticipantDto>> getParticipants(
+            @PathVariable UUID retroId,
+            HttpServletRequest httpRequest) {
+
+        try {
+            participantService.getParticipantForSession(httpRequest, retroId);
+
+            List<ParticipantDto> participants = participantService.getSessionParticipants(retroId)
+                .stream()
+                .map(p -> new ParticipantDto(
+                    p.getParticipantId(),
+                    p.getDisplayName(),
+                    p.getRole().name()
+                ))
+                .toList();
+
+            return ResponseEntity.ok(participants);
+
+        } catch (ParticipantNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (Exception e) {
+            log.error("Error getting participants for {}: ", retroId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    private String deriveTitleFromStep(RetroStep step) {
+        Map<String, Object> config = step.getComponentConfig();
+        if (config != null) {
+            Object columns = config.get("columns");
+            if (columns instanceof List<?> colList && !colList.isEmpty()) {
+                Object first = colList.get(0);
+                if (first instanceof Map<?, ?> colMap) {
+                    Object title = colMap.get("title");
+                    if (title instanceof String s && !s.isBlank()) {
+                        return s;
+                    }
+                }
+            }
+        }
+        return step.getComponentType().name().replace("_", " ");
+    }
 
  }

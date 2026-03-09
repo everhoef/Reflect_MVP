@@ -3,6 +3,7 @@ package direct.reflect.facilitator.eventing;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,9 @@ public class EventService {
     private final ApplicationEventPublisher applicationEventPublisher;
     private final AtomicInteger activeConnections = new AtomicInteger(0);
 
+    @Value("${facilitator.sse.timeout-ms:3600000}")
+    private long sseTimeoutMs;
+
     // Record to store SSE emitter with participant info
     private record EmitterConnection(SseEmitter emitter, String participantName) {}
 
@@ -43,8 +47,6 @@ public class EventService {
     private final ConcurrentHashMap<String, EmitterConnection> localEmitters = new ConcurrentHashMap<>();
     private final ScheduledExecutorService keepAliveExecutor = Executors.newScheduledThreadPool(2);
 
-    private static final long SSE_TIMEOUT = 3600000L; // 1 hour
-    
     @PostConstruct
     public void init() {
         log.info("EventService initializing with Redis Pub/Sub");
@@ -127,7 +129,7 @@ public class EventService {
             cleanupConnection(connectionId, existingConnection.emitter(), participantInfo, retroId);
         }
 
-        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
+        SseEmitter emitter = new SseEmitter(sseTimeoutMs);
 
         // Store locally with participant name
         localEmitters.put(connectionId, new EmitterConnection(emitter, participantName));

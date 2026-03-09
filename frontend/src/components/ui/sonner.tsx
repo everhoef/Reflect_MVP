@@ -8,12 +8,14 @@ import {
 import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 
-const Toaster = ({ ...props }: ToasterProps) => {
+const Toaster = (props: ToasterProps) => {
   const { theme = "system" } = useTheme()
+  const resolvedTheme = theme as "light" | "dark" | "system"
 
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      {...props}
+      theme={resolvedTheme}
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,
@@ -30,7 +32,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--border-radius": "var(--radius)",
         } as React.CSSProperties
       }
-      {...props}
     />
   )
 }

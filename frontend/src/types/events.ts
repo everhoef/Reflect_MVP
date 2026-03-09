@@ -5,28 +5,30 @@
  * Java values are UPPER_SNAKE_CASE; SSE wire format uses lowercase_snake_case
  * (e.g., NOTE_ADDED → event name "note_added").
  */
-export enum EventType {
-  PARTICIPANT_JOINED = "participant_joined",
-  PARTICIPANT_LEFT = "participant_left",
-  SESSION_STARTED = "session_started",
-  STEP_ADVANCED = "step_advanced",
-  RETRO_CREATED = "retro_created",
-  PHASE_STARTED = "phase_started",
-  NOTE_ADDED = "note_added",
-  NOTE_UPDATED = "note_updated",
-  NOTE_DELETED = "note_deleted",
-  VOTE_ADDED = "vote_added",
-  VOTE_REMOVED = "vote_removed",
-  GROUP_CREATED = "group_created",
-  GROUP_UPDATED = "group_updated",
-  GROUP_DELETED = "group_deleted",
-  ACTION_CREATED = "action_created",
-  ACTION_UPDATED = "action_updated",
-  ACTION_DELETED = "action_deleted",
-  TIMER_STARTED = "timer_started",
-  TIMER_PAUSED = "timer_paused",
-  TIMER_FINISHED = "timer_finished",
-}
+export const EventType = {
+  PARTICIPANT_JOINED: "participant_joined",
+  PARTICIPANT_LEFT: "participant_left",
+  SESSION_STARTED: "session_started",
+  STEP_ADVANCED: "step_advanced",
+  RETRO_CREATED: "retro_created",
+  PHASE_STARTED: "phase_started",
+  NOTE_ADDED: "note_added",
+  NOTE_UPDATED: "note_updated",
+  NOTE_DELETED: "note_deleted",
+  VOTE_ADDED: "vote_added",
+  VOTE_REMOVED: "vote_removed",
+  GROUP_CREATED: "group_created",
+  GROUP_UPDATED: "group_updated",
+  GROUP_DELETED: "group_deleted",
+  ACTION_CREATED: "action_created",
+  ACTION_UPDATED: "action_updated",
+  ACTION_DELETED: "action_deleted",
+  TIMER_STARTED: "timer_started",
+  TIMER_PAUSED: "timer_paused",
+  TIMER_FINISHED: "timer_finished",
+} as const;
+
+export type EventType = (typeof EventType)[keyof typeof EventType];
 
 /**
  * ResponseData payload for NOTE events.

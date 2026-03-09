@@ -3,7 +3,7 @@ spring:
     name: facilitator
   datasource:
     hikari:
-      maximum-pool-size: 30          # Increase from default 10 for integration tests
+      maximum-pool-size: 30
       minimum-idle: 5
       connection-timeout: 30000
       idle-timeout: 600000
@@ -19,13 +19,9 @@ spring:
     web-application-type: servlet
   docker:
     compose:
-      enabled: false  # Disable Docker Compose for tests, use Testcontainers only
-  # WORKAROUND: OAuth2 properties must be explicitly specified in test application.yaml
-  # Root Cause: During @SpringBootTest context loading, OAuth2 properties from src/main/resources/application.yaml 
-  # are not loaded in the correct order or are overridden by test-specific property resolution.
-  # This ensures Spring's OAuth2ClientAutoConfiguration creates the required ClientRegistrationRepository bean.
+      enabled: false
   security:
-    enabled: false  # Disable main SecurityConfig for tests
+    enabled: false
     oauth2:
       client:
         registration:
@@ -40,19 +36,30 @@ spring:
             user-info-uri: https://api.github.com/user
             user-name-attribute: login
 
+server:
+  tomcat:
+    threads:
+      max: 400
+      min-spare: 20
+    accept-count: 200
+  servlet:
+    async:
+      timeout: 60000
+
+facilitator:
+  sse:
+    timeout-ms: 30000
+
 logging:
   level:
-    # Test logging - MINIMAL NOISE, package-level settings
-    "[direct.reflect.facilitator.integration]": INFO                          # Test execution flow
-    "[direct.reflect.facilitator.integration.BaseIntegrationTest]": DEBUG     # Enable debug for base test helpers
-    "[direct.reflect.facilitator.facilitation]": DEBUG                        # Business logic (temporarily DEBUG for session start debugging)
-    "[direct.reflect.facilitator.eventing]": DEBUG                            # SSE events (temporarily DEBUG to see session_started event)
-    "[direct.reflect.facilitator.web]": WARN                                  # Controllers
-    "[direct.reflect.facilitator.auth]": WARN                                 # Authentication
-    "[direct.reflect.facilitator.common]": ERROR                              # Exceptions only
-    "[direct.reflect.facilitator]": ERROR                                     # Catch-all
-
-    # Silence external noise completely
+    "[direct.reflect.facilitator.integration]": INFO
+    "[direct.reflect.facilitator.integration.BaseIntegrationTest]": DEBUG
+    "[direct.reflect.facilitator.facilitation]": DEBUG
+    "[direct.reflect.facilitator.eventing]": DEBUG
+    "[direct.reflect.facilitator.web]": WARN
+    "[direct.reflect.facilitator.auth]": WARN
+    "[direct.reflect.facilitator.common]": ERROR
+    "[direct.reflect.facilitator]": ERROR
     "[org.springframework]": ERROR
     "[org.hibernate]": ERROR
     "[org.testcontainers]": WARN

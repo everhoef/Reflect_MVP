@@ -1,7 +1,6 @@
 package direct.reflect.facilitator.eventing;
 
 import direct.reflect.facilitator.eventing.EventService;
-import direct.reflect.facilitator.eventing.EventType;
 import direct.reflect.facilitator.eventing.RetroEvent;
 import direct.reflect.facilitator.facilitation.ParticipantService;
 import direct.reflect.facilitator.facilitation.Participant;

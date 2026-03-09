@@ -173,6 +173,24 @@ export function HistogramChart({
       <p className="text-xs text-gray-400 text-right">
         {totalResponses} {totalResponses === 1 ? "response" : "responses"}
       </p>
+
+      {responses.some((r) => r.comment) && (
+        <div className="space-y-2 border-t border-gray-100 pt-4">
+          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Comments
+          </h4>
+          {responses
+            .filter((r) => r.comment)
+            .map((r) => (
+              <div key={r.id ?? r.participantId} className="flex items-start gap-2">
+                <span className="text-xs font-semibold text-blue-600 tabular-nums shrink-0">
+                  {r.rating}
+                </span>
+                <p className="text-sm text-gray-700">{r.comment}</p>
+              </div>
+            ))}
+        </div>
+      )}
     </div>
   );
 }

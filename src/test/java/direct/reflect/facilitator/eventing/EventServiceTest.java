@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.UUID;
@@ -43,6 +44,7 @@ class EventServiceTest {
     @BeforeEach
     void setUp() {
         testRetroId = UUID.randomUUID();
+        ReflectionTestUtils.setField(eventService, "sseTimeoutMs", 3600000L);
     }
 
     @Test

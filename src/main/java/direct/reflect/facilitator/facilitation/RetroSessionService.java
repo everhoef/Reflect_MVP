@@ -12,7 +12,6 @@ import direct.reflect.facilitator.configurator.RetroStepRepository;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponseRepository;
 import direct.reflect.facilitator.facilitation.dto.TimerStateDto;
 import direct.reflect.facilitator.eventing.EventService;
-import direct.reflect.facilitator.eventing.EventType;
 import direct.reflect.facilitator.eventing.RetroEvent;
 
 import java.time.LocalDateTime;

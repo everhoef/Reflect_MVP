@@ -9,16 +9,16 @@ export interface StickyNoteData {
   columnId: string;
   content: string;
   visible: boolean;
-  participantName?: string;
-  participantId?: string;
+  participantName?: string | undefined;
+  participantId?: string | undefined;
   voteCount: number;
-  clusterId?: string;
-  clusterName?: string;
+  clusterId?: string | undefined;
+  clusterName?: string | undefined;
 }
 
 interface StickyNoteProps {
   note: StickyNoteData;
-  currentParticipantId?: string;
+  currentParticipantId?: string | undefined;
   isOwn: boolean;
   allowVoting: boolean;
   allowMerging: boolean;
@@ -106,8 +106,8 @@ export function StickyNote({
         </div>
 
         {isHidden ? (
-          <p className="text-sm text-gray-400 italic select-none blur-sm pr-6">
-            {note.content}
+          <p className="text-sm text-gray-400 italic select-none pr-6">
+            [Hidden until revealed]
           </p>
         ) : isEditing ? (
           <textarea

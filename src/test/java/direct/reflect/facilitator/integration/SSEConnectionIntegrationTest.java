@@ -93,7 +93,7 @@ public class SSEConnectionIntegrationTest extends BaseIntegrationTest {
             "Participant should be in retro lobby");
 
         // Facilitator starts the retrospective
-        clickElement(facilitatorPage, "button:has-text('Start Retrospective')");
+        clickElement(facilitatorPage, "[data-testid='start-retro-button']");
 
         // Wait for both pages to transition to active retrospective phase
         facilitatorPage.waitForFunction("() => !document.body.textContent.includes('Session Lobby')",

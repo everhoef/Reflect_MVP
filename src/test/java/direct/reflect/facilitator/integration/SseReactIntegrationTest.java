@@ -13,22 +13,17 @@ import java.util.UUID;
 /**
  * Integration test verifying the SSE → UI update chain.
  *
- * This test runs against the Thymeleaf app (current state) because T31
- * (Spring Boot serving React) is not yet complete. The SSE infrastructure
- * being tested is shared by both Thymeleaf and React: the same backend
- * EventService publishes events to the same SSE endpoint (/api/retro/{id}/events).
- * Once T31 is done, the selectors may need updating to target React-rendered DOM,
- * but the SSE plumbing assertions will remain valid.
+ * Tests verify the full end-to-end chain:
+ * Backend action → SSE event published → React Query invalidation → DOM updated
+ *
+ * Verification is DOM-based (not window.eventSource) because the React useSSE hook
+ * creates a local EventSource that is not exposed on window.
  *
  * Test scenarios:
  * 1. Submit a note via the UI → SSE note_added event fires → note appears on
  *    all connected browser contexts (multi-user real-time update chain).
  * 2. New participant joins → SSE participant_joined event fires → participant
  *    list updates on all existing connected browser contexts.
- *
- * The SSE → React Query invalidation chain (T8/useSSE hook) is unit-tested in
- * frontend/src/hooks/useSSE.test.ts. This integration test validates the
- * backend half of the chain: that real SSE events are fired when actions occur.
  */
 @DisplayName("SSE → UI Update Integration Tests")
 @Slf4j
@@ -42,7 +37,7 @@ public class SseReactIntegrationTest extends BaseIntegrationTest {
      * 1. Facilitator and participant both open a retro page (SSE connected)
      * 2. Participant submits a note via the UI form
      * 3. Backend saves note and publishes SSE note_added event
-     * 4. Facilitator's page receives the SSE event and HTMX refreshes the column
+     * 4. React invalidates the query and re-fetches responses
      * 5. The note content is visible on the facilitator's page without manual refresh
      */
     @Test
@@ -88,7 +83,6 @@ public class SseReactIntegrationTest extends BaseIntegrationTest {
                 new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
 
             // Navigate to a step with a MULTI_COLUMN_BOARD (Mad/Sad/Glad input step)
-            // Skip through steps until we find the Mad/Sad/Glad input step
             log.info("Navigating to Mad/Sad/Glad input step...");
             int maxSkips = 15;
             boolean foundInputStep = false;
@@ -106,44 +100,25 @@ public class SseReactIntegrationTest extends BaseIntegrationTest {
                 throw new AssertionError("Failed to find Mad/Sad/Glad input step after " + maxSkips + " iterations");
             }
 
-            // Note content that we'll submit and then check appears on the facilitator's page
+            // Note content that we'll submit and then verify appears on the facilitator's page
             String noteContent = "SSE test note: " + System.currentTimeMillis();
-
-            facilitatorPage.evaluate("window.sseNoteEvents = []");
-            facilitatorPage.evaluate("""
-                if (window.eventSource) {
-                    window.eventSource.addEventListener('note_added', function(evt) {
-                        console.log('[SSE] facilitator received note_added:', evt.data);
-                        window.sseNoteEvents.push(evt.data);
-                    });
-                }
-            """);
 
             fillElement(participantPage, "[data-column=\"Mad\"] textarea[name='content']", noteContent);
             clickElement(participantPage, "[data-column=\"Mad\"] button:has-text('➕')");
             log.info("Participant submitted note: {}", noteContent);
 
+            // Verify note appears on participant's own page
             waitForElement(participantPage, "[data-column=\"Mad\"] p:has-text('" + noteContent + "')",
                 DEFAULT_TIMEOUT_MS);
             log.info("Note visible on participant's own page");
 
-            facilitatorPage.waitForFunction(
-                "() => window.sseNoteEvents && window.sseNoteEvents.length > 0",
-                null,
-                new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
-            log.info("Facilitator received note_added SSE event");
-
-            Integer facilitatorNoteEventCount = (Integer) facilitatorPage.evaluate(
-                "() => window.sseNoteEvents ? window.sseNoteEvents.length : 0");
-            assertTrue(facilitatorNoteEventCount > 0,
-                "Facilitator MUST receive note_added SSE event when participant submits a note");
-
+            // Verify note (hidden) appears on facilitator's page via SSE → React Query refresh
             waitForElement(facilitatorPage, "[data-column=\"Mad\"] p:has-text('[Hidden until revealed]')",
                 SSE_PROPAGATION_TIMEOUT_MS);
 
             assertTrue(facilitatorPage.locator(
                 "[data-column=\"Mad\"] p:has-text('[Hidden until revealed]')").first().isVisible(),
-                "Facilitator's Mad column should show a hidden card after SSE note_added event propagates via HTMX");
+                "Facilitator's Mad column should show a hidden card after SSE note_added event propagates");
 
             log.info("✅ SSE note_added chain verified: note submitted by participant → visible on facilitator's page");
 
@@ -208,37 +183,10 @@ public class SseReactIntegrationTest extends BaseIntegrationTest {
                 null,
                 new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
 
-            // Verify SSE connections are active on retro page
-            facilitatorPage.waitForFunction(
-                "() => window.eventSource && window.eventSource.readyState === 1",
-                null,
-                new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-            participant1Page.waitForFunction(
-                "() => window.eventSource && window.eventSource.readyState === 1",
-                null,
-                new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+            // Verify both SSE connections are active on retro page by checking retro content is visible
+            waitForSseConnection(facilitatorPage, UUID.fromString(sessionId));
+            waitForSseConnection(participant1Page, UUID.fromString(sessionId));
             log.info("Both SSE connections active on retro page");
-
-            // Set up SSE event capture on facilitator and participant1 before participant2 joins
-            facilitatorPage.evaluate("""
-                window.sseParticipantEvents = [];
-                if (window.eventSource) {
-                    window.eventSource.addEventListener('participant_joined', function(evt) {
-                        console.log('[SSE] facilitator received participant_joined:', evt.data);
-                        window.sseParticipantEvents.push(evt.data);
-                    });
-                }
-            """);
-
-            participant1Page.evaluate("""
-                window.sseParticipantEvents = [];
-                if (window.eventSource) {
-                    window.eventSource.addEventListener('participant_joined', function(evt) {
-                        console.log('[SSE] participant1 received participant_joined:', evt.data);
-                        window.sseParticipantEvents.push(evt.data);
-                    });
-                }
-            """);
 
             // Now participant2 joins — this should trigger participant_joined SSE event
             log.info("Participant2 joining the active session...");
@@ -246,43 +194,12 @@ public class SseReactIntegrationTest extends BaseIntegrationTest {
             joinRetroSession(participant2Page, sessionId);
             log.info("Bob joined session");
 
-            // Wait for facilitator to receive the participant_joined SSE event
-            facilitatorPage.waitForFunction(
-                "() => window.sseParticipantEvents && window.sseParticipantEvents.length > 0",
-                null,
-                new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+            // Verify participant list updates on facilitator's page and participant1's page via SSE
+            waitForAllPagesParticipantList(
+                new String[]{"Facilitator", "Alice", "Bob"},
+                facilitatorPage, participant1Page);
 
-            // Wait for participant1 to receive the participant_joined SSE event
-            participant1Page.waitForFunction(
-                "() => window.sseParticipantEvents && window.sseParticipantEvents.length > 0",
-                null,
-                new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
-
-            // Verify both received the event
-            Integer facilitatorEventCount = (Integer) facilitatorPage.evaluate(
-                "() => window.sseParticipantEvents ? window.sseParticipantEvents.length : 0");
-            Integer participant1EventCount = (Integer) participant1Page.evaluate(
-                "() => window.sseParticipantEvents ? window.sseParticipantEvents.length : 0");
-
-            log.info("SSE participant_joined events received — Facilitator: {}, Participant1: {}",
-                facilitatorEventCount, participant1EventCount);
-
-            assertTrue(facilitatorEventCount > 0,
-                "Facilitator MUST receive participant_joined SSE event when Bob joins");
-            assertTrue(participant1EventCount > 0,
-                "Participant1 MUST receive participant_joined SSE event when Bob joins");
-
-            // Verify the SSE event payload contains the new participant's name
-            // The participant_joined payload is a JSON string (displayName)
-            String facilitatorLastEvent = (String) facilitatorPage.evaluate(
-                "() => window.sseParticipantEvents[window.sseParticipantEvents.length - 1]");
-            log.info("participant_joined payload received by facilitator: {}", facilitatorLastEvent);
-            assertNotNull(facilitatorLastEvent,
-                "participant_joined payload must not be null");
-            assertTrue(facilitatorLastEvent.contains("Bob"),
-                "participant_joined payload must contain the joiner's name 'Bob', got: " + facilitatorLastEvent);
-
-            log.info("✅ SSE participant_joined chain verified: Bob joined → event received by facilitator and Alice");
+            log.info("✅ SSE participant_joined chain verified: Bob joined → participant list updated on facilitator and Alice's pages");
 
         } finally {
             facilitatorContext.close();

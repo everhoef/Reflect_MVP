@@ -143,33 +143,33 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             log.info("  ├─ Testing MULTI_COLUMN_BOARD privacy settings...");
 
             // Bob adds to "Mad" column
-            fillElement(bobPage, "[data-testid=\"note-input-Mad\"]", "Bob Mad: Slow deployments");
-            clickElement(bobPage, "[data-testid=\"submit-note-Mad\"]");
+            fillElement(bobPage, "[data-testid=\"note-input-mad\"]", "Bob Mad: Slow deployments");
+            clickElement(bobPage, "[data-testid=\"submit-note-mad\"]");
 
             // Carol adds to "Glad" column
-            fillElement(carolPage, "[data-testid=\"note-input-Glad\"]", "Carol Glad: Great teamwork");
-            clickElement(carolPage, "[data-testid=\"submit-note-Glad\"]");
+            fillElement(carolPage, "[data-testid=\"note-input-glad\"]", "Carol Glad: Great teamwork");
+            clickElement(carolPage, "[data-testid=\"submit-note-glad\"]");
 
             // Facilitator adds to "Sad" column
-            fillElement(facilitatorPage, "[data-testid=\"note-input-Sad\"]", "Alice Sad: Missed deadline");
-            clickElement(facilitatorPage, "[data-testid=\"submit-note-Sad\"]");
+            fillElement(facilitatorPage, "[data-testid=\"note-input-sad\"]", "Alice Sad: Missed deadline");
+            clickElement(facilitatorPage, "[data-testid=\"submit-note-sad\"]");
 
             // Bob adds another "Mad" card
-            fillElement(bobPage, "[data-testid=\"note-input-Mad\"]", "Bob Mad: Long meetings");
-            clickElement(bobPage, "[data-testid=\"submit-note-Mad\"]");
+            fillElement(bobPage, "[data-testid=\"note-input-mad\"]", "Bob Mad: Long meetings");
+            clickElement(bobPage, "[data-testid=\"submit-note-mad\"]");
 
             // Verify PRIVACY - responses hidden from others
             logTestProgress("PHASE_2", 9, 24, "Verifying privacy mode");
             log.info("  ├─ Verifying privacy mode (responses hidden)...");
-            assertFalse(bobPage.locator("[data-testid=\"column-Glad\"] p:has-text('Carol Glad: Great teamwork')").isVisible(),
+            assertFalse(bobPage.locator("[data-testid=\"column-glad\"] p:has-text('Carol Glad: Great teamwork')").isVisible(),
                 "Bob should NOT see Carol's response before reveal (privacy mode)");
-            assertFalse(carolPage.locator("[data-testid=\"column-Mad\"] p:has-text('Bob Mad: Slow deployments')").isVisible(),
+            assertFalse(carolPage.locator("[data-testid=\"column-mad\"] p:has-text('Bob Mad: Slow deployments')").isVisible(),
                 "Carol should NOT see Bob's response before reveal (privacy mode)");
 
             // Each user should see their OWN responses (use p selector to avoid matching hidden textarea in edit mode)
-            assertTrue(bobPage.locator("[data-testid=\"column-Mad\"] p:has-text('Bob Mad: Slow deployments')").isVisible(),
+            assertTrue(bobPage.locator("[data-testid=\"column-mad\"] p:has-text('Bob Mad: Slow deployments')").isVisible(),
                 "Bob should see his own responses");
-            assertTrue(carolPage.locator("[data-testid=\"column-Glad\"] p:has-text('Carol Glad: Great teamwork')").isVisible(),
+            assertTrue(carolPage.locator("[data-testid=\"column-glad\"] p:has-text('Carol Glad: Great teamwork')").isVisible(),
                 "Carol should see her own responses");
 
             log.info("  ├─ ✅ Privacy mode validated - responses properly hidden");
@@ -186,13 +186,13 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             log.info("  ├─ Verifying responses visible after reveal...");
 
             // Wait for all pages to show revealed content (use p selector to avoid edit mode textarea)
-            waitForAllPagesElement("[data-testid=\"column-Glad\"] p:has-text('Carol Glad: Great teamwork')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage, facilitatorPage);
+            waitForAllPagesElement("[data-testid=\"column-glad\"] p:has-text('Carol Glad: Great teamwork')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage, facilitatorPage);
 
-            assertTrue(bobPage.locator("[data-testid=\"column-Glad\"] p:has-text('Carol Glad: Great teamwork')").isVisible(),
+            assertTrue(bobPage.locator("[data-testid=\"column-glad\"] p:has-text('Carol Glad: Great teamwork')").isVisible(),
                 "Bob should see Carol's response after reveal");
-            assertTrue(carolPage.locator("[data-testid=\"column-Mad\"] p:has-text('Bob Mad: Slow deployments')").isVisible(),
+            assertTrue(carolPage.locator("[data-testid=\"column-mad\"] p:has-text('Bob Mad: Slow deployments')").isVisible(),
                 "Carol should see Bob's response after reveal");
-            assertTrue(facilitatorPage.locator("[data-testid=\"column-Mad\"] p:has-text('Bob Mad: Long meetings')").isVisible(),
+            assertTrue(facilitatorPage.locator("[data-testid=\"column-mad\"] p:has-text('Bob Mad: Long meetings')").isVisible(),
                 "All 4 cards should be visible after reveal");
 
             log.info("  ├─ ✅ Responses properly revealed");
@@ -201,7 +201,7 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             log.info("  ├─ Testing voting functionality...");
 
             // Find vote button within the specific card - use div[id^='card-'] to stay within card scope
-            String voteSelector = "[data-testid=\"column-Glad\"] div[id^='card-']:has(p:has-text('Carol Glad: Great teamwork')) button:has-text('👍')";
+            String voteSelector = "[data-testid=\"column-glad\"] div[id^='card-']:has(p:has-text('Carol Glad: Great teamwork')) button:has-text('👍')";
 
             if (bobPage.locator(voteSelector).count() > 0) {
                 clickElement(bobPage, voteSelector, DEFAULT_TIMEOUT_MS);
@@ -214,8 +214,8 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
 
             // Test clustering (if implemented)
             log.info("  ├─ Testing clustering/merging functionality...");
-            Locator bobMadCard1 = facilitatorPage.locator("[data-testid=\"column-Mad\"] p:has-text('Bob Mad: Slow deployments')");
-            Locator bobMadCard2 = facilitatorPage.locator("[data-testid=\"column-Mad\"] p:has-text('Bob Mad: Long meetings')");
+            Locator bobMadCard1 = facilitatorPage.locator("[data-testid=\"column-mad\"] p:has-text('Bob Mad: Slow deployments')");
+            Locator bobMadCard2 = facilitatorPage.locator("[data-testid=\"column-mad\"] p:has-text('Bob Mad: Long meetings')");
 
             if (bobMadCard1.count() > 0 && bobMadCard2.count() > 0) {
                 try {
@@ -245,10 +245,12 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             // Q1: What did we do well? (input step)
             logTestProgress("PHASE_3", 13, 24, "Q1: What did we do well?");
             log.info("  ├─ Testing Q1 columnId isolation...");
-            fillElement(bobPage, "textarea[name='content']", "Bob Q1: Good code reviews");
-            clickElement(bobPage, "button[type='submit']");
-            fillElement(carolPage, "textarea[name='content']", "Carol Q1: Strong testing");
-            clickElement(carolPage, "button[type='submit']");
+            waitForElement(bobPage, "[data-column='What did we do well?'] textarea[name='content']", DEFAULT_TIMEOUT_MS);
+            fillElement(bobPage, "[data-column='What did we do well?'] textarea[name='content']", "Bob Q1: Good code reviews");
+            clickElement(bobPage, "[data-column='What did we do well?'] button[type='submit']");
+            waitForElement(carolPage, "[data-column='What did we do well?'] textarea[name='content']", DEFAULT_TIMEOUT_MS);
+            fillElement(carolPage, "[data-column='What did we do well?'] textarea[name='content']", "Carol Q1: Strong testing");
+            clickElement(carolPage, "[data-column='What did we do well?'] button[type='submit']");
 
             // Wait for responses to appear on both pages
             // Use p:has-text() to only match the visible <p> tag, not the hidden <textarea> in edit mode
@@ -266,8 +268,10 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             // Q2: What did we learn?
             logTestProgress("PHASE_3", 14, 24, "Q2: What did we learn? (testing columnId isolation)");
             log.info("  ├─ Testing Q2 columnId isolation (critical)...");
-            fillElement(bobPage, "textarea[name='content']", "Bob Q2: Docker networking");
-            clickElement(bobPage, "button[type='submit']");
+            // Wait for Q2 column to fully render (step index change doesn't guarantee child re-render)
+            waitForElement(bobPage, "[data-column='What did we learn?'] textarea[name='content']", DEFAULT_TIMEOUT_MS);
+            fillElement(bobPage, "[data-column='What did we learn?'] textarea[name='content']", "Bob Q2: Docker networking");
+            clickElement(bobPage, "[data-column='What did we learn?'] button[type='submit']");
 
             // Wait for Q2 response to appear
             waitForAllPagesElement("p:has-text('Bob Q2: Docker networking')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
@@ -286,8 +290,9 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
 
             // Q3: What should we do differently?
             logTestProgress("PHASE_3", 15, 24, "Q3: What should we do differently?");
-            fillElement(bobPage, "textarea[name='content']", "Bob Q3: Earlier testing");
-            clickElement(bobPage, "button[type='submit']");
+            waitForElement(bobPage, "[data-column='What should we do differently?'] textarea[name='content']", DEFAULT_TIMEOUT_MS);
+            fillElement(bobPage, "[data-column='What should we do differently?'] textarea[name='content']", "Bob Q3: Earlier testing");
+            clickElement(bobPage, "[data-column='What should we do differently?'] button[type='submit']");
 
             // Wait for Q3 response to appear
             waitForElement(bobPage, "p:has-text('Bob Q3: Earlier testing')");
@@ -305,8 +310,9 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
 
             // Q4: What still puzzles us?
             logTestProgress("PHASE_3", 16, 24, "Q4: What still puzzles us?");
-            fillElement(carolPage, "textarea[name='content']", "Carol Q4: Performance bottleneck");
-            clickElement(carolPage, "button[type='submit']");
+            waitForElement(carolPage, "[data-column='What still puzzles us?'] textarea[name='content']", DEFAULT_TIMEOUT_MS);
+            fillElement(carolPage, "[data-column='What still puzzles us?'] textarea[name='content']", "Carol Q4: Performance bottleneck");
+            clickElement(carolPage, "[data-column='What still puzzles us?'] button[type='submit']");
 
             // Wait for Q4 response to appear
             waitForAllPagesElement("p:has-text('Carol Q4: Performance bottleneck')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
@@ -344,7 +350,7 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             carolPage.navigate(retroUrl);
 
             // Wait for facilitator to reach the AUTO step (Next button visible, step changed)
-            waitForElement(facilitatorPage, "button:has-text('Next')", DEFAULT_TIMEOUT_MS);
+            waitForElement(facilitatorPage, "[data-testid='next-step-button']", DEFAULT_TIMEOUT_MS);
 
             // Advance through the AUTO step → transitions session to COMPLETED
             logTestProgress("PHASE_5", 2, 2, "Advancing AUTO step to complete session");
@@ -352,7 +358,7 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
 
             // Verify session completion
             logTestProgress("COMPLETE", 2, 2, "Verifying session completion");
-            assertFalse(facilitatorPage.locator("button:has-text('Next')").isVisible(),
+            assertFalse(facilitatorPage.locator("[data-testid='next-step-button']").isVisible(),
                 "Session should be complete - no Next button after final step");
 
             log.info("  └─ ✓ Session complete");
@@ -389,15 +395,17 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             // navigateToStepType(facilitatorPage, "CATEGORICAL", participantPage); // Removed as it stops at first categorical step (instructions)
 
             log.info("🎯 Navigating to Mad/Sad/Glad input step...");
-            int maxSkips = 15; // Increased to ensure we reach stage 2
+            int maxSkips = 15;
             boolean foundMadInputStep = false;
             
             for (int i = 0; i < maxSkips; i++) {
-                // Check WITHOUT waiting first to avoid timeouts on wrong steps
-                if (participantPage.locator("[data-testid=\"note-input-Mad\"]").count() > 0) {
+                try {
+                    participantPage.waitForSelector("[data-testid=\"note-input-mad\"]",
+                        new Page.WaitForSelectorOptions().setTimeout(SHORT_TIMEOUT_MS));
                     log.info("✅ Found Mad/Sad/Glad step with input capability at iteration {}", i);
                     foundMadInputStep = true;
                     break;
+                } catch (Exception ignored) {
                 }
                 
                 log.info("Step {} doesn't have Mad input, clicking Next...", i + 1);
@@ -408,14 +416,14 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
                 throw new AssertionError("Failed to find Mad/Sad/Glad input step after " + maxSkips + " iterations");
             }
 
-            fillElement(participantPage, "[data-testid=\"note-input-Mad\"]", "Initial frustration");
-            clickElement(participantPage, "[data-testid=\"submit-note-Mad\"]");
+            fillElement(participantPage, "[data-testid=\"note-input-mad\"]", "Initial frustration");
+            clickElement(participantPage, "[data-testid=\"submit-note-mad\"]");
 
             // Wait for response to appear
-            waitForElement(participantPage, "[data-testid=\"column-Mad\"] p:has-text('Initial frustration')");
+            waitForElement(participantPage, "[data-testid=\"column-mad\"] p:has-text('Initial frustration')");
 
             // Verify response appears
-            assertTrue(participantPage.locator("[data-testid=\"column-Mad\"] p:has-text('Initial frustration')").isVisible());
+            assertTrue(participantPage.locator("[data-testid=\"column-mad\"] p:has-text('Initial frustration')").isVisible());
 
             // Edit the response (if editing is supported)
             if (participantPage.locator("button:has-text('Edit')").count() > 0) {
@@ -450,99 +458,42 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
         Page participant2Page = participant2Context.newPage();
 
         try {
-            // Set up session with facilitator and first participant
             authenticateAsGuest(facilitatorPage, "Facilitator");
             authenticateAsGuest(participant1Page, "Participant1");
 
             String sessionId = createRetroSession(facilitatorPage, "SSE Test Session");
             joinRetroSession(participant1Page, sessionId);
 
-            // Wait for SSE connection on participant page before starting session
-            log.info("Waiting for SSE connection on participant lobby page...");
             waitForSseConnection(participant1Page, UUID.fromString(sessionId));
-            log.info("\u2705 SSE connection established on participant page");
-            // Brief pause to ensure server-side SSE emitter registration is complete
             Thread.sleep(500);
 
-            // Start the session to activate SSE connections
             Response startResponse = facilitatorPage.waitForResponse(
                 response -> response.url().contains("/start") && response.request().method().equals("POST"),
-                () -> clickElement(facilitatorPage, "button:has-text('Start Retrospective')"));
+                () -> clickElement(facilitatorPage, "[data-testid='start-retro-button']"));
 
-            // Wait for facilitator to transition to retro with Next button (facilitator-specific element)
-            log.info("Waiting for facilitator page to transition to retro...");
-            waitForAllPagesTransition("Session Lobby", "button:has-text('Next')", facilitatorPage);
+            log.info("Start response status: {}", startResponse.status());
 
-            // Wait for participant to transition to retro with step heading (visible to all users)
-            log.info("Waiting for participant page to transition to retro...");
+            waitForAllPagesTransition("Session Lobby", "[data-testid='next-step-button']", facilitatorPage);
             waitForAllPagesTransition("Session Lobby", "h2:has-text('Step')", SSE_PROPAGATION_TIMEOUT_MS, participant1Page);
 
-            // Wait for SSE connections to be established after page transition
-            log.info("Waiting for SSE connections to be established...");
-            facilitatorPage.waitForFunction(
-                "() => window.eventSource && window.eventSource.readyState === 1",
-                null,
-                new Page.WaitForFunctionOptions().setTimeout(SHORT_TIMEOUT_MS));
-            participant1Page.waitForFunction(
-                "() => window.eventSource && window.eventSource.readyState === 1",
-                null,
-                new Page.WaitForFunctionOptions().setTimeout(SHORT_TIMEOUT_MS));
+            waitForSseConnection(facilitatorPage, UUID.fromString(sessionId));
+            waitForSseConnection(participant1Page, UUID.fromString(sessionId));
             log.info("✅ SSE connections established on both pages");
-
-            // Set up SSE event capture on existing participants before new participant joins
-            facilitatorPage.evaluate("""
-                window.sseEventsReceived = [];
-                if (window.eventSource) {
-                    window.eventSource.addEventListener('participant_joined', function(evt) {
-                        console.log('Facilitator received participant_joined:', evt.data);
-                        window.sseEventsReceived.push({type: 'participant_joined', data: evt.data});
-                    });
-                }
-            """);
-
-            participant1Page.evaluate("""
-                window.sseEventsReceived = [];
-                if (window.eventSource) {
-                    window.eventSource.addEventListener('participant_joined', function(evt) {
-                        console.log('Participant1 received participant_joined:', evt.data);
-                        window.sseEventsReceived.push({type: 'participant_joined', data: evt.data});
-                    });
-                }
-            """);
 
             log.info("Adding third participant to test SSE event delivery");
             authenticateAsGuest(participant2Page, "Participant2");
             joinRetroSession(participant2Page, sessionId);
 
-            facilitatorPage.waitForFunction(
-                "() => window.sseEventsReceived && window.sseEventsReceived.length > 0",
-                null, new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-            participant1Page.waitForFunction(
-                "() => window.sseEventsReceived && window.sseEventsReceived.length > 0",
-                null, new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+            waitForParticipantList(facilitatorPage, SSE_PROPAGATION_TIMEOUT_MS, "Facilitator", "Participant1", "Participant2");
+            waitForParticipantList(participant1Page, SSE_PROPAGATION_TIMEOUT_MS, "Facilitator", "Participant1", "Participant2");
 
-            Integer facilitatorEventCount = (Integer) facilitatorPage.evaluate("() => window.sseEventsReceived ? window.sseEventsReceived.length : 0");
-            Integer participant1EventCount = (Integer) participant1Page.evaluate("() => window.sseEventsReceived ? window.sseEventsReceived.length : 0");
+            log.info("✅ SSE event delivery confirmed - participant list updated on all pages");
 
-            log.info("SSE events received - Facilitator: {}, Participant1: {}", facilitatorEventCount, participant1EventCount);
+            waitForSseConnection(participant2Page, UUID.fromString(sessionId));
+            assertTrue(participant2Page.locator("[data-testid='retro-content']").count() > 0,
+                "Participant2 should have active SSE connection after joining");
 
-            // ALL existing participants should have received the PARTICIPANT_JOINED event
-            assertTrue(facilitatorEventCount > 0,
-                "Facilitator MUST receive PARTICIPANT_JOINED event via SSE");
-            assertTrue(participant1EventCount > 0,
-                "Participant1 MUST receive PARTICIPANT_JOINED event via SSE");
-
-            // Verify participant2 also gets SSE connection after joining
-            // Wait for SSE to connect (async) before checking readyState - same pattern as facilitator/participant1 above
-            participant2Page.waitForFunction(
-                "() => window.eventSource && window.eventSource.readyState === 1",
-                null,
-                new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-            Object participant2SSEResult = participant2Page.evaluate("() => window.eventSource ? (window.eventSource.readyState === 1) : false");
-            boolean participant2SSE = participant2SSEResult != null && (Boolean) participant2SSEResult;
-            assertTrue(participant2SSE, "Participant2 should have active SSE connection after joining");
-
-            log.info("✅ SSE event delivery confirmed - PARTICIPANT_JOINED events received");
+            log.info("✅ Participant2 SSE connection confirmed");
 
         } finally {
             facilitatorContext.close();
@@ -614,16 +565,13 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             // Verify we're in the LOBBY phase and facilitator can see Start button
             log.info("Checking for Start Retrospective button visibility");
 
-            // Wait for page to fully load
-            facilitatorPage.waitForTimeout(SHORT_TIMEOUT_MS);
+            waitForElement(facilitatorPage, "[data-testid='start-retro-button']", SSE_PROPAGATION_TIMEOUT_MS);
 
-            // Check what's rendered
             log.info("Current page URL: {}", facilitatorPage.url());
             String pageContent = facilitatorPage.content();
             log.info("Page contains 'Start Retrospective': {}", pageContent.contains("Start Retrospective"));
 
-            // Find the button
-            int startButtonCount = facilitatorPage.locator("button:has-text('Start Retrospective')").count();
+            int startButtonCount = facilitatorPage.locator("[data-testid='start-retro-button']").count();
             log.info("Start Retrospective buttons found: {}", startButtonCount);
 
             if (startButtonCount > 0) {
@@ -660,11 +608,10 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             joinRetroSession(participantPage, sessionId);
 
             // Verify facilitator can see Start button
-            int facilitatorStartButtonCount = facilitatorPage.locator("button:has-text('Start Retrospective')").count();
+            int facilitatorStartButtonCount = facilitatorPage.locator("[data-testid='start-retro-button']").count();
             log.info("Facilitator - Start Retrospective buttons found: {}", facilitatorStartButtonCount);
 
-            // Verify participant cannot see Start button
-            int participantStartButtonCount = participantPage.locator("button:has-text('Start Retrospective')").count();
+            int participantStartButtonCount = participantPage.locator("[data-testid='start-retro-button']").count();
             log.info("Participant - Start Retrospective buttons found: {}", participantStartButtonCount);
 
             assertTrue(facilitatorStartButtonCount > 0, "Facilitator should see Start Retrospective button");

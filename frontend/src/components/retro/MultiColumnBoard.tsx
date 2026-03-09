@@ -59,10 +59,11 @@ interface MeResponse {
 }
 
 function getCsrfToken(): string | undefined {
-  return document.cookie
+  const raw = document.cookie
     .split("; ")
     .find((row) => row.startsWith("XSRF-TOKEN="))
     ?.split("=")[1];
+  return raw ? decodeURIComponent(raw) : undefined;
 }
 
 function jsonHeaders(): HeadersInit {
@@ -122,7 +123,7 @@ function ColumnDropZone({ columnId, children }: ColumnDropZoneProps) {
 
 interface AddNoteFormProps {
   columnId: string;
-  placeholder?: string;
+  placeholder?: string | undefined;
   maxLength: number;
   retroId: string;
   stepId: number;
@@ -140,8 +141,8 @@ function AddNoteForm({ columnId, placeholder, maxLength, retroId, stepId, onSucc
     setSubmitting(true);
     try {
       const params = new URLSearchParams({
-        "dto.columnId": columnId,
-        "dto.content": trimmed,
+        columnId: columnId,
+        content: trimmed,
       });
       await fetch(`/api/retro/${retroId}/step/${stepId}/response/column?${params.toString()}`, {
         method: "POST",
@@ -165,6 +166,7 @@ function AddNoteForm({ columnId, placeholder, maxLength, retroId, stepId, onSucc
     <form onSubmit={(e) => void handleSubmit(e)} className="mt-2">
       <textarea
         data-testid={`note-input-${columnId}`}
+        name="content"
         value={content}
         onChange={(e) => setContent(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -181,7 +183,7 @@ function AddNoteForm({ columnId, placeholder, maxLength, retroId, stepId, onSucc
           disabled={!content.trim() || submitting}
           className="text-xs px-3 py-1 rounded-lg bg-amber-500 text-white font-medium hover:bg-amber-600 disabled:opacity-40 transition-colors"
         >
-          {submitting ? "Adding…" : "Add"}
+          {submitting ? "Adding…" : "➕"}
         </button>
       </div>
     </form>
@@ -191,7 +193,10 @@ function AddNoteForm({ columnId, placeholder, maxLength, retroId, stepId, onSucc
 export function MultiColumnBoard({ retroId, stepId, componentConfig }: StepComponentProps) {
   const queryClient = useQueryClient();
   const config = componentConfig as unknown as MultiColumnBoardConfig;
-  const columns = config.columns ?? [];
+  const columns = (config.columns ?? []).map((col) => ({
+    ...col,
+    id: col.id ?? col.title.toLowerCase(),
+  }));
   const caps = config.capabilities ?? {};
   const display = config.display ?? {};
   const cardConfig = config.cardConfig ?? {};
@@ -202,6 +207,7 @@ export function MultiColumnBoard({ retroId, stepId, componentConfig }: StepCompo
   const showVotes = display.showVotes === true || caps.showVotes === true;
   const showAuthor = display.showAuthor === true || caps.showAuthor === true;
   const maxLength = cardConfig.maxLength ?? caps.maxLength ?? 500;
+  const showContent = caps.showContent === true;
 
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
@@ -213,6 +219,7 @@ export function MultiColumnBoard({ retroId, stepId, componentConfig }: StepCompo
     queryKey: ["clusters", retroId, stepId],
     queryFn: () => fetchClusters(retroId, stepId),
     enabled: !!retroId,
+    refetchInterval: 3000,
   });
 
   const { data: me } = useQuery<MeResponse>({
@@ -313,7 +320,7 @@ export function MultiColumnBoard({ retroId, stepId, componentConfig }: StepCompo
         id: r.id ?? "",
         columnId: r.columnId,
         content: r.content,
-        visible: r.visible !== false,
+        visible: showContent || r.visible !== false,
         participantName: r.participantName,
         participantId: r.participantId,
         voteCount: r.voteCount ?? 0,
@@ -346,9 +353,10 @@ export function MultiColumnBoard({ retroId, stepId, componentConfig }: StepCompo
           const noteIds = colNotes.map((n) => n.id);
 
           return (
-            <div key={col.id} data-testid={`column-${col.id}`} className="flex flex-col gap-3">
+            <div key={col.id} data-testid={`column-${col.id}`} data-column={col.title} className="flex flex-col gap-3">
               <div
-                className="px-3 py-2 rounded-t-lg font-semibold text-sm text-white bg-gray-500"
+                className="px-3 py-2 rounded-t-lg font-semibold text-sm text-white"
+                style={col.color ? { backgroundColor: col.color } : { backgroundColor: '#6b7280' }}
               >
                 {col.title}
                 <span className="ml-2 text-xs font-normal opacity-75">({colNotes.length})</span>

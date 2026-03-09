@@ -1,14 +1,13 @@
 package direct.reflect.facilitator.common.config;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.thymeleaf.extras.springsecurity6.dialect.SpringSecurityDialect;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
 
-@Configuration
+@Controller
 public class WebConfig {
-    
-    @Bean
-    public SpringSecurityDialect springSecurityDialect() {
-        return new SpringSecurityDialect();
+
+    @RequestMapping(value = {"/login", "/retro/**"})
+    public String spa() {
+        return "forward:/index.html";
     }
 }

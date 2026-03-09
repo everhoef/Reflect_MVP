@@ -1,5 +1,10 @@
 package direct.reflect.facilitator.config;
 
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -10,14 +15,14 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.SimpleUrlLogoutSuccessHandler;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import direct.reflect.facilitator.common.config.SecurityConfig;
 
-/**
- * Complete test security configuration that replaces the main SecurityConfig for tests.
- * Includes the /test/** endpoints for test authentication.
- * Marked as @Primary to override the main SecurityConfig bean.
- */
+import java.io.IOException;
+
 @TestConfiguration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
@@ -27,36 +32,28 @@ public class TestSecurityOverride {
     @Bean
     @Primary
     public SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
+        CookieCsrfTokenRepository tokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
+
         return http
-            // OIDC authentication for registered users
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/login")
                 .successHandler(oidcSuccessHandler())
             )
-            // CSRF Configuration - disable for test endpoints
             .csrf(csrf -> csrf
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .csrfTokenRepository(tokenRepository)
+                .csrfTokenRequestHandler(requestHandler)
                 .ignoringRequestMatchers("/test/**")
             )
-            // Authorization rules - same as main config PLUS test endpoints
+            .addFilterAfter(new CsrfCookieFilter(), org.springframework.security.web.csrf.CsrfFilter.class)
             .authorizeHttpRequests(requests -> requests
-                // Public static resources
-                .requestMatchers("/css/**", "/js/**", "/images/**", "/img/**", "/static/**").permitAll()
-                .requestMatchers("/favicon.ico", "/htmx.min.js", "/sse.js", "/json-enc.js", "/script.js").permitAll()
-                
-                // Public pages
+                .requestMatchers("/css/**", "/js/**", "/images/**", "/img/**", "/static/**", "/webjars/**", "/assets/**").permitAll()
+                .requestMatchers("/favicon.ico", "/favicon.svg", "/vite.svg").permitAll()
                 .requestMatchers("/login").permitAll()
-                
-                // Auth endpoints
                 .requestMatchers("/auth/guest").permitAll()
-                
-                // TEST ENDPOINTS - This is the only addition for testing
                 .requestMatchers("/test/**").permitAll()
-                
-                // Health checks for monitoring
                 .requestMatchers("/actuator/health/**").permitAll()
-                
-                // Continue with the rest of the main config rules - authenticated endpoints
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/", "/home").authenticated()
                 .requestMatchers("/api/retro/*/join").authenticated()
                 .requestMatchers("/api/retro/*/participants").authenticated()
@@ -65,11 +62,8 @@ public class TestSecurityOverride {
                 .requestMatchers("/api/user/**").authenticated()
                 .requestMatchers("/profile/**").authenticated()
                 .requestMatchers("/admin/**").authenticated()
-                
-                // Default: allow access, enforce business rules in service layer
                 .anyRequest().permitAll()
             )
-            // Exception handling (same as main config)
             .exceptionHandling(exceptions -> exceptions
                 .authenticationEntryPoint((request, response, ex) -> {
                     if (request.getRequestURI().startsWith("/api/")) {
@@ -81,7 +75,6 @@ public class TestSecurityOverride {
                     }
                 })
             )
-            // Logout handling (same as main config)
             .logout(logout -> logout
                 .logoutUrl("/logout")
                 .logoutSuccessHandler(hybridLogoutHandler())
@@ -90,15 +83,27 @@ public class TestSecurityOverride {
             )
             .build();
     }
-    
+
     @Bean
     public SecurityConfig.OidcSuccessHandler oidcSuccessHandler() {
         return new SecurityConfig.OidcSuccessHandler();
     }
-    
+
     private SimpleUrlLogoutSuccessHandler hybridLogoutHandler() {
         SimpleUrlLogoutSuccessHandler handler = new SimpleUrlLogoutSuccessHandler();
         handler.setDefaultTargetUrl("/");
         return handler;
+    }
+
+    static final class CsrfCookieFilter extends OncePerRequestFilter {
+        @Override
+        protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+                throws ServletException, IOException {
+            CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+            if (csrfToken != null) {
+                csrfToken.getToken();
+            }
+            filterChain.doFilter(request, response);
+        }
     }
 }

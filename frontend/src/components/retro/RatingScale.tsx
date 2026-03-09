@@ -29,10 +29,11 @@ interface MeResponse {
 }
 
 function getCsrfToken(): string | undefined {
-  return document.cookie
+  const raw = document.cookie
     .split("; ")
     .find((row) => row.startsWith("XSRF-TOKEN="))
     ?.split("=")[1];
+  return raw ? decodeURIComponent(raw) : undefined;
 }
 
 function formHeaders(): HeadersInit {
@@ -127,10 +128,10 @@ export function RatingScale({ retroId, stepId, componentConfig }: StepComponentP
     setSubmitting(true);
     try {
       const params = new URLSearchParams({
-        "dto.rating": String(selectedRating),
+        rating: String(selectedRating),
       });
       if (allowComment && comment.trim()) {
-        params.set("dto.comment", comment.trim());
+        params.set("comment", comment.trim());
       }
       await fetch(
         `/api/retro/${retroId}/step/${stepId}/response/rating?${params.toString()}`,
@@ -214,7 +215,7 @@ export function RatingScale({ retroId, stepId, componentConfig }: StepComponentP
             <label
               key={v}
               className={[
-                "flex flex-col items-center cursor-pointer group select-none",
+                "relative flex flex-col items-center cursor-pointer group select-none",
                 submitting ? "opacity-50 cursor-not-allowed" : "",
               ].join(" ")}
             >
@@ -225,7 +226,7 @@ export function RatingScale({ retroId, stepId, componentConfig }: StepComponentP
                 checked={selectedRating === v}
                 onChange={() => setSelectedRating(v)}
                 disabled={submitting}
-                className="sr-only"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
               <div
                 className={[
@@ -267,6 +268,7 @@ export function RatingScale({ retroId, stepId, componentConfig }: StepComponentP
             </label>
             <textarea
               id={`rating-comment-${stepId}`}
+              name="comment"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               maxLength={commentMaxLength}

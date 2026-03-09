@@ -40,14 +40,18 @@ async function fetchRetroState(retroId: string): Promise<RetroStateDto> {
   return res.json() as Promise<RetroStateDto>;
 }
 
-// TODO: Replace with real API call once /api/retro/:retroId/participants endpoint is available
-const PLACEHOLDER_PARTICIPANTS: ParticipantDto[] = [];
+async function fetchParticipants(retroId: string): Promise<ParticipantDto[]> {
+  const res = await fetch(`/api/retro/${retroId}/participants`);
+  if (!res.ok) throw new Error(`Failed to fetch participants: ${res.status}`);
+  return res.json() as Promise<ParticipantDto[]>;
+}
 
 async function postNextStep(retroId: string): Promise<void> {
-  const csrfToken = document.cookie
+  const raw = document.cookie
     .split("; ")
     .find((row) => row.startsWith("XSRF-TOKEN="))
     ?.split("=")[1];
+  const csrfToken = raw ? decodeURIComponent(raw) : undefined;
   await fetch(`/api/retro/${retroId}/next`, {
     method: "POST",
     headers: csrfToken ? { "X-XSRF-TOKEN": csrfToken } : {},
@@ -123,23 +127,37 @@ export default function RetroPage() {
     queryKey: ["retroState", retroId],
     queryFn: () => fetchRetroState(retroId!),
     enabled: !!retroId,
+    refetchInterval: 3000,
   });
 
-  const participants: ParticipantDto[] = PLACEHOLDER_PARTICIPANTS;
+  const { data: participants = [] } = useQuery<ParticipantDto[]>({
+    queryKey: ["participants", retroId],
+    queryFn: () => fetchParticipants(retroId!),
+    enabled: !!retroId,
+    refetchInterval: 5000,
+  });
 
   const refreshState = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["retroState", retroId] });
+  }, [queryClient, retroId]);
+
+  const refreshParticipants = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["participants", retroId] });
   }, [queryClient, retroId]);
 
   useSSE(retroId, {
     [EventType.STEP_ADVANCED]: refreshState,
     [EventType.SESSION_STARTED]: refreshState,
     [EventType.PHASE_STARTED]: refreshState,
+    [EventType.PARTICIPANT_JOINED]: refreshParticipants,
+    [EventType.PARTICIPANT_LEFT]: refreshParticipants,
   });
 
   const handleNext = () => {
     if (!retroId) return;
-    void postNextStep(retroId);
+    void postNextStep(retroId).then(() => {
+      refreshState();
+    });
   };
 
   if (isLoading) {
@@ -269,7 +287,7 @@ export default function RetroPage() {
               <div className="text-center py-12">
                 {state.phase === "LOBBY" && (
                   <div>
-                    <h4 className="text-xl font-semibold text-gray-800 mb-2">Session Lobby</h4>
+                    <h2 className="text-xl font-semibold text-gray-800 mb-2">Session Lobby</h2>
                     <p className="text-gray-500 text-sm mb-4">Waiting for the facilitator to start the retrospective.</p>
                     {state.isFacilitator && (
                       <button
@@ -313,24 +331,24 @@ export default function RetroPage() {
             <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
               Participants ({(participants ?? []).length})
             </h3>
-            <div className="space-y-2">
+            <ul id="participants-list" className="space-y-2">
               {(participants ?? []).map((p) => (
-                <div key={p.participantId} className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-gray-100">
-                  <div className="flex items-center gap-2.5">
+                <li key={p.participantId} className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-gray-100">
+                  <span className="text-sm font-medium text-gray-800">{p.displayName}</span>
+                  <div className="flex items-center gap-2">
                     <InitialsAvatar name={p.displayName} />
-                    <span className="text-sm font-medium text-gray-800">{p.displayName}</span>
+                    {p.role === "FACILITATOR" && (
+                      <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">
+                        Facilitator
+                      </span>
+                    )}
                   </div>
-                  {p.role === "FACILITATOR" && (
-                    <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">
-                      Facilitator
-                    </span>
-                  )}
-                </div>
+                </li>
               ))}
               {(participants ?? []).length === 0 && (
-                <p className="text-gray-400 text-sm text-center py-4">No participants yet</p>
+                <li className="text-gray-400 text-sm text-center py-4">No participants yet</li>
               )}
-            </div>
+            </ul>
           </div>
         </aside>
 

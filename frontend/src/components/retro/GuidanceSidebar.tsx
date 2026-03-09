@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface GuidanceSidebarProps {
   guidance?: string | null | undefined;
-  stepTitle?: string;
+  stepTitle?: string | undefined;
 }
 
 function GuidanceContent({ text }: { text: string }) {

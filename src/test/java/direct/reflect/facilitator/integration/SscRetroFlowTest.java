@@ -85,20 +85,20 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
             logTestProgress("COLORS", 6, 6, "Verifying Start/Stop/Continue column colors");
             waitForElement(facilitatorPage, "[data-column='Start']");
 
-            String startStyle    = facilitatorPage.locator("[data-column='Start']").getAttribute("style");
-            String stopStyle     = facilitatorPage.locator("[data-column='Stop']").getAttribute("style");
-            String continueStyle = facilitatorPage.locator("[data-column='Continue']").getAttribute("style");
+            String startStyle    = facilitatorPage.locator("[data-column='Start'] > div:first-child").getAttribute("style");
+            String stopStyle     = facilitatorPage.locator("[data-column='Stop'] > div:first-child").getAttribute("style");
+            String continueStyle = facilitatorPage.locator("[data-column='Continue'] > div:first-child").getAttribute("style");
 
             assertNotNull(startStyle,    "Start column should have an inline style attribute");
             assertNotNull(stopStyle,     "Stop column should have an inline style attribute");
             assertNotNull(continueStyle, "Continue column should have an inline style attribute");
 
-            assertTrue(startStyle.contains("#10B981"),
-                    "Start column should be green (#10B981), got: " + startStyle);
-            assertTrue(stopStyle.contains("#EF4444"),
-                    "Stop column should be red (#EF4444), got: " + stopStyle);
-            assertTrue(continueStyle.contains("#3B82F6"),
-                    "Continue column should be blue (#3B82F6), got: " + continueStyle);
+            assertTrue(startStyle.contains("#10B981") || startStyle.contains("rgb(16, 185, 129)"),
+                    "Start column should be green (#10B981 / rgb(16,185,129)), got: " + startStyle);
+            assertTrue(stopStyle.contains("#EF4444") || stopStyle.contains("rgb(239, 68, 68)"),
+                    "Stop column should be red (#EF4444 / rgb(239,68,68)), got: " + stopStyle);
+            assertTrue(continueStyle.contains("#3B82F6") || continueStyle.contains("rgb(59, 130, 246)"),
+                    "Continue column should be blue (#3B82F6 / rgb(59,130,246)), got: " + continueStyle);
 
             // ── 7. Submit sticky notes in all three columns ─────────────────────────
             logTestProgress("STICKY_NOTES", 6, 6, "Submitting sticky notes in all three columns");
@@ -185,24 +185,14 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
             facilitatorPage.waitForFunction("() => !!document.querySelector('[data-column]')", null,
                     new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
 
-            logTestProgress("CLUSTERING", 4, 4, "Verifying clustering UI: no dual-render, sortable class present");
+            logTestProgress("CLUSTERING", 4, 4, "Verifying clustering UI: notes with drag handles present");
 
-            // Verify the non-clustering standard view div is NOT present when allowMerging=true
-            // Standard cards list should be absent; only the sortable clustering container should appear
-            // (The dual-render bug fix ensures the th:unless div is not rendered)
-            // We verify this by checking the lane content area has at most ONE cards container per column
-            Object dualRenderCount = facilitatorPage.evaluate(
-                    "() => document.querySelectorAll('[id^=\"column-lane-\"]').length");
-            assertNotNull(dualRenderCount, "Column lane elements should be present");
-
-            // Clustering sortable container uses class="sortable" — verify it is present in the DOM
-            // when allowMerging=true (loaded via HTMX into the column-lane div)
             facilitatorPage.waitForFunction(
-                    "() => document.querySelector('.sortable') !== null",
+                    "() => document.querySelector('[aria-label=\"Drag to reorder\"]') !== null",
                     null,
                     new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
-            assertTrue(facilitatorPage.locator(".sortable").count() > 0,
-                    "Clustering sortable container should be present for allowMerging=true step");
+            assertTrue(facilitatorPage.locator("[aria-label='Drag to reorder']").count() > 0,
+                    "Drag handles should be present for allowMerging=true step");
 
             logTestProgress("CLUSTERING", 4, 4, "Clustering display verified - no dual-render, sortable UI present");
 
@@ -277,19 +267,17 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
 
             // Wait for vote buttons to appear (allowVoting=true at this step)
             facilitatorPage.waitForFunction(
-                    "() => document.querySelector('button[hx-post*=\"/vote\"]') !== null",
+                    "() => document.querySelector('button[aria-label^=\"Vote for this note\"]') !== null",
                     null,
                     new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
 
-            assertTrue(facilitatorPage.locator("button[hx-post*='/vote']").count() > 0,
+            assertTrue(facilitatorPage.locator("button[aria-label^='Vote for this note']").count() > 0,
                     "Vote button should be visible at voting step");
 
-            // Click vote button
-            facilitatorPage.locator("button[hx-post*='/vote']").first().click();
+            facilitatorPage.locator("button[aria-label^='Vote for this note']").first().click();
 
-            // Verify vote was registered (vote count should update or button remains present)
             facilitatorPage.waitForFunction(
-                    "() => document.querySelector('button[hx-post*=\"/vote\"]') !== null",
+                    "() => document.querySelector('button[aria-label^=\"Vote for this note\"]') !== null",
                     null,
                     new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
 
