@@ -7,7 +7,7 @@
     <div class="grid gap-4"
          th:classappend="${#lists.size(columns) == 1 ? 'grid-cols-1' : #lists.size(columns) == 2 ? 'grid-cols-2' : #lists.size(columns) == 3 ? 'grid-cols-3' : 'grid-cols-4'}">
         <div th:each="column : ${columns}"
-             th:attr="data-column=${column['title']}"
+             th:attr="data-column=${column['title']},data-testid='column-' + ${column['title']}"
              class="rounded-lg border-2 flex flex-col"
              th:style="${column['color'] != null ? 'background-color: ' + column['color'] + '22; border-color: ' + column['color'] + '; min-height: 500px' : 'background-color: #f3f4f6; border-color: #d1d5db; min-height: 500px'}">
             <!-- Column Header -->
@@ -31,9 +31,10 @@
                                name="columnId"
                                th:value="${column['title']}">
 
-                        <!-- Card Content -->
-                        <textarea name="content"
-                                  class="w-full p-2 border-0 rounded-md resize-none focus:ring-0 focus:outline-none text-sm"
+                         <!-- Card Content -->
+                         <textarea name="content"
+                                   th:attr="data-testid='note-input-' + ${column['title']}"
+                                   class="w-full p-2 border-0 rounded-md resize-none focus:ring-0 focus:outline-none text-sm"
                                   rows="2"
                                   th:maxlength="${capabilities.maxLength}"
                                   th:placeholder="${column['placeholder']}"
@@ -41,9 +42,10 @@
                                   onblur="if(this.value==''){this.rows=2}"></textarea>
 
                         <div class="flex justify-end pt-1">
-                            <button type="submit"
-                                    class="text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-full p-1.5 transition-colors"
-                                    title="Add card">
+                             <button type="submit"
+                                     th:attr="data-testid='submit-note-' + ${column['title']}"
+                                     class="text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-full p-1.5 transition-colors"
+                                     title="Add card">
                                 ➕
                             </button>
                         </div>

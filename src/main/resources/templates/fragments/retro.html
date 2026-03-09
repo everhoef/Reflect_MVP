@@ -8,7 +8,8 @@
     <div th:fragment="inner-content"
          th:attr="data-step-index=${retroSession.currentStepIndex},
                   data-phase=${retroSession.phase?.name()},
-                  data-component-type=${currentStep != null ? currentStep.componentType?.name() : 'NONE'}">
+                  data-component-type=${currentStep != null ? currentStep.componentType?.name() : 'NONE'},
+                  data-testid='retro-content'">
     
     <div th:if="${currentStep != null}" class="bg-white border-b border-gray-200 px-6 py-4">
         <div class="flex items-center justify-center space-x-8">
@@ -127,6 +128,7 @@
                     </button>
                     <button th:if="${isFacilitator}" 
                             class="px-6 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600"
+                            data-testid="next-step-button"
                             th:attr="hx-post=@{/api/retro/{retroId}/next(retroId=${retroSession.id})}"
                             hx-swap="none">
                         Next
@@ -260,6 +262,7 @@
                 <!-- Start Button for Facilitator -->
                 <div th:if="${isFacilitator and retroSession.phase?.name() == 'LOBBY'}" class="mt-6">
                     <button class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg text-white font-medium transition-colors"
+                            data-testid="start-retro-button"
                             th:attr="hx-post=@{/api/retro/{retroId}/start(retroId=${retroSession.id})}">
                         Start Retrospective
                     </button>

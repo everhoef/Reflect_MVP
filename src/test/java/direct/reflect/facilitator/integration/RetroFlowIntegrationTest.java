@@ -143,33 +143,33 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             log.info("  ├─ Testing MULTI_COLUMN_BOARD privacy settings...");
 
             // Bob adds to "Mad" column
-            fillElement(bobPage, "[data-column=\"Mad\"] textarea[name='content']", "Bob Mad: Slow deployments");
-            clickElement(bobPage, "[data-column=\"Mad\"] button:has-text('➕')");
+            fillElement(bobPage, "[data-testid=\"note-input-Mad\"]", "Bob Mad: Slow deployments");
+            clickElement(bobPage, "[data-testid=\"submit-note-Mad\"]");
 
             // Carol adds to "Glad" column
-            fillElement(carolPage, "[data-column=\"Glad\"] textarea[name='content']", "Carol Glad: Great teamwork");
-            clickElement(carolPage, "[data-column=\"Glad\"] button:has-text('➕')");
+            fillElement(carolPage, "[data-testid=\"note-input-Glad\"]", "Carol Glad: Great teamwork");
+            clickElement(carolPage, "[data-testid=\"submit-note-Glad\"]");
 
             // Facilitator adds to "Sad" column
-            fillElement(facilitatorPage, "[data-column=\"Sad\"] textarea[name='content']", "Alice Sad: Missed deadline");
-            clickElement(facilitatorPage, "[data-column=\"Sad\"] button:has-text('➕')");
+            fillElement(facilitatorPage, "[data-testid=\"note-input-Sad\"]", "Alice Sad: Missed deadline");
+            clickElement(facilitatorPage, "[data-testid=\"submit-note-Sad\"]");
 
             // Bob adds another "Mad" card
-            fillElement(bobPage, "[data-column=\"Mad\"] textarea[name='content']", "Bob Mad: Long meetings");
-            clickElement(bobPage, "[data-column=\"Mad\"] button:has-text('➕')");
+            fillElement(bobPage, "[data-testid=\"note-input-Mad\"]", "Bob Mad: Long meetings");
+            clickElement(bobPage, "[data-testid=\"submit-note-Mad\"]");
 
             // Verify PRIVACY - responses hidden from others
             logTestProgress("PHASE_2", 9, 24, "Verifying privacy mode");
             log.info("  ├─ Verifying privacy mode (responses hidden)...");
-            assertFalse(bobPage.locator("[data-column=\"Glad\"] p:has-text('Carol Glad: Great teamwork')").isVisible(),
+            assertFalse(bobPage.locator("[data-testid=\"column-Glad\"] p:has-text('Carol Glad: Great teamwork')").isVisible(),
                 "Bob should NOT see Carol's response before reveal (privacy mode)");
-            assertFalse(carolPage.locator("[data-column=\"Mad\"] p:has-text('Bob Mad: Slow deployments')").isVisible(),
+            assertFalse(carolPage.locator("[data-testid=\"column-Mad\"] p:has-text('Bob Mad: Slow deployments')").isVisible(),
                 "Carol should NOT see Bob's response before reveal (privacy mode)");
 
             // Each user should see their OWN responses (use p selector to avoid matching hidden textarea in edit mode)
-            assertTrue(bobPage.locator("[data-column=\"Mad\"] p:has-text('Bob Mad: Slow deployments')").isVisible(),
+            assertTrue(bobPage.locator("[data-testid=\"column-Mad\"] p:has-text('Bob Mad: Slow deployments')").isVisible(),
                 "Bob should see his own responses");
-            assertTrue(carolPage.locator("[data-column=\"Glad\"] p:has-text('Carol Glad: Great teamwork')").isVisible(),
+            assertTrue(carolPage.locator("[data-testid=\"column-Glad\"] p:has-text('Carol Glad: Great teamwork')").isVisible(),
                 "Carol should see her own responses");
 
             log.info("  ├─ ✅ Privacy mode validated - responses properly hidden");
@@ -186,13 +186,13 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             log.info("  ├─ Verifying responses visible after reveal...");
 
             // Wait for all pages to show revealed content (use p selector to avoid edit mode textarea)
-            waitForAllPagesElement("[data-column=\"Glad\"] p:has-text('Carol Glad: Great teamwork')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage, facilitatorPage);
+            waitForAllPagesElement("[data-testid=\"column-Glad\"] p:has-text('Carol Glad: Great teamwork')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage, facilitatorPage);
 
-            assertTrue(bobPage.locator("[data-column=\"Glad\"] p:has-text('Carol Glad: Great teamwork')").isVisible(),
+            assertTrue(bobPage.locator("[data-testid=\"column-Glad\"] p:has-text('Carol Glad: Great teamwork')").isVisible(),
                 "Bob should see Carol's response after reveal");
-            assertTrue(carolPage.locator("[data-column=\"Mad\"] p:has-text('Bob Mad: Slow deployments')").isVisible(),
+            assertTrue(carolPage.locator("[data-testid=\"column-Mad\"] p:has-text('Bob Mad: Slow deployments')").isVisible(),
                 "Carol should see Bob's response after reveal");
-            assertTrue(facilitatorPage.locator("[data-column=\"Mad\"] p:has-text('Bob Mad: Long meetings')").isVisible(),
+            assertTrue(facilitatorPage.locator("[data-testid=\"column-Mad\"] p:has-text('Bob Mad: Long meetings')").isVisible(),
                 "All 4 cards should be visible after reveal");
 
             log.info("  ├─ ✅ Responses properly revealed");
@@ -201,7 +201,7 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             log.info("  ├─ Testing voting functionality...");
 
             // Find vote button within the specific card - use div[id^='card-'] to stay within card scope
-            String voteSelector = "[data-column=\"Glad\"] div[id^='card-']:has(p:has-text('Carol Glad: Great teamwork')) button:has-text('👍')";
+            String voteSelector = "[data-testid=\"column-Glad\"] div[id^='card-']:has(p:has-text('Carol Glad: Great teamwork')) button:has-text('👍')";
 
             if (bobPage.locator(voteSelector).count() > 0) {
                 clickElement(bobPage, voteSelector, DEFAULT_TIMEOUT_MS);
@@ -214,8 +214,8 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
 
             // Test clustering (if implemented)
             log.info("  ├─ Testing clustering/merging functionality...");
-            Locator bobMadCard1 = facilitatorPage.locator("[data-column=\"Mad\"] p:has-text('Bob Mad: Slow deployments')");
-            Locator bobMadCard2 = facilitatorPage.locator("[data-column=\"Mad\"] p:has-text('Bob Mad: Long meetings')");
+            Locator bobMadCard1 = facilitatorPage.locator("[data-testid=\"column-Mad\"] p:has-text('Bob Mad: Slow deployments')");
+            Locator bobMadCard2 = facilitatorPage.locator("[data-testid=\"column-Mad\"] p:has-text('Bob Mad: Long meetings')");
 
             if (bobMadCard1.count() > 0 && bobMadCard2.count() > 0) {
                 try {
@@ -394,7 +394,7 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             
             for (int i = 0; i < maxSkips; i++) {
                 // Check WITHOUT waiting first to avoid timeouts on wrong steps
-                if (participantPage.locator("[data-column=\"Mad\"] textarea[name='content']").count() > 0) {
+                if (participantPage.locator("[data-testid=\"note-input-Mad\"]").count() > 0) {
                     log.info("✅ Found Mad/Sad/Glad step with input capability at iteration {}", i);
                     foundMadInputStep = true;
                     break;
@@ -408,14 +408,14 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
                 throw new AssertionError("Failed to find Mad/Sad/Glad input step after " + maxSkips + " iterations");
             }
 
-            fillElement(participantPage, "[data-column=\"Mad\"] textarea[name='content']", "Initial frustration");
-            clickElement(participantPage, "[data-column=\"Mad\"] button:has-text('➕')");
+            fillElement(participantPage, "[data-testid=\"note-input-Mad\"]", "Initial frustration");
+            clickElement(participantPage, "[data-testid=\"submit-note-Mad\"]");
 
             // Wait for response to appear
-            waitForElement(participantPage, "[data-column=\"Mad\"] p:has-text('Initial frustration')");
+            waitForElement(participantPage, "[data-testid=\"column-Mad\"] p:has-text('Initial frustration')");
 
             // Verify response appears
-            assertTrue(participantPage.locator("[data-column=\"Mad\"] p:has-text('Initial frustration')").isVisible());
+            assertTrue(participantPage.locator("[data-testid=\"column-Mad\"] p:has-text('Initial frustration')").isVisible());
 
             // Edit the response (if editing is supported)
             if (participantPage.locator("button:has-text('Edit')").count() > 0) {
