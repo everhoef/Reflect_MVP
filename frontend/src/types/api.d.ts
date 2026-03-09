@@ -28,6 +28,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        /**
+         * Update a response
+         * @description Updates the content of an existing participant response
+         */
         put: operations["updateResponse"];
         post?: never;
         delete?: never;
@@ -45,6 +49,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Resume the session timer
+         * @description Resumes the countdown timer for the current step; facilitator-only action
+         */
         post: operations["resumeTimer"];
         delete?: never;
         options?: never;
@@ -61,6 +69,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Pause the session timer
+         * @description Pauses the countdown timer for the current step; facilitator-only action
+         */
         post: operations["pauseTimer"];
         delete?: never;
         options?: never;
@@ -77,6 +89,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Reveal responses for a step
+         * @description Makes all participant responses visible; facilitator-only action
+         */
         post: operations["revealResponses"];
         delete?: never;
         options?: never;
@@ -93,6 +109,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Submit a rating response
+         * @description Submits a rating scale response for the current step
+         */
         post: operations["submitRatingResponse"];
         delete?: never;
         options?: never;
@@ -109,6 +129,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Submit a column/categorical response
+         * @description Submits a response to a multi-column board step
+         */
         post: operations["submitColumnResponse"];
         delete?: never;
         options?: never;
@@ -157,6 +181,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Start a retrospective session
+         * @description Transitions the session from LOBBY to active phase; facilitator-only action
+         */
         post: operations["startSession"];
         delete?: never;
         options?: never;
@@ -173,6 +201,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Toggle a vote on a response
+         * @description Adds or removes a vote for the current participant on the specified response
+         */
         post: operations["toggleVote"];
         delete?: never;
         options?: never;
@@ -308,12 +340,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCurrentUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         RenameClusterRequest: {
             name: string;
+        };
+        /** @description Result of updating a participant response */
+        UpdateResponseResult: {
+            /**
+             * Format: uuid
+             * @description ID of the updated response
+             */
+            responseId?: string;
+            /** @description Updated content of the response */
+            content?: string;
+        };
+        /** @description Result of revealing responses for a step */
+        RevealResult: {
+            /**
+             * Format: int64
+             * @description ID of the step whose responses were revealed
+             */
+            stepId?: number;
+            /** @description Always true — indicates reveal was successful */
+            revealed?: boolean;
         };
         RatingResponseDto: {
             /** Format: uuid */
@@ -325,6 +393,21 @@ export interface components {
             participantName?: string;
             /** Format: uuid */
             participantId?: string;
+        };
+        /** @description Result of submitting a participant response */
+        SubmitResponseResult: {
+            /**
+             * Format: uuid
+             * @description ID of the created/updated response
+             * @example 550e8400-e29b-41d4-a716-446655440000
+             */
+            responseId?: string;
+            /**
+             * Format: int64
+             * @description ID of the step the response belongs to
+             * @example 1
+             */
+            stepId?: number;
         };
         ColumnResponseDto: {
             /** Format: uuid */
@@ -347,6 +430,19 @@ export interface components {
         };
         MergeRequest: {
             responseIds: string[];
+        };
+        /** @description Result of toggling a vote on a response */
+        VoteResult: {
+            /**
+             * Format: uuid
+             * @description ID of the response that was voted on
+             */
+            responseId?: string;
+            /**
+             * Format: int32
+             * @description Updated total vote count for this response
+             */
+            voteCount?: number;
         };
         JoinRetroRequest: {
             retroId: string;
@@ -425,12 +521,23 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description Response updated successfully */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": components["schemas"]["UpdateResponseResult"];
+                };
+            };
+            /** @description Not authorized to edit this response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UpdateResponseResult"];
+                };
             };
         };
     };
@@ -445,8 +552,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description Timer resumed successfully */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Only facilitators can resume the timer */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -465,8 +579,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description Timer paused successfully */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Only facilitators can pause the timer */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -486,12 +607,23 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description Responses revealed successfully */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": components["schemas"]["RevealResult"];
+                };
+            };
+            /** @description Only facilitators can reveal responses */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RevealResult"];
+                };
             };
         };
     };
@@ -509,12 +641,23 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description Rating submitted successfully */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": components["schemas"]["SubmitResponseResult"];
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SubmitResponseResult"];
+                };
             };
         };
     };
@@ -532,13 +675,22 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description Response submitted successfully */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": string;
+                    "*/*": components["schemas"]["SubmitResponseResult"];
+                };
+            };
+            /** @description Validation error or input limit exceeded */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SubmitResponseResult"];
                 };
             };
         };
@@ -608,8 +760,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description Session started successfully */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Only facilitators can start sessions */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -629,13 +788,22 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description Vote toggled successfully, returns updated vote count */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": string;
+                    "*/*": components["schemas"]["VoteResult"];
+                };
+            };
+            /** @description Vote limit exceeded */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["VoteResult"];
                 };
             };
         };
@@ -805,6 +973,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["SessionInfo"][];
+                };
+            };
+        };
+    };
+    getCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
                 };
             };
         };

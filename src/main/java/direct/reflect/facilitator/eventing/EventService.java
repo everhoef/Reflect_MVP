@@ -221,9 +221,14 @@ public class EventService {
 
         for (Map.Entry<String, EmitterConnection> entry : matchingEmitters) {
             try {
-                // Send properly formatted SSE event using SseEmitter.event() builder
-                // Use the event type as the SSE event name, and pass the actual payload as data
-                String eventData = event.payload() != null ? event.payload().toString() : "refresh";
+                String eventData;
+                try {
+                    eventData = event.payload() != null ? objectMapper.writeValueAsString(event.payload()) : "\"refresh\"";
+                } catch (Exception jsonEx) {
+                    log.warn("[{}] Failed to serialize payload for event type {}: {}",
+                        event.correlationId(), event.type(), jsonEx.getMessage());
+                    throw new RuntimeException("Failed to serialize SSE event payload", jsonEx);
+                }
                 entry.getValue().emitter().send(SseEmitter.event()
                     .id(event.correlationId())  // Include correlation ID in SSE message
                     .name(event.type().name().toLowerCase())

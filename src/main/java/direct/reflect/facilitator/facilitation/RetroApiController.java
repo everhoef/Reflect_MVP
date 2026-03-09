@@ -19,6 +19,11 @@ import direct.reflect.facilitator.facilitation.dto.ComponentResponseDto;
 import direct.reflect.facilitator.facilitation.dto.ColumnResponseDto;
 import direct.reflect.facilitator.facilitation.dto.RatingResponseDto;
 import direct.reflect.facilitator.facilitation.dto.TimerStateDto;
+import direct.reflect.facilitator.facilitation.dto.SubmitResponseResult;
+import direct.reflect.facilitator.facilitation.dto.VoteResult;
+import direct.reflect.facilitator.facilitation.dto.RevealResult;
+import direct.reflect.facilitator.facilitation.dto.UpdateResponseResult;
+import direct.reflect.facilitator.facilitation.response.ParticipantResponse;
 import direct.reflect.facilitator.facilitation.response.ResponseService;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.ComponentType;
@@ -28,6 +33,8 @@ import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.common.exception.InputLimitExceededException;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 
 import jakarta.validation.Valid;
 
@@ -140,7 +147,10 @@ public class RetroApiController {
     }
 
     @PostMapping("/{retroId}/start")
-    @PreAuthorize("hasAnyRole('USER', 'GUEST')") // Both users and guests can start sessions if they're facilitators
+    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    @Operation(summary = "Start a retrospective session", description = "Transitions the session from LOBBY to active phase; facilitator-only action")
+    @ApiResponse(responseCode = "200", description = "Session started successfully")
+    @ApiResponse(responseCode = "403", description = "Only facilitators can start sessions")
     public ResponseEntity<Void> startSession(
             @PathVariable UUID retroId,
             HttpServletRequest httpRequest) {
@@ -153,7 +163,6 @@ public class RetroApiController {
         }
         
         try {
-            // Service handles both database changes and event publishing within transaction
             retroService.startSession(retroId);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
@@ -242,13 +251,12 @@ public class RetroApiController {
         }
     }
     
-    /**
-     * Submit a categorical response (MULTI_COLUMN_BOARD component type).
-     * Form data is automatically validated using Jakarta Bean Validation annotations.
-     */
     @PostMapping("/{retroId}/step/{stepId}/response/column")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<String> submitColumnResponse(
+    @Operation(summary = "Submit a column/categorical response", description = "Submits a response to a multi-column board step")
+    @ApiResponse(responseCode = "200", description = "Response submitted successfully")
+    @ApiResponse(responseCode = "400", description = "Validation error or input limit exceeded")
+    public ResponseEntity<SubmitResponseResult> submitColumnResponse(
             @PathVariable UUID retroId,
             @PathVariable Long stepId,
             @Valid @ModelAttribute ColumnResponseDto dto,
@@ -258,16 +266,16 @@ public class RetroApiController {
             retroId, stepId, dto.columnId());
 
         try {
-            responseService.submitResponse(retroId, stepId, dto, httpRequest);
+            ParticipantResponse saved = responseService.submitResponse(retroId, stepId, dto, httpRequest);
             log.info("Submitted column response for step: {}", stepId);
 
             return ResponseEntity.ok()
                 .header("HX-Trigger", "responseSubmitted")
-                .body("");
+                .body(new SubmitResponseResult(saved.getId(), stepId));
 
         } catch (InputLimitExceededException e) {
             log.debug("Input limit exceeded for retro {}: {}", retroId, e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         } catch (RetroSessionNotFoundException e) {
             log.warn("Session not found: {}", retroId);
             return ResponseEntity.notFound().build();
@@ -277,13 +285,12 @@ public class RetroApiController {
         }
     }
 
-    /**
-     * Submit a rating response (RATING_SCALE component type).
-     * Form data is automatically validated using Jakarta Bean Validation annotations.
-     */
     @PostMapping("/{retroId}/step/{stepId}/response/rating")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<Void> submitRatingResponse(
+    @Operation(summary = "Submit a rating response", description = "Submits a rating scale response for the current step")
+    @ApiResponse(responseCode = "200", description = "Rating submitted successfully")
+    @ApiResponse(responseCode = "400", description = "Validation error")
+    public ResponseEntity<SubmitResponseResult> submitRatingResponse(
             @PathVariable UUID retroId,
             @PathVariable Long stepId,
             @Valid @ModelAttribute RatingResponseDto dto,
@@ -293,12 +300,12 @@ public class RetroApiController {
             retroId, stepId, dto.rating());
 
         try {
-            responseService.submitResponse(retroId, stepId, dto, httpRequest);
+            ParticipantResponse saved = responseService.submitResponse(retroId, stepId, dto, httpRequest);
             log.info("Submitted rating response for step: {}", stepId);
 
             return ResponseEntity.ok()
                 .header("HX-Trigger", "responseSubmitted")
-                .build();
+                .body(new SubmitResponseResult(saved.getId(), stepId));
 
         } catch (RetroSessionNotFoundException e) {
             log.warn("Session not found: {}", retroId);
@@ -311,7 +318,10 @@ public class RetroApiController {
 
     @PutMapping("/{retroId}/response/{responseId}")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<Void> updateResponse(
+    @Operation(summary = "Update a response", description = "Updates the content of an existing participant response")
+    @ApiResponse(responseCode = "200", description = "Response updated successfully")
+    @ApiResponse(responseCode = "403", description = "Not authorized to edit this response")
+    public ResponseEntity<UpdateResponseResult> updateResponse(
             @PathVariable UUID retroId,
             @PathVariable UUID responseId,
             @RequestParam String content,
@@ -325,11 +335,11 @@ public class RetroApiController {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
 
-            responseService.updateResponse(responseId, participant, content);
+            ParticipantResponse saved = responseService.updateResponse(responseId, participant, content);
 
             log.info("Updated response: {}", responseId);
 
-            return ResponseEntity.ok().build();
+            return ResponseEntity.ok(new UpdateResponseResult(saved.getId(), content));
 
         } catch (SecurityException e) {
             log.warn("Unauthorized response update attempt: {}", e.getMessage());
@@ -342,7 +352,10 @@ public class RetroApiController {
 
     @PostMapping("/{retroId}/response/{responseId}/vote")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<String> toggleVote(
+    @Operation(summary = "Toggle a vote on a response", description = "Adds or removes a vote for the current participant on the specified response")
+    @ApiResponse(responseCode = "200", description = "Vote toggled successfully, returns updated vote count")
+    @ApiResponse(responseCode = "400", description = "Vote limit exceeded")
+    public ResponseEntity<VoteResult> toggleVote(
             @PathVariable UUID retroId,
             @PathVariable UUID responseId,
             HttpServletRequest httpRequest) {
@@ -350,17 +363,22 @@ public class RetroApiController {
         log.debug("Toggling vote for response {} in retro: {}", responseId, retroId);
 
         try {
-            responseService.toggleVote(retroId, responseId, httpRequest);
+            ParticipantResponse saved = responseService.toggleVote(retroId, responseId, httpRequest);
             log.info("Toggled vote for response: {}", responseId);
+
+            Object votesObj = saved.getResponseData().get("votes");
+            int voteCount = 0;
+            if (votesObj instanceof List<?>) {
+                voteCount = ((List<?>) votesObj).size();
+            }
 
             return ResponseEntity.ok()
                 .header("HX-Trigger", "voteToggled")
-                .build();
+                .body(new VoteResult(responseId, voteCount));
 
         } catch (VoteLimitExceededException e) {
             log.warn("Vote limit exceeded: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         } catch (SecurityException e) {
             log.warn("Unauthorized vote attempt: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -372,7 +390,10 @@ public class RetroApiController {
 
      @PostMapping("/{retroId}/step/{stepId}/reveal")
      @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-     public ResponseEntity<Void> revealResponses(
+     @Operation(summary = "Reveal responses for a step", description = "Makes all participant responses visible; facilitator-only action")
+     @ApiResponse(responseCode = "200", description = "Responses revealed successfully")
+     @ApiResponse(responseCode = "403", description = "Only facilitators can reveal responses")
+     public ResponseEntity<RevealResult> revealResponses(
              @PathVariable UUID retroId,
              @PathVariable Long stepId,
              HttpServletRequest httpRequest) {
@@ -380,26 +401,23 @@ public class RetroApiController {
          log.debug("Revealing responses for retro: {}, step: {}", retroId, stepId);
          
          try {
-             // Only facilitators can reveal responses
              boolean isFacilitator = participantService.isFacilitator(httpRequest, retroId);
              if (!isFacilitator) {
                  return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
              }
              
-             // Get the session
              RetroSession session = retroService.getSessionById(retroId);
              if (session == null) {
                  return ResponseEntity.notFound().build();
              }
              
-             // Reveal all responses for this step
              responseService.revealAllResponses(session, stepId);
              
              log.info("Revealed responses for step: {} in retro: {}", stepId, retroId);
                  
              return ResponseEntity.ok()
                  .header("HX-Trigger", "responsesRevealed")
-                 .build();
+                 .body(new RevealResult(stepId, true));
                  
          } catch (Exception e) {
              log.error("Error revealing responses: ", e);
@@ -435,6 +453,9 @@ public class RetroApiController {
 
      @PostMapping("/{retroId}/timer/pause")
      @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+     @Operation(summary = "Pause the session timer", description = "Pauses the countdown timer for the current step; facilitator-only action")
+     @ApiResponse(responseCode = "200", description = "Timer paused successfully")
+     @ApiResponse(responseCode = "403", description = "Only facilitators can pause the timer")
      public ResponseEntity<Void> pauseTimer(
              @PathVariable UUID retroId,
              HttpServletRequest httpRequest) {
@@ -458,6 +479,9 @@ public class RetroApiController {
 
      @PostMapping("/{retroId}/timer/resume")
      @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+     @Operation(summary = "Resume the session timer", description = "Resumes the countdown timer for the current step; facilitator-only action")
+     @ApiResponse(responseCode = "200", description = "Timer resumed successfully")
+     @ApiResponse(responseCode = "403", description = "Only facilitators can resume the timer")
      public ResponseEntity<Void> resumeTimer(
              @PathVariable UUID retroId,
              HttpServletRequest httpRequest) {

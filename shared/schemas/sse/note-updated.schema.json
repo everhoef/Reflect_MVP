@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "note-updated.schema.json",
+  "title": "NoteUpdated",
+  "description": "Payload for NOTE_UPDATED SSE events. Either a ResponseData object (single note privacy change) or an integer stepId (batch reveal).",
+  "oneOf": [
+    {
+      "$ref": "response-data.schema.json"
+    },
+    {
+      "type": "integer",
+      "description": "Step ID when all notes in a step are revealed at once (responsesRevealed factory method)"
+    }
+  ]
+}
