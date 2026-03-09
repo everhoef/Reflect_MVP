@@ -107,7 +107,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get rating responses for histogram
+         * @description Returns all rating responses for the stage containing this step (used by HISTOGRAM_CHART component)
+         */
+        get: operations["getRatingResponses"];
         put?: never;
         /**
          * Submit a rating response
@@ -308,6 +312,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/retro/{retroId}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getRetroState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retro/{retroId}/participants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getParticipants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/retro/{retroId}/events": {
         parameters: {
             query?: never;
@@ -461,6 +497,40 @@ export interface components {
                 [key: string]: components["schemas"]["ColumnResponseDto"][];
             };
             unclustered?: components["schemas"]["ColumnResponseDto"][];
+        };
+        RetroStateDto: {
+            /** Format: uuid */
+            retroId?: string;
+            phase?: string;
+            /** Format: int64 */
+            currentStepId?: number;
+            /** Format: int32 */
+            currentStepIndex?: number;
+            steps?: components["schemas"]["StepSummaryDto"][];
+            /** Format: uuid */
+            facilitatorId?: string;
+            isFacilitator?: boolean;
+            /** Format: int32 */
+            participantCount?: number;
+        };
+        StepSummaryDto: {
+            /** Format: int64 */
+            id?: number;
+            title?: string;
+            componentType?: string;
+            advancementTrigger?: string;
+            /** Format: int32 */
+            durationSeconds?: number;
+            componentConfig?: {
+                [key: string]: unknown;
+            };
+            guidance?: string;
+        };
+        ParticipantDto: {
+            /** Format: uuid */
+            participantId?: string;
+            displayName?: string;
+            role?: string;
         };
         SseEmitter: {
             /** Format: int64 */
@@ -623,6 +693,29 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RevealResult"];
+                };
+            };
+        };
+    };
+    getRatingResponses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+                stepId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rating responses returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RatingResponseDto"][];
                 };
             };
         };
@@ -931,6 +1024,50 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ClusterGroupsDto"];
+                };
+            };
+        };
+    };
+    getRetroState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RetroStateDto"];
+                };
+            };
+        };
+    };
+    getParticipants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ParticipantDto"][];
                 };
             };
         };

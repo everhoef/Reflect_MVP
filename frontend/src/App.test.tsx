@@ -18,6 +18,6 @@ describe('App', () => {
         <App />
       </MemoryRouter>
     )
-    expect(screen.getByText(/home/i)).toBeInTheDocument()
+    expect(screen.getByText('Welcome to Reflect.Direct')).toBeInTheDocument()
   })
 })

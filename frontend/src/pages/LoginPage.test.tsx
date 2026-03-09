@@ -1,14 +1,23 @@
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import LoginPage from './LoginPage'
 
 describe('LoginPage', () => {
-  it('renders the Login heading', () => {
-    render(<LoginPage />)
-    expect(screen.getByRole('heading', { name: 'Login' })).toBeInTheDocument()
+  it('renders the guest login heading', () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    )
+    expect(screen.getByRole('heading', { name: 'Join as Guest' })).toBeInTheDocument()
   })
 
   it('renders the sign in prompt text', () => {
-    render(<LoginPage />)
-    expect(screen.getByText('Sign in to continue')).toBeInTheDocument()
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    )
+    expect(screen.getByPlaceholderText('Your display name')).toBeInTheDocument()
   })
 })
