@@ -27,12 +27,24 @@ describe('LoginPage', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders the guest login heading', () => {
+  it('renders the welcome heading', () => {
     renderLoginPage()
-    expect(screen.getByRole('heading', { name: 'Join as Guest' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Welcome' })).toBeInTheDocument()
   })
 
-  it('renders the sign in prompt text', () => {
+  it('renders the GitHub OAuth sign in link', () => {
+    renderLoginPage()
+    const githubLink = screen.getByRole('link', { name: /sign in with github/i })
+    expect(githubLink).toBeInTheDocument()
+    expect(githubLink).toHaveAttribute('href', '/oauth2/authorization/github')
+  })
+
+  it('renders the or divider between OAuth and guest login', () => {
+    renderLoginPage()
+    expect(screen.getByText('or')).toBeInTheDocument()
+  })
+
+  it('renders the guest login form', () => {
     renderLoginPage()
     expect(screen.getByPlaceholderText('Your display name')).toBeInTheDocument()
   })
@@ -59,7 +71,7 @@ describe('LoginPage', () => {
     )
     renderLoginPage()
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Join as Guest' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Welcome' })).toBeInTheDocument()
     })
     expect(mockNavigate).not.toHaveBeenCalledWith('/', expect.anything())
   })
