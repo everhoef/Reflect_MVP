@@ -1,9 +1,10 @@
 import { useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSSE } from "@/hooks/useSSE";
+import { useSSESubscription } from "@/hooks/useSSEContext";
 import { EventType } from "@/types/events";
 import type { StepComponentProps } from "@/components/ComponentRouter";
 import type { components } from "@/types/api.d.ts";
+import { submitRatingResponse } from "@/hooks/api/useRating";
 
 type RatingResponseDto = components["schemas"]["RatingResponseDto"];
 
@@ -26,19 +27,6 @@ interface MeResponse {
     displayName: string;
     role: string;
   };
-}
-
-function getCsrfToken(): string | undefined {
-  const raw = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("XSRF-TOKEN="))
-    ?.split("=")[1];
-  return raw ? decodeURIComponent(raw) : undefined;
-}
-
-function formHeaders(): HeadersInit {
-  const csrf = getCsrfToken();
-  return csrf ? { "X-XSRF-TOKEN": csrf } : {};
 }
 
 async function fetchMe(): Promise<MeResponse> {
@@ -97,10 +85,8 @@ export function RatingScale({ retroId, stepId, componentConfig }: StepComponentP
     void queryClient.invalidateQueries({ queryKey: ["ratingResponse", retroId, stepId] });
   }, [queryClient, retroId, stepId]);
 
-  useSSE(retroId, {
-    [EventType.NOTE_ADDED]: invalidate,
-    [EventType.NOTE_UPDATED]: invalidate,
-  });
+  useSSESubscription(EventType.NOTE_ADDED, invalidate);
+  useSSESubscription(EventType.NOTE_UPDATED, invalidate);
 
   const currentParticipantId = me?.user?.id;
 
@@ -127,18 +113,11 @@ export function RatingScale({ retroId, stepId, componentConfig }: StepComponentP
     if (selectedRating === null) return;
     setSubmitting(true);
     try {
-      const params = new URLSearchParams({
-        rating: String(selectedRating),
-      });
-      if (allowComment && comment.trim()) {
-        params.set("comment", comment.trim());
-      }
-      await fetch(
-        `/api/retro/${retroId}/step/${stepId}/response/rating?${params.toString()}`,
-        {
-          method: "POST",
-          headers: formHeaders(),
-        }
+      await submitRatingResponse(
+        retroId,
+        stepId,
+        selectedRating,
+        allowComment && comment.trim() ? comment.trim() : undefined,
       );
       setSubmitted(true);
       invalidate();

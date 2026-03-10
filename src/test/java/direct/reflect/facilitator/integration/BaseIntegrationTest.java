@@ -452,7 +452,8 @@ public abstract class BaseIntegrationTest {
             page.context().clearCookies();
 
             page.navigate(baseUrl + "/login");
-            page.waitForLoadState(LoadState.NETWORKIDLE);
+            page.waitForSelector("input[name='displayName']",
+                new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
 
             page.fill("input[name='displayName']", displayName);
             page.click("button[type='submit']");
@@ -1431,12 +1432,12 @@ public abstract class BaseIntegrationTest {
     protected void waitForSseConnection(Page page, UUID retroId) {
         recordActivity("waitForSseConnection: " + retroId);
         page.waitForSelector(
-            "[data-testid='retro-content']",
+            "[data-testid='retro-content'][data-sse-connected='true']",
             new Page.WaitForSelectorOptions()
                 .setState(WaitForSelectorState.ATTACHED)
                 .setTimeout(DEFAULT_TIMEOUT_MS)
         );
-        log.debug("SSE connection established for retro: {} (retro-content element present)", retroId);
+        log.debug("SSE connection established for retro: {} (data-sse-connected='true')", retroId);
         recordActivity("SSE connection established: " + retroId);
     }
 

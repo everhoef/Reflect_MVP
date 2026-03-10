@@ -14,8 +14,13 @@ mkdirSync(outputDir, { recursive: true });
 const schemaFiles = [
   "response-data.schema.json",
   "participant-event.schema.json",
+  "participant-name.schema.json",
   "note-updated.schema.json",
   "retro-event-envelope.schema.json",
+  "step-id.schema.json",
+  "phase-name.schema.json",
+  "void-event.schema.json",
+  // event-type-registry.json is a documentation registry, not a type schema — excluded from generation
 ];
 
 for (const filename of schemaFiles) {

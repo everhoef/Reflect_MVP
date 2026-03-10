@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 function getCsrfToken(): string | undefined {
@@ -14,6 +14,20 @@ export default function LoginPage() {
   const [displayName, setDisplayName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    void fetch('/api/me')
+      .then((res) => {
+        if (res.ok) return res.json() as Promise<{ isAuthenticated: boolean }>
+        return null
+      })
+      .then((data) => {
+        if (data?.isAuthenticated) {
+          navigate('/', { replace: true })
+        }
+      })
+      .catch(() => {})
+  }, [navigate])
 
   const handleGuestLogin = async (e: React.FormEvent) => {
     e.preventDefault()

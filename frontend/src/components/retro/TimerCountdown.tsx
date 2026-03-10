@@ -26,8 +26,6 @@ export function TimerCountdown({ durationSeconds }: TimerCountdownProps) {
 
   useEffect(() => {
     if (!timerActive || timerStartedAt === null) {
-      const total = timerDurationSeconds ?? durationSeconds;
-      setRemaining(total);
       return;
     }
 
@@ -38,6 +36,7 @@ export function TimerCountdown({ durationSeconds }: TimerCountdownProps) {
       return Math.max(0, total - elapsed);
     };
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRemaining(calculate());
 
     const id = setInterval(() => {

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "phase-name.schema.json",
+  "title": "PhaseName",
+  "description": "Payload for PHASE_STARTED SSE events. A plain string representing the retro phase name (e.g. GATHER_DATA, GENERATE_INSIGHTS). Maps to the RetroPhase enum string value.",
+  "type": "string",
+  "minLength": 1,
+  "examples": [
+    "SET_THE_STAGE",
+    "GATHER_DATA",
+    "GENERATE_INSIGHTS",
+    "DECIDE_ACTIONS",
+    "CLOSE_RETRO"
+  ]
+}

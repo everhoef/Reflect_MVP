@@ -1,13 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-
-function getCsrfToken(): string | undefined {
-  const raw = document.cookie
-    .split('; ')
-    .find((row) => row.startsWith('XSRF-TOKEN='))
-    ?.split('=')[1]
-  return raw ? decodeURIComponent(raw) : undefined
-}
+import { createRetrospective, joinRetrospective } from '@/hooks/api/useHome'
+import { ApiError } from '@/lib/api-client'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -23,23 +17,10 @@ export default function HomePage() {
     setCreating(true)
     setError(null)
     try {
-      const csrf = getCsrfToken()
-      const res = await fetch('/api/retro/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}),
-        },
-        body: JSON.stringify({ sessionName: sessionName.trim() }),
-      })
-      const redirect = res.headers.get('HX-Redirect') ?? res.headers.get('Location')
-      if (redirect) {
-        navigate(redirect)
-      } else {
-        setError('Failed to create session')
-      }
-    } catch {
-      setError('Failed to create session')
+      const data = await createRetrospective({ sessionName: sessionName.trim() })
+      navigate(data.redirectUrl)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to create session')
     } finally {
       setCreating(false)
     }
@@ -51,23 +32,10 @@ export default function HomePage() {
     setJoining(true)
     setError(null)
     try {
-      const csrf = getCsrfToken()
-      const res = await fetch('/api/retro/join', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}),
-        },
-        body: JSON.stringify({ retroId: retroId.trim() }),
-      })
-      const redirect = res.headers.get('HX-Redirect') ?? res.headers.get('Location')
-      if (redirect) {
-        navigate(redirect)
-      } else {
-        setError('Failed to join session')
-      }
-    } catch {
-      setError('Failed to join session')
+      const data = await joinRetrospective({ retroId: retroId.trim() })
+      navigate(data.redirectUrl)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to join session')
     } finally {
       setJoining(false)
     }

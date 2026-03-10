@@ -1,17 +1,18 @@
 import { useState, useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, useDroppable } from "@dnd-kit/core";
 import type { DragEndEvent, DragOverEvent } from "@dnd-kit/core";
 import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { useSSE } from "@/hooks/useSSE";
+import { useSSESubscription } from "@/hooks/useSSEContext";
 import { EventType } from "@/types/events";
 import { StickyNote } from "./StickyNote";
 import type { StickyNoteData } from "./StickyNote";
 import type { StepComponentProps } from "@/components/ComponentRouter";
 import type { components } from "@/types/api.d.ts";
+import { useClusters, submitColumnResponse, toggleVote, updateResponse, mergeResponses, unmergeResponse } from "@/hooks/api/useColumnBoard";
 
 type ColumnResponseDto = components["schemas"]["ColumnResponseDto"];
 type ClusterGroupsDto = components["schemas"]["ClusterGroupsDto"];
@@ -56,33 +57,6 @@ interface MeResponse {
     displayName: string;
     role: string;
   };
-}
-
-function getCsrfToken(): string | undefined {
-  const raw = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("XSRF-TOKEN="))
-    ?.split("=")[1];
-  return raw ? decodeURIComponent(raw) : undefined;
-}
-
-function jsonHeaders(): HeadersInit {
-  const csrf = getCsrfToken();
-  return {
-    "Content-Type": "application/json",
-    ...(csrf ? { "X-XSRF-TOKEN": csrf } : {}),
-  };
-}
-
-function formHeaders(): HeadersInit {
-  const csrf = getCsrfToken();
-  return csrf ? { "X-XSRF-TOKEN": csrf } : {};
-}
-
-async function fetchClusters(retroId: string, stepId: number): Promise<ClusterGroupsDto> {
-  const res = await fetch(`/api/retro/${retroId}/step/${stepId}/clusters`);
-  if (!res.ok) throw new Error(`Failed to fetch clusters: ${res.status}`);
-  return res.json() as Promise<ClusterGroupsDto>;
 }
 
 async function fetchMe(): Promise<MeResponse> {
@@ -140,14 +114,7 @@ function AddNoteForm({ columnId, placeholder, maxLength, retroId, stepId, onSucc
     if (!trimmed) return;
     setSubmitting(true);
     try {
-      const params = new URLSearchParams({
-        columnId: columnId,
-        content: trimmed,
-      });
-      await fetch(`/api/retro/${retroId}/step/${stepId}/response/column?${params.toString()}`, {
-        method: "POST",
-        headers: formHeaders(),
-      });
+      await submitColumnResponse(retroId, stepId, columnId, trimmed);
       setContent("");
       onSuccess();
     } finally {
@@ -191,7 +158,6 @@ function AddNoteForm({ columnId, placeholder, maxLength, retroId, stepId, onSucc
 }
 
 export function MultiColumnBoard({ retroId, stepId, componentConfig }: StepComponentProps) {
-  const queryClient = useQueryClient();
   const config = componentConfig as unknown as MultiColumnBoardConfig;
   const columns = (config.columns ?? []).map((col) => ({
     ...col,
@@ -215,11 +181,7 @@ export function MultiColumnBoard({ retroId, stepId, componentConfig }: StepCompo
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
-  const { data: clusters, isLoading } = useQuery<ClusterGroupsDto>({
-    queryKey: ["clusters", retroId, stepId],
-    queryFn: () => fetchClusters(retroId, stepId),
-    enabled: !!retroId,
-  });
+  const { data: clusters, isLoading, invalidate } = useClusters(retroId, stepId);
 
   const { data: me } = useQuery<MeResponse>({
     queryKey: ["me"],
@@ -229,41 +191,28 @@ export function MultiColumnBoard({ retroId, stepId, componentConfig }: StepCompo
 
   const currentParticipantId = me?.user?.id;
 
-  const invalidate = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ["clusters", retroId, stepId] });
-  }, [queryClient, retroId, stepId]);
+  const invalidateLocal = useCallback(() => {
+    invalidate();
+  }, [invalidate]);
 
-  useSSE(retroId, {
-    [EventType.NOTE_ADDED]: invalidate,
-    [EventType.NOTE_UPDATED]: invalidate,
-    [EventType.NOTE_DELETED]: invalidate,
-    [EventType.VOTE_ADDED]: invalidate,
-    [EventType.VOTE_REMOVED]: invalidate,
-  });
+  useSSESubscription(EventType.NOTE_ADDED, invalidateLocal);
+  useSSESubscription(EventType.NOTE_UPDATED, invalidateLocal);
+  useSSESubscription(EventType.NOTE_DELETED, invalidateLocal);
+  useSSESubscription(EventType.VOTE_ADDED, invalidateLocal);
+  useSSESubscription(EventType.VOTE_REMOVED, invalidateLocal);
 
   const handleVote = async (responseId: string) => {
-    await fetch(`/api/retro/${retroId}/response/${responseId}/vote`, {
-      method: "POST",
-      headers: formHeaders(),
-    });
+    await toggleVote(retroId, responseId);
     invalidate();
   };
 
   const handleEdit = async (responseId: string, newContent: string) => {
-    const params = new URLSearchParams({ content: newContent });
-    await fetch(`/api/retro/${retroId}/response/${responseId}?${params.toString()}`, {
-      method: "PUT",
-      headers: formHeaders(),
-    });
+    await updateResponse(retroId, responseId, newContent);
     invalidate();
   };
 
   const handleUnmerge = async (responseId: string) => {
-    await fetch(`/api/retro/${retroId}/step/${stepId}/cluster/unmerge`, {
-      method: "POST",
-      headers: jsonHeaders(),
-      body: JSON.stringify({ responseId }),
-    });
+    await unmergeResponse(retroId, stepId, responseId);
     invalidate();
   };
 
@@ -298,11 +247,7 @@ export function MultiColumnBoard({ retroId, stepId, componentConfig }: StepCompo
     if (!draggedNote || !targetNote) return;
     if (draggedNote.columnId !== targetNote.columnId) return;
 
-    await fetch(`/api/retro/${retroId}/step/${stepId}/cluster/merge`, {
-      method: "POST",
-      headers: jsonHeaders(),
-      body: JSON.stringify({ responseIds: [draggedNoteId, overId] }),
-    });
+    await mergeResponses(retroId, stepId, [draggedNoteId, overId]);
     invalidate();
   };
 

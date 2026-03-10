@@ -93,7 +93,7 @@ public class RetroApiControllerTest {
 
     @Test
     @WithMockUser(roles = "USER")
-    void shouldCreateRetrospectiveAndRedirect() throws Exception {
+    void shouldCreateRetrospectiveAndReturnJson() throws Exception {
         // Arrange
         UUID retroId = UUID.randomUUID();
         RetroSession mockSession = new RetroSession();
@@ -116,12 +116,15 @@ public class RetroApiControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"sessionName\":\"Test Session\"}"))
                 .andDo(print())
-                .andExpect(status().is3xxRedirection());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.retroId").value(retroId.toString()))
+                .andExpect(jsonPath("$.redirectUrl").value("/retro/" + retroId))
+                .andExpect(jsonPath("$.sessionName").value("Test Session"));
     }
     
     @Test
     @WithMockUser(roles = "GUEST")
-    void shouldJoinRetrospectiveAndRedirect() throws Exception {
+    void shouldJoinRetrospectiveAndReturnJson() throws Exception {
         // Arrange
         UUID retroId = UUID.randomUUID();
         JoinRetroRequest request = new JoinRetroRequest(retroId.toString());
@@ -146,7 +149,9 @@ public class RetroApiControllerTest {
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"retroId\":\"" + retroId + "\"}"))
-                .andExpect(status().is3xxRedirection());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.retroId").value(retroId.toString()))
+                .andExpect(jsonPath("$.redirectUrl").value("/retro/" + retroId));
     }
     
     @Test
@@ -173,7 +178,9 @@ public class RetroApiControllerTest {
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"sessionName\":\"Test Session\"}"))
-                .andExpect(status().is3xxRedirection());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.retroId").value(retroId.toString()))
+                .andExpect(jsonPath("$.redirectUrl").value("/retro/" + retroId));
     }
     
     @Test
@@ -682,6 +689,43 @@ public class RetroApiControllerTest {
     // ============================================================================
     // JSON Response Body Tests
     // ============================================================================
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void nextStep_Facilitator_ShouldReturnJsonWithAdvancedTrue() throws Exception {
+        UUID retroId = UUID.randomUUID();
+
+        when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
+            .thenReturn(true);
+
+        mockMvc.perform(post("/api/retro/{retroId}/next", retroId)
+                .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.retroId").value(retroId.toString()))
+                .andExpect(jsonPath("$.advanced").value(true));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void nextStep_NonFacilitator_ShouldReturnForbidden() throws Exception {
+        UUID retroId = UUID.randomUUID();
+
+        when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
+            .thenReturn(false);
+
+        mockMvc.perform(post("/api/retro/{retroId}/next", retroId)
+                .with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void leaveActiveSessions_ShouldReturnJsonWithSuccessTrue() throws Exception {
+        mockMvc.perform(post("/api/retro/leave-active-sessions")
+                .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
 
     @Test
     @WithMockUser(roles = "USER")

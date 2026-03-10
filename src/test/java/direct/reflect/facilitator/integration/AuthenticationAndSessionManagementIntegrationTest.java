@@ -292,28 +292,22 @@ public class AuthenticationAndSessionManagementIntegrationTest extends BaseInteg
                 log.info("Testing invalid session ID handling");
                 String invalidSessionId = "00000000-0000-0000-0000-000000000000";
                 
-                // Attempt to join invalid session using helper method
-                boolean gotExpectedException = false;
-                try {
-                    joinRetroSession(userPage, invalidSessionId);
-                    fail("Expected an exception when joining invalid session, but none was thrown");
-                } catch (RuntimeException e) {
-                    // Expected - invalid session should cause the helper to throw an exception
-                    log.info("✅ Got expected error when joining invalid session: {}", e.getMessage());
-                    gotExpectedException = true;
-                    
-                    // Verify the error message contains relevant information
-                    String errorMessage = e.getMessage().toLowerCase();
-                    assertTrue(errorMessage.contains("failed to join session") || 
-                              errorMessage.contains("error") ||
-                              errorMessage.contains("session_not_found") ||
-                              errorMessage.contains("invalid"),
-                              "Error message should indicate session join failure: " + e.getMessage());
-                }
-                
-                assertTrue(gotExpectedException, "Should have thrown exception for invalid session");
-                
-                log.info("✅ Invalid session ID handled gracefully");
+                userPage.navigate(baseUrl + "/");
+                userPage.waitForSelector("input[name='retroId']",
+                    new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+                userPage.fill("input[name='retroId']", invalidSessionId);
+                userPage.click("button:has-text('Join Session')");
+
+                userPage.waitForSelector(".text-red-600",
+                    new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+
+                assertFalse(userPage.url().contains("/retro/"),
+                    "Page should not navigate to a retro session for an invalid session ID");
+
+                String errorText = userPage.locator(".text-red-600").textContent();
+                assertFalse(errorText == null || errorText.isBlank(),
+                    "An error message should be displayed for invalid session ID");
+                log.info("✅ Invalid session ID handled gracefully with error: {}", errorText);
                 
             } finally {
                 userContext.close();

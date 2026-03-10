@@ -13,7 +13,11 @@ import jakarta.servlet.http.HttpSession;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
 import direct.reflect.facilitator.facilitation.dto.CreateRetroRequest;
+import direct.reflect.facilitator.facilitation.dto.CreateRetroResponse;
 import direct.reflect.facilitator.facilitation.dto.JoinRetroRequest;
+import direct.reflect.facilitator.facilitation.dto.JoinRetroResponse;
+import direct.reflect.facilitator.facilitation.dto.NextStepResult;
+import direct.reflect.facilitator.facilitation.dto.LeaveActiveSessionsResult;
 import direct.reflect.facilitator.facilitation.dto.SessionInfo;
 import direct.reflect.facilitator.facilitation.dto.ComponentResponseDto;
 import direct.reflect.facilitator.facilitation.dto.ColumnResponseDto;
@@ -65,7 +69,7 @@ public class RetroApiController {
 
     @PostMapping(value = "/create", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<Void> createRetrospective(
+    public ResponseEntity<CreateRetroResponse> createRetrospective(
             @Valid @RequestBody CreateRetroRequest request,
             HttpServletRequest httpRequest,
             Authentication authentication) {
@@ -80,33 +84,22 @@ public class RetroApiController {
             request.sessionName(), authentication.getName());
 
         try {
-            // Service layer orchestrates the complete workflow
             RetroSession retro = retroService.createSessionWithFacilitator(request.sessionName(), httpRequest);
             String redirectUrl = "/retro/" + retro.getId();
 
             log.info("✅ Created retro session: {} (id: {})", retro.getName(), retro.getId());
-            log.debug("Setting HX-Redirect header to: {}", redirectUrl);
-            log.debug("Returning response with status: {}", HttpStatus.FOUND);
 
-            ResponseEntity<Void> response = ResponseEntity.status(HttpStatus.FOUND)
-                .header("HX-Redirect", redirectUrl)
-                .build();
-
-            log.debug("=== CREATE REQUEST SUCCESS - Response built with HX-Redirect: {} ===", redirectUrl);
-            return response;
+            return ResponseEntity.ok(new CreateRetroResponse(retro.getId(), redirectUrl, retro.getName()));
 
         } catch (Exception e) {
             log.error("❌ ERROR creating retro session", e);
-            log.error("Exception type: {}, message: {}", e.getClass().getName(), e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .header("HX-Redirect", "/home?error=creation_failed")
-                .build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     @PostMapping(value = "/join", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<Void> joinRetrospective(
+    public ResponseEntity<JoinRetroResponse> joinRetrospective(
             @Valid @RequestBody JoinRetroRequest request,
             HttpServletRequest httpRequest,
             Authentication authentication) {
@@ -122,35 +115,26 @@ public class RetroApiController {
             retroId = UUID.fromString(request.retroId());
         } catch (IllegalArgumentException e) {
             log.warn("Invalid UUID format for retroId: {}", request.retroId());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .header("HX-Redirect", "/home?error=invalid_input")
-                .build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
         
         log.debug("Join request for retro: {} by user: {}", 
             retroId, authentication.getName());
         
         try {
-            // Service layer handles all business logic including event publishing
             RetroSession sessionToJoin = retroService.getSessionById(retroId);
             participantService.addParticipantToSession(httpRequest, sessionToJoin, ParticipantRole.PARTICIPANT);
             
-            log.debug("Successfully added participant to session, redirecting to: /retro/{}", retroId);
+            log.debug("Successfully added participant to session: {}", retroId);
             
-            return ResponseEntity.status(HttpStatus.FOUND)
-                .header("HX-Redirect", "/retro/" + retroId)
-                .build();
+            return ResponseEntity.ok(new JoinRetroResponse(retroId, "/retro/" + retroId));
             
         } catch (RetroSessionNotFoundException e) {
             log.warn("Session not found: {}", retroId);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .header("HX-Redirect", "/home?error=session_not_found")
-                .build();
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         } catch (Exception e) {
             log.error("Error joining retro session {}: ", retroId, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .header("HX-Redirect", "/home?error=join_failed")
-                .build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
@@ -181,48 +165,37 @@ public class RetroApiController {
 
     @PostMapping("/{retroId}/next")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')") // Both users and guests can advance sessions if they're facilitators
-    public ResponseEntity<Void> nextStep(
+    public ResponseEntity<NextStepResult> nextStep(
             @PathVariable UUID retroId,
             HttpServletRequest httpRequest) {
 
         boolean isFacilitator = participantService.isFacilitator(httpRequest, retroId);
         if (!isFacilitator) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .header("HX-Redirect", "/retro/" + retroId)
-                .build();
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
         try {
-            // Service handles both database changes and event publishing within transaction
             retroService.advanceToNextStep(retroId);
 
-            return ResponseEntity.ok()
-                .header("HX-Trigger", "stepAdvanced")
-                .build();
+            return ResponseEntity.ok(new NextStepResult(retroId, true));
         } catch (Exception e) {
             log.error("Error advancing step", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .header("HX-Redirect", "/retro/" + retroId + "?error=next_step_failed")
-                .build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
     
     @PostMapping("/leave-active-sessions")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<Void> leaveActiveSessions(HttpServletRequest httpRequest) {
+    public ResponseEntity<LeaveActiveSessionsResult> leaveActiveSessions(HttpServletRequest httpRequest) {
         log.debug("Request to leave all active sessions");
         
         try {
             participantService.leaveAllActiveSessions(httpRequest);
             log.info("Successfully left all active sessions");
-            return ResponseEntity.status(HttpStatus.FOUND)
-                .header("HX-Redirect", "/home?message=left_sessions")
-                .build();
+            return ResponseEntity.ok(new LeaveActiveSessionsResult(true));
         } catch (Exception e) {
             log.error("Error leaving active sessions: ", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .header("HX-Redirect", "/home?error=leave_sessions_failed")
-                .build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
     
@@ -320,6 +293,33 @@ public class RetroApiController {
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error submitting rating response: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GetMapping("/{retroId}/step/{stepId}/response/rating/me")
+    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    @Operation(summary = "Get current user's rating response", description = "Returns the authenticated user's rating response for a given step, or 404 if not yet submitted")
+    @ApiResponse(responseCode = "200", description = "Rating response returned")
+    @ApiResponse(responseCode = "404", description = "No rating response found for this participant and step")
+    public ResponseEntity<RatingResponseDto> getMyRatingResponse(
+            @PathVariable UUID retroId,
+            @PathVariable Long stepId,
+            HttpServletRequest httpRequest) {
+
+        log.debug("Getting my rating response for retro: {}, step: {}", retroId, stepId);
+
+        try {
+            return responseService.getMyRatingResponse(retroId, stepId, httpRequest)
+                .map(r -> ResponseEntity.ok(RatingResponseDto.from(r)))
+                .orElse(ResponseEntity.notFound().build());
+
+        } catch (ParticipantNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (RetroSessionNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error fetching my rating response for retro {}, step {}: ", retroId, stepId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

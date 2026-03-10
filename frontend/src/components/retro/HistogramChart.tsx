@@ -1,11 +1,7 @@
-import { useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSSE } from "@/hooks/useSSE";
+import { useSSESubscription } from "@/hooks/useSSEContext";
 import { EventType } from "@/types/events";
 import type { StepComponentProps } from "@/components/ComponentRouter";
-import type { components } from "@/types/api.d.ts";
-
-type RatingResponseDto = components["schemas"]["RatingResponseDto"];
+import { useRatingResponses } from "@/hooks/api/useRating";
 
 interface HistogramConfig {
   min: number;
@@ -14,23 +10,11 @@ interface HistogramConfig {
   labels: string[];
 }
 
-async function fetchRatingResponses(
-  retroId: string,
-  stepId: number
-): Promise<RatingResponseDto[]> {
-  const res = await fetch(`/api/retro/${retroId}/step/${stepId}/response/rating`);
-  if (!res.ok) return [];
-  const data: unknown = await res.json();
-  if (!Array.isArray(data)) return [];
-  return data as RatingResponseDto[];
-}
-
 export function HistogramChart({
   retroId,
   stepId,
   componentConfig,
 }: StepComponentProps) {
-  const queryClient = useQueryClient();
   const config = componentConfig as unknown as Partial<HistogramConfig>;
 
   const min = config.min ?? 1;
@@ -46,22 +30,10 @@ export function HistogramChart({
     values.push(v);
   }
 
-  const { data: responses = [] } = useQuery<RatingResponseDto[]>({
-    queryKey: ["ratingResponses", retroId, stepId],
-    queryFn: () => fetchRatingResponses(retroId, stepId),
-    enabled: !!retroId,
-  });
+  const { data: responses = [], invalidate } = useRatingResponses(retroId, stepId);
 
-  const invalidate = useCallback(() => {
-    void queryClient.invalidateQueries({
-      queryKey: ["ratingResponses", retroId, stepId],
-    });
-  }, [queryClient, retroId, stepId]);
-
-  useSSE(retroId, {
-    [EventType.NOTE_ADDED]: invalidate,
-    [EventType.NOTE_UPDATED]: invalidate,
-  });
+  useSSESubscription(EventType.NOTE_ADDED, invalidate);
+  useSSESubscription(EventType.NOTE_UPDATED, invalidate);
 
   const countsByValue = new Map<number, number>();
   for (const v of values) {

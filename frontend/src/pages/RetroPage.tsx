@@ -1,12 +1,18 @@
-import { useCallback } from "react";
-import { useParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSSE } from "@/hooks/useSSE";
 import { EventType } from "@/types/events";
 import { ComponentRouter } from "@/components/ComponentRouter";
 import { GuidanceSidebar } from "@/components/retro/GuidanceSidebar";
 import { TimerCountdown } from "@/components/retro/TimerCountdown";
+import { SSEProvider } from "@/contexts/SSEContext";
+import { useSSEContextDispatch } from "@/hooks/useSSEContext";
+import { useRetroState, useParticipants, useNextStep, useStartSession } from "@/hooks/api/useRetro";
+import { ApiError } from "@/lib/api-client";
+import type { components } from "@/types/api.d.ts";
 
+// Normalized local types with required fields (schema generates optional fields from OpenAPI)
 interface StepSummaryDto {
   id: number;
   title: string;
@@ -17,7 +23,7 @@ interface StepSummaryDto {
   guidance?: string | null;
 }
 
-interface RetroStateDto {
+interface RetroState {
   retroId: string;
   phase: string;
   currentStepId: number | null;
@@ -28,34 +34,29 @@ interface RetroStateDto {
   participantCount: number;
 }
 
-interface ParticipantDto {
-  participantId: string;
-  displayName: string;
-  role: string;
+function normalizeStep(s: components["schemas"]["StepSummaryDto"]): StepSummaryDto {
+  return {
+    id: s.id ?? 0,
+    title: s.title ?? "",
+    componentType: s.componentType ?? "",
+    advancementTrigger: s.advancementTrigger ?? "",
+    durationSeconds: s.durationSeconds ?? null,
+    componentConfig: (s.componentConfig as Record<string, unknown>) ?? {},
+    guidance: s.guidance ?? null,
+  };
 }
 
-async function fetchRetroState(retroId: string): Promise<RetroStateDto> {
-  const res = await fetch(`/api/retro/${retroId}/state`);
-  if (!res.ok) throw new Error(`Failed to fetch retro state: ${res.status}`);
-  return res.json() as Promise<RetroStateDto>;
-}
-
-async function fetchParticipants(retroId: string): Promise<ParticipantDto[]> {
-  const res = await fetch(`/api/retro/${retroId}/participants`);
-  if (!res.ok) throw new Error(`Failed to fetch participants: ${res.status}`);
-  return res.json() as Promise<ParticipantDto[]>;
-}
-
-async function postNextStep(retroId: string): Promise<void> {
-  const raw = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("XSRF-TOKEN="))
-    ?.split("=")[1];
-  const csrfToken = raw ? decodeURIComponent(raw) : undefined;
-  await fetch(`/api/retro/${retroId}/next`, {
-    method: "POST",
-    headers: csrfToken ? { "X-XSRF-TOKEN": csrfToken } : {},
-  });
+function normalizeState(raw: components["schemas"]["RetroStateDto"]): RetroState {
+  return {
+    retroId: raw.retroId ?? "",
+    phase: raw.phase ?? "LOBBY",
+    currentStepId: raw.currentStepId ?? null,
+    currentStepIndex: raw.currentStepIndex ?? 0,
+    steps: (raw.steps ?? []).map(normalizeStep),
+    facilitatorId: raw.facilitatorId ?? "",
+    isFacilitator: raw.isFacilitator ?? false,
+    participantCount: raw.participantCount ?? 0,
+  };
 }
 
 function InitialsAvatar({ name }: { name: string }) {
@@ -120,20 +121,26 @@ function StageProgressBar({ steps, currentStepIndex }: { steps: StepSummaryDto[]
 }
 
 export default function RetroPage() {
+  return (
+    <SSEProvider>
+      <RetroPageInner />
+    </SSEProvider>
+  );
+}
+
+function RetroPageInner() {
   const { retroId } = useParams<{ retroId: string }>();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [sseConnected, setSseConnected] = useState(false);
+  const sseDispatch = useSSEContextDispatch();
 
-  const { data: state, isLoading, error } = useQuery<RetroStateDto>({
-    queryKey: ["retroState", retroId],
-    queryFn: () => fetchRetroState(retroId!),
-    enabled: !!retroId,
-  });
+  const { data: rawState, isLoading, error } = useRetroState(retroId);
 
-  const { data: participants = [] } = useQuery<ParticipantDto[]>({
-    queryKey: ["participants", retroId],
-    queryFn: () => fetchParticipants(retroId!),
-    enabled: !!retroId,
-  });
+  const { data: participants = [] } = useParticipants(retroId);
+
+  const nextStepMutation = useNextStep(retroId);
+  const startSessionMutation = useStartSession(retroId);
 
   const refreshState = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["retroState", retroId] });
@@ -144,18 +151,21 @@ export default function RetroPage() {
   }, [queryClient, retroId]);
 
   useSSE(retroId, {
-    [EventType.STEP_ADVANCED]: refreshState,
-    [EventType.SESSION_STARTED]: refreshState,
-    [EventType.PHASE_STARTED]: refreshState,
-    [EventType.PARTICIPANT_JOINED]: refreshParticipants,
-    [EventType.PARTICIPANT_LEFT]: refreshParticipants,
-  });
+    [EventType.STEP_ADVANCED]: (data) => { refreshState(); sseDispatch(EventType.STEP_ADVANCED, data); },
+    [EventType.SESSION_STARTED]: (data) => { refreshState(); sseDispatch(EventType.SESSION_STARTED, data); },
+    [EventType.PHASE_STARTED]: (data) => { refreshState(); sseDispatch(EventType.PHASE_STARTED, data); },
+    [EventType.PARTICIPANT_JOINED]: (data) => { refreshParticipants(); sseDispatch(EventType.PARTICIPANT_JOINED, data); },
+    [EventType.PARTICIPANT_LEFT]: (data) => { refreshParticipants(); sseDispatch(EventType.PARTICIPANT_LEFT, data); },
+    [EventType.NOTE_ADDED]: (data) => sseDispatch(EventType.NOTE_ADDED, data),
+    [EventType.NOTE_UPDATED]: (data) => sseDispatch(EventType.NOTE_UPDATED, data),
+    [EventType.NOTE_DELETED]: (data) => sseDispatch(EventType.NOTE_DELETED, data),
+    [EventType.VOTE_ADDED]: (data) => sseDispatch(EventType.VOTE_ADDED, data),
+    [EventType.VOTE_REMOVED]: (data) => sseDispatch(EventType.VOTE_REMOVED, data),
+  }, () => setSseConnected(true));
 
   const handleNext = () => {
     if (!retroId) return;
-    void postNextStep(retroId).then(() => {
-      refreshState();
-    });
+    nextStepMutation.mutate();
   };
 
   if (isLoading) {
@@ -169,20 +179,33 @@ export default function RetroPage() {
     );
   }
 
-  if (error || !state) {
+  if (error || !rawState) {
+    const is404 = error instanceof ApiError && error.status === 404;
     return (
       <div className="flex items-center justify-center h-[calc(100vh-3.5rem)]">
         <div className="text-center">
-          <p className="text-red-600 font-semibold">Could not load retrospective</p>
-          <p className="text-gray-500 text-sm mt-1">{String(error ?? "Unknown error")}</p>
+          <p className="text-red-600 font-semibold text-lg">
+            {is404 ? "Retrospective not found" : "Could not load retrospective"}
+          </p>
+          <p className="text-gray-500 text-sm mt-1">
+            {is404
+              ? "The session may have ended or the link is invalid."
+              : String(error ?? "Unknown error")}
+          </p>
+          <button
+            onClick={() => navigate("/")}
+            className="mt-4 px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium transition-colors"
+          >
+            Go Home
+          </button>
         </div>
       </div>
     );
   }
 
+  const state: RetroState = normalizeState(rawState);
+
   const currentStep = state.steps.find((s) => s.id === state.currentStepId) ?? null;
-  const respondedCount = 0;
-  const canAdvance = respondedCount >= state.participantCount;
 
   return (
     <div
@@ -190,6 +213,7 @@ export default function RetroPage() {
       data-testid="retro-content"
       data-step-index={state.currentStepIndex}
       data-phase={state.phase}
+      data-sse-connected={sseConnected ? "true" : "false"}
     >
 
       {currentStep && (
@@ -257,18 +281,6 @@ export default function RetroPage() {
               />
 
               <div className="mt-8 flex flex-col items-center gap-3">
-                {state.isFacilitator && !canAdvance && (
-                  <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-                    <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                    </svg>
-                    <span>
-                      {respondedCount} of {state.participantCount} participants responded. You can still proceed.
-                    </span>
-                  </div>
-                )}
-
                 {state.isFacilitator && (
                   <button
                     data-testid="next-step-button"
@@ -290,16 +302,7 @@ export default function RetroPage() {
                     {state.isFacilitator && (
                       <button
                         data-testid="start-retro-button"
-                        onClick={() => {
-                          const csrfToken = document.cookie
-                            .split("; ")
-                            .find((row) => row.startsWith("XSRF-TOKEN="))
-                            ?.split("=")[1];
-                          void fetch(`/api/retro/${retroId}/start`, {
-                            method: "POST",
-                            headers: csrfToken ? { "X-XSRF-TOKEN": csrfToken } : {},
-                          }).then(refreshState);
-                        }}
+                        onClick={() => startSessionMutation.mutate()}
                         className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
                       >
                         Start Retrospective
@@ -334,7 +337,7 @@ export default function RetroPage() {
                 <li key={p.participantId} className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-gray-100">
                   <span className="text-sm font-medium text-gray-800">{p.displayName}</span>
                   <div className="flex items-center gap-2">
-                    <InitialsAvatar name={p.displayName} />
+                    <InitialsAvatar name={p.displayName ?? ""} />
                     {p.role === "FACILITATOR" && (
                       <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">
                         Facilitator
