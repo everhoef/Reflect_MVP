@@ -43,6 +43,16 @@ spring:
             user-info-uri: https://api.github.com/user
             user-name-attribute: login
 
+server:
+  servlet:
+    session:
+      cookie:
+        # Set cookie max-age to match server-side session timeout (2h = 7200s).
+        # Without this the SESSION cookie is a session cookie (no Max-Age), so
+        # closing the browser tab discards it even though the Redis session is
+        # still alive — causing users to appear logged out after < 1 hour.
+        max-age: 7200
+
 springdoc:
   api-docs:
     path: /v3/api-docs
