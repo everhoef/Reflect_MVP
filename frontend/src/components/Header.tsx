@@ -38,8 +38,7 @@ export default function Header({ currentStage }: HeaderProps) {
         <div className="flex items-center justify-between h-14">
           <Link
             to="/"
-            className="text-xl font-semibold tracking-tight"
-            style={{ color: '#C49A1A' }}
+            className="text-xl font-semibold tracking-tight text-[#C49A1A]"
           >
             Reflect.Direct
           </Link>

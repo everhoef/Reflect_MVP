@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @Controller
 public class WebConfig {
 
-    @RequestMapping(value = {"/login", "/retro/**"})
+    @RequestMapping(value = {"/", "/login", "/home", "/retro/**"})
     public String spa() {
         return "forward:/index.html";
     }

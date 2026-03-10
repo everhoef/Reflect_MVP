@@ -127,14 +127,12 @@ export default function RetroPage() {
     queryKey: ["retroState", retroId],
     queryFn: () => fetchRetroState(retroId!),
     enabled: !!retroId,
-    refetchInterval: 3000,
   });
 
   const { data: participants = [] } = useQuery<ParticipantDto[]>({
     queryKey: ["participants", retroId],
     queryFn: () => fetchParticipants(retroId!),
     enabled: !!retroId,
-    refetchInterval: 5000,
   });
 
   const refreshState = useCallback(() => {

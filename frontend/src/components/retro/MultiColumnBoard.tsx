@@ -219,7 +219,6 @@ export function MultiColumnBoard({ retroId, stepId, componentConfig }: StepCompo
     queryKey: ["clusters", retroId, stepId],
     queryFn: () => fetchClusters(retroId, stepId),
     enabled: !!retroId,
-    refetchInterval: 3000,
   });
 
   const { data: me } = useQuery<MeResponse>({
