@@ -1,4 +1,5 @@
 import { render, screen, act, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import RetroPage from './RetroPage'
@@ -375,5 +376,87 @@ describe('RetroPage SSE routing', () => {
     })
 
     expect(subscriberEvents).toContainEqual({ type: EventType.VOTE_REMOVED, data: '{"responseId":"v2"}' })
+  })
+})
+
+describe('RetroPage lobby phase', () => {
+  const lobbyState = {
+    ...baseState,
+    phase: 'LOBBY',
+    currentStepId: null,
+    currentStepIndex: 0,
+    steps: [],
+  }
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+      configurable: true,
+      writable: true,
+    })
+  })
+
+  function mockLobbyFetch() {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (url.includes('/state')) {
+        return Promise.resolve(new Response(JSON.stringify(lobbyState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/participants')) {
+        return Promise.resolve(new Response(JSON.stringify(baseParticipants), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      return Promise.resolve(new Response('{}', { status: 404 }))
+    })
+  }
+
+  it('shows the retro ID in the lobby', async () => {
+    mockLobbyFetch()
+    renderRetroPage(buildQueryClient())
+
+    await waitFor(() => {
+      expect(screen.getByTestId('retro-id-display')).toBeInTheDocument()
+    })
+
+    expect(screen.getByTestId('retro-id-display')).toHaveTextContent(RETRO_ID)
+  })
+
+  it('renders the copy button in the lobby', async () => {
+    mockLobbyFetch()
+    renderRetroPage(buildQueryClient())
+
+    await waitFor(() => {
+      expect(screen.getByTestId('copy-retro-id-button')).toBeInTheDocument()
+    })
+
+    expect(screen.getByTestId('copy-retro-id-button')).toHaveTextContent('Copy')
+  })
+
+  it('copies the retro ID when copy button is clicked and shows Copied! feedback', async () => {
+    mockLobbyFetch()
+    const user = userEvent.setup()
+    renderRetroPage(buildQueryClient())
+
+    await waitFor(() => {
+      expect(screen.getByTestId('copy-retro-id-button')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByTestId('copy-retro-id-button'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('copy-retro-id-button')).toHaveTextContent('Copied!')
+    })
+  })
+
+  it('does NOT show retro ID display when not in LOBBY phase', async () => {
+    mockFetchSuccess()
+    renderRetroPage(buildQueryClient())
+
+    await waitFor(() => {
+      expect(screen.getByTestId('retro-content')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('retro-id-display')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('copy-retro-id-button')).not.toBeInTheDocument()
   })
 })

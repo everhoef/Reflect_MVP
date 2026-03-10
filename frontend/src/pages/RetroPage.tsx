@@ -133,7 +133,16 @@ function RetroPageInner() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [sseConnected, setSseConnected] = useState(false);
+  const [copied, setCopied] = useState(false);
   const sseDispatch = useSSEContextDispatch();
+
+  const handleCopyRetroId = () => {
+    if (!retroId) return;
+    void navigator.clipboard.writeText(retroId).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   const { data: rawState, isLoading, error } = useRetroState(retroId);
 
@@ -299,6 +308,26 @@ function RetroPageInner() {
                   <div>
                     <h2 className="text-xl font-semibold text-gray-800 mb-2">Session Lobby</h2>
                     <p className="text-gray-500 text-sm mb-4">Waiting for the facilitator to start the retrospective.</p>
+
+                    <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-gray-500 text-sm shrink-0">Session ID:</span>
+                        <span
+                          data-testid="retro-id-display"
+                          className="font-mono text-sm text-amber-700 truncate"
+                        >
+                          {retroId}
+                        </span>
+                      </div>
+                      <button
+                        data-testid="copy-retro-id-button"
+                        onClick={handleCopyRetroId}
+                        className="shrink-0 px-3 py-1.5 text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-md transition-colors"
+                      >
+                        {copied ? "Copied!" : "Copy"}
+                      </button>
+                    </div>
+
                     {state.isFacilitator && (
                       <button
                         data-testid="start-retro-button"
