@@ -225,7 +225,7 @@ public class EventService {
             try {
                 String eventData;
                 try {
-                    eventData = event.payload() != null ? objectMapper.writeValueAsString(event.payload()) : "\"refresh\"";
+                    eventData = event.payload() != null ? objectMapper.writeValueAsString(event.payload()) : "null";
                 } catch (Exception jsonEx) {
                     log.warn("[{}] Failed to serialize payload for event type {}: {}",
                         event.correlationId(), event.type(), jsonEx.getMessage());

@@ -5,7 +5,7 @@ import { EventType } from "@/types/events";
  * Handler receives the raw payload string from the SSE data field.
  *
  * The backend sends named SSE events where `data:` contains only the
- * serialized payload (e.g. `"refresh"` for null payloads, or a JSON
+ * serialized payload (e.g. `null` for void payloads, or a JSON
  * object string for data payloads) — NOT a full RetroSseEvent envelope.
  *
  * Transport reconnection is delegated to the browser's native EventSource

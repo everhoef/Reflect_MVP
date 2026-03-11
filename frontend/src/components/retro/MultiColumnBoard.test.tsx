@@ -269,7 +269,7 @@ describe('MultiColumnBoard SSE invalidation', () => {
     const countAfterMount = fetchSpy.mock.calls.length
 
     act(() => {
-      dispatch.current!(EventType.STEP_ADVANCED, '"refresh"')
+      dispatch.current!(EventType.STEP_ADVANCED, 'null')
     })
     await Promise.resolve()
 

@@ -150,11 +150,11 @@ describe('useSSE', () => {
     rerender({ handler: secondHandler })
 
     act(() => {
-      latestInstance().triggerEvent(EventType.STEP_ADVANCED, '"refresh"')
+      latestInstance().triggerEvent(EventType.STEP_ADVANCED, 'null')
     })
 
     expect(firstHandler).not.toHaveBeenCalled()
     expect(secondHandler).toHaveBeenCalledOnce()
-    expect(secondHandler).toHaveBeenCalledWith('"refresh"')
+    expect(secondHandler).toHaveBeenCalledWith('null')
   })
 })

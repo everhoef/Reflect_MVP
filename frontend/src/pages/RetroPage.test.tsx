@@ -171,7 +171,7 @@ describe('RetroPage SSE routing', () => {
     const callCountBeforeEvent = fetchSpy.mock.calls.length
 
     act(() => {
-      capturedSSE.handlers[EventType.STEP_ADVANCED]?.('"refresh"')
+      capturedSSE.handlers[EventType.STEP_ADVANCED]?.('null')
     })
 
     await waitFor(() => {
@@ -202,7 +202,7 @@ describe('RetroPage SSE routing', () => {
     const callCountBeforeEvent = fetchSpy.mock.calls.length
 
     act(() => {
-      capturedSSE.handlers[EventType.SESSION_STARTED]?.('"refresh"')
+      capturedSSE.handlers[EventType.SESSION_STARTED]?.('null')
     })
 
     await waitFor(() => {
