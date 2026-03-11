@@ -1,10 +1,5 @@
 package direct.reflect.facilitator.config;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -15,19 +10,22 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.SimpleUrlLogoutSuccessHandler;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
-import org.springframework.web.filter.OncePerRequestFilter;
 
+import direct.reflect.facilitator.common.config.CsrfCookieFilter;
 import direct.reflect.facilitator.common.config.SecurityConfig;
-
-import java.io.IOException;
 
 @TestConfiguration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
 @Profile("test")
 public class TestSecurityOverride {
+
+    private final CsrfCookieFilter csrfCookieFilter;
+
+    public TestSecurityOverride(CsrfCookieFilter csrfCookieFilter) {
+        this.csrfCookieFilter = csrfCookieFilter;
+    }
 
     @Bean
     @Primary
@@ -45,7 +43,7 @@ public class TestSecurityOverride {
                 .csrfTokenRequestHandler(requestHandler)
                 .ignoringRequestMatchers("/test/**")
             )
-            .addFilterAfter(new CsrfCookieFilter(), org.springframework.security.web.csrf.CsrfFilter.class)
+            .addFilterAfter(csrfCookieFilter, org.springframework.security.web.csrf.CsrfFilter.class)
             .authorizeHttpRequests(requests -> requests
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/img/**", "/static/**", "/webjars/**", "/assets/**").permitAll()
                 .requestMatchers("/favicon.ico", "/favicon.svg", "/vite.svg").permitAll()
@@ -93,17 +91,5 @@ public class TestSecurityOverride {
         SimpleUrlLogoutSuccessHandler handler = new SimpleUrlLogoutSuccessHandler();
         handler.setDefaultTargetUrl("/");
         return handler;
-    }
-
-    static final class CsrfCookieFilter extends OncePerRequestFilter {
-        @Override
-        protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-                throws ServletException, IOException {
-            CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
-            if (csrfToken != null) {
-                csrfToken.getToken();
-            }
-            filterChain.doFilter(request, response);
-        }
     }
 }
