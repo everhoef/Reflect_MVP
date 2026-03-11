@@ -460,3 +460,58 @@ describe('RetroPage lobby phase', () => {
     expect(screen.queryByTestId('copy-retro-id-button')).not.toBeInTheDocument()
   })
 })
+
+describe('RetroPage facilitator role', () => {
+  const lobbyFacilitatorState = {
+    ...baseState,
+    phase: 'LOBBY',
+    currentStepId: null,
+    currentStepIndex: 0,
+    steps: [],
+    isFacilitator: true,
+  }
+
+  const lobbyParticipantState = {
+    ...baseState,
+    phase: 'LOBBY',
+    currentStepId: null,
+    currentStepIndex: 0,
+    steps: [],
+    isFacilitator: false,
+  }
+
+  function mockLobbyFetchWithState(state: typeof lobbyFacilitatorState) {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (url.includes('/state')) {
+        return Promise.resolve(new Response(JSON.stringify(state), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/participants')) {
+        return Promise.resolve(new Response(JSON.stringify(baseParticipants), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      return Promise.resolve(new Response('{}', { status: 404 }))
+    })
+  }
+
+  it('shows Start Retrospective button when isFacilitator is true', async () => {
+    mockLobbyFetchWithState(lobbyFacilitatorState)
+    renderRetroPage(buildQueryClient())
+
+    await waitFor(() => {
+      expect(screen.getByTestId('start-retro-button')).toBeInTheDocument()
+    })
+
+    expect(screen.getByTestId('start-retro-button')).toHaveTextContent('Start Retrospective')
+  })
+
+  it('hides Start Retrospective button when isFacilitator is false', async () => {
+    mockLobbyFetchWithState(lobbyParticipantState)
+    renderRetroPage(buildQueryClient())
+
+    await waitFor(() => {
+      expect(screen.getByTestId('retro-id-display')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('start-retro-button')).not.toBeInTheDocument()
+  })
+})

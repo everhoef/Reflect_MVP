@@ -276,3 +276,152 @@ describe('MultiColumnBoard SSE invalidation', () => {
     expect(fetchSpy.mock.calls.length).toBe(countAfterMount)
   })
 })
+
+describe('MultiColumnBoard note editing', () => {
+  const OWN_NOTE_CLUSTERS = {
+    clustered: {},
+    unclustered: [
+      {
+        id: 'note-own',
+        columnId: 'col1',
+        content: 'My own frustration',
+        visible: true,
+        participantName: 'Alice',
+        participantId: 'p1',
+        voteCount: 0,
+      },
+    ],
+  }
+
+  const UPDATED_NOTE_CLUSTERS = {
+    clustered: {},
+    unclustered: [
+      {
+        id: 'note-own',
+        columnId: 'col1',
+        content: 'Updated frustration with more details',
+        visible: true,
+        participantName: 'Alice',
+        participantId: 'p1',
+        voteCount: 0,
+      },
+    ],
+  }
+
+  const MINIMAL_CONFIG_WITH_INPUT = {
+    columns: [
+      { id: 'col1', title: 'Mad', color: '#EF4444' },
+    ],
+    capabilities: { allowInput: false },
+  }
+
+  function mockFetchWithMeAsP1(first: typeof OWN_NOTE_CLUSTERS, second?: typeof OWN_NOTE_CLUSTERS | typeof UPDATED_NOTE_CLUSTERS) {
+    let callCount = 0
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (url.includes('/clusters')) {
+        callCount++
+        const payload = second && callCount > 1 ? second : first
+        return Promise.resolve(
+          new Response(JSON.stringify(payload), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        )
+      }
+      if (url.includes('/api/me')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              isAuthenticated: true,
+              isGuest: false,
+              authType: 'OIDC',
+              user: { id: 'p1', displayName: 'Alice', role: 'USER' },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+        )
+      }
+      if (url.includes('/response/') && !url.includes('/clusters')) {
+        return Promise.resolve(new Response('{}', { status: 200 }))
+      }
+      return Promise.resolve(new Response('{}', { status: 404 }))
+    })
+  }
+
+  function renderBoardWithConfig(queryClient: QueryClient, dispatch: { current: Dispatch | null }) {
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <SSEProvider>
+          <DispatchCapture holder={dispatch} />
+          <MultiColumnBoard
+            retroId={RETRO_ID}
+            stepId={STEP_ID}
+            componentConfig={MINIMAL_CONFIG_WITH_INPUT as Record<string, unknown>}
+          />
+        </SSEProvider>
+      </QueryClientProvider>
+    )
+  }
+
+  it('renders edit affordance (click-to-edit) for own notes', async () => {
+    mockFetchWithMeAsP1(OWN_NOTE_CLUSTERS)
+    const dispatch = { current: null as Dispatch | null }
+    renderBoardWithConfig(buildQueryClient(), dispatch)
+
+    await waitFor(() => {
+      expect(screen.getByText('My own frustration')).toBeInTheDocument()
+    })
+
+    // Own notes have cursor-pointer and title="Click to edit"
+    const noteText = screen.getByTitle('Click to edit')
+    expect(noteText).toBeInTheDocument()
+    expect(noteText).toHaveTextContent('My own frustration')
+  })
+
+  it('activates inline edit mode when own note text is clicked', async () => {
+    mockFetchWithMeAsP1(OWN_NOTE_CLUSTERS)
+    const dispatch = { current: null as Dispatch | null }
+    const user = (await import('@testing-library/user-event')).default.setup()
+    renderBoardWithConfig(buildQueryClient(), dispatch)
+
+    await waitFor(() => {
+      expect(screen.getByText('My own frustration')).toBeInTheDocument()
+    })
+
+    const noteText = screen.getByTitle('Click to edit')
+    await user.click(noteText)
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('My own frustration')).toBeInTheDocument()
+    })
+  })
+
+  it('submits updated content when Enter is pressed in edit textarea', async () => {
+    mockFetchWithMeAsP1(OWN_NOTE_CLUSTERS, UPDATED_NOTE_CLUSTERS)
+    const dispatch = { current: null as Dispatch | null }
+    const user = (await import('@testing-library/user-event')).default.setup()
+    renderBoardWithConfig(buildQueryClient(), dispatch)
+
+    await waitFor(() => {
+      expect(screen.getByText('My own frustration')).toBeInTheDocument()
+    })
+
+    const noteText = screen.getByTitle('Click to edit')
+    await user.click(noteText)
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('My own frustration')).toBeInTheDocument()
+    })
+
+    const textarea = screen.getByDisplayValue('My own frustration')
+    await user.clear(textarea)
+    await user.type(textarea, 'Updated frustration with more details')
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => {
+      expect(screen.getByText('Updated frustration with more details')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('My own frustration')).not.toBeInTheDocument()
+  })
+})
