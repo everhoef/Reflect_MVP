@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, type MockedFunction } from 'vitest'
 import LoginPage from './LoginPage'
 
@@ -10,10 +11,18 @@ vi.mock('react-router-dom', async (importOriginal) => {
 })
 
 function renderLoginPage() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  })
+
   return render(
-    <MemoryRouter>
-      <LoginPage />
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    </QueryClientProvider>
   )
 }
 
