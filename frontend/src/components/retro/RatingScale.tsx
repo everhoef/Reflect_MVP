@@ -5,6 +5,7 @@ import { EventType } from "@/types/events";
 import type { StepComponentProps } from "@/components/ComponentRouter";
 import type { components } from "@/types/api.d.ts";
 import { submitRatingResponse } from "@/hooks/api/useRating";
+import { useCurrentUser } from "@/hooks/api/useAuth";
 
 type RatingResponseDto = components["schemas"]["RatingResponseDto"];
 
@@ -16,23 +17,6 @@ interface RatingScaleConfig {
   inputType: "radio" | "slider";
   allowComment: boolean;
   commentMaxLength: number;
-}
-
-interface MeResponse {
-  isAuthenticated: boolean;
-  isGuest: boolean;
-  authType: string;
-  user?: {
-    id: string;
-    displayName: string;
-    role: string;
-  };
-}
-
-async function fetchMe(): Promise<MeResponse> {
-  const res = await fetch("/api/me");
-  if (!res.ok) throw new Error(`Failed to fetch current user: ${res.status}`);
-  return res.json() as Promise<MeResponse>;
 }
 
 async function fetchMyRating(
@@ -69,11 +53,7 @@ export function RatingScale({ retroId, stepId, componentConfig }: StepComponentP
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const { data: me } = useQuery<MeResponse>({
-    queryKey: ["me"],
-    queryFn: fetchMe,
-    staleTime: Infinity,
-  });
+  const { data: me } = useCurrentUser();
 
   const { data: existingRating } = useQuery<RatingResponseDto | null>({
     queryKey: ["ratingResponse", retroId, stepId],

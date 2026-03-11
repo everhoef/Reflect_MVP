@@ -1,5 +1,4 @@
 import { useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, useDroppable } from "@dnd-kit/core";
 import type { DragEndEvent, DragOverEvent } from "@dnd-kit/core";
 import {
@@ -13,6 +12,7 @@ import type { StickyNoteData } from "./StickyNote";
 import type { StepComponentProps } from "@/components/ComponentRouter";
 import type { components } from "@/types/api.d.ts";
 import { useClusters, submitColumnResponse, toggleVote, updateResponse, mergeResponses, unmergeResponse } from "@/hooks/api/useColumnBoard";
+import { useCurrentUser } from "@/hooks/api/useAuth";
 
 type ColumnResponseDto = components["schemas"]["ColumnResponseDto"];
 type ClusterGroupsDto = components["schemas"]["ClusterGroupsDto"];
@@ -46,23 +46,6 @@ interface MultiColumnBoardConfig {
     maxLength?: number;
     placeholder?: string;
   };
-}
-
-interface MeResponse {
-  isAuthenticated: boolean;
-  isGuest: boolean;
-  authType: string;
-  user?: {
-    id: string;
-    displayName: string;
-    role: string;
-  };
-}
-
-async function fetchMe(): Promise<MeResponse> {
-  const res = await fetch("/api/me");
-  if (!res.ok) throw new Error(`Failed to fetch current user: ${res.status}`);
-  return res.json() as Promise<MeResponse>;
 }
 
 function allResponses(clusters: ClusterGroupsDto): ColumnResponseDto[] {
@@ -183,11 +166,7 @@ export function MultiColumnBoard({ retroId, stepId, componentConfig }: StepCompo
 
   const { data: clusters, isLoading, invalidate } = useClusters(retroId, stepId);
 
-  const { data: me } = useQuery<MeResponse>({
-    queryKey: ["me"],
-    queryFn: fetchMe,
-    staleTime: Infinity,
-  });
+  const { data: me } = useCurrentUser();
 
   const currentParticipantId = me?.user?.id;
 
