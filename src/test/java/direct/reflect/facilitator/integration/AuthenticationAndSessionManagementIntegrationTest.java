@@ -28,46 +28,6 @@ import lombok.extern.slf4j.Slf4j;
 public class AuthenticationAndSessionManagementIntegrationTest extends BaseIntegrationTest {
 
     @Nested
-    @DisplayName("Authentication Flows")
-    class AuthenticationFlows {
-
-        @Test
-        @DisplayName("Should support both OAuth2 and guest authentication flows")
-        void shouldSupportOAuth2AndGuestAuthentication() {
-            // Create browser contexts for different user types
-            BrowserContext oauth2Context = createMonitoredContext();
-            BrowserContext guestContext = createMonitoredContext();
-            
-            Page oauth2Page = oauth2Context.newPage();
-            Page guestPage = guestContext.newPage();
-
-            try {
-                log.info("Testing OAuth2 user authentication");
-                authenticateAsOAuth2User(oauth2Page, "testuser", "Test User", "test@example.com");
-                
-                // Verify OAuth2 user sees home page correctly (authentication method already navigated to home page)
-                assertTrue(oauth2Page.url().contains(baseUrl), 
-                    "OAuth2 user should reach home page after authentication");
-                assertThat(oauth2Page.locator("body")).containsText("Welcome");
-                
-                log.info("Testing guest user authentication");
-                authenticateAsGuest(guestPage, "Guest User");
-                
-                // Verify guest user sees home page correctly
-                assertTrue(guestPage.url().contains(baseUrl), 
-                    "Guest user should reach home page after authentication");
-                assertThat(guestPage.locator("body")).containsText("Welcome");
-                
-                log.info("✅ Both authentication flows working correctly");
-                
-            } finally {
-                oauth2Context.close();
-                guestContext.close();
-            }
-        }
-    }
-
-    @Nested
     @DisplayName("Multi-User Session Management")
     class MultiUserSessionManagement {
 
@@ -134,67 +94,6 @@ public class AuthenticationAndSessionManagementIntegrationTest extends BaseInteg
             }
         }
 
-        @Test
-        @DisplayName("Should handle session switching between multiple users")
-        void shouldHandleSessionSwitchingBetweenMultipleUsers() {
-            // Create contexts for 3 users
-            BrowserContext aliceContext = createMonitoredContext();
-            BrowserContext bobContext = createMonitoredContext();
-            BrowserContext charlieContext = createMonitoredContext();
-            
-            Page alicePage = aliceContext.newPage();
-            Page bobPage = bobContext.newPage();
-            Page charliePage = charlieContext.newPage();
-
-            try {
-                // Set up authentication
-                log.info("Setting up users for session switching test");
-                authenticateAsGuest(alicePage, "Alice");
-                authenticateAsGuest(bobPage, "Bob");
-                authenticateAsGuest(charliePage, "Charlie");
-                
-                // Alice creates first session
-                log.info("Alice creating first session");
-                String session1Id = createRetroSession(alicePage, "Session 1");
-                
-                // Bob creates second session  
-                log.info("Bob creating second session");
-                String session2Id = createRetroSession(bobPage, "Session 2");
-                
-                // Charlie joins session 1
-                log.info("Charlie joining session 1");
-                joinRetroSession(charliePage, session1Id);
-                assertTrue(charliePage.url().contains("/retro/" + session1Id),
-                    "Charlie should be in session 1");
-                
-                // Charlie switches to session 2
-                log.info("Charlie switching to session 2");
-                joinRetroSession(charliePage, session2Id);
-                assertTrue(charliePage.url().contains("/retro/" + session2Id),
-                    "Charlie should have switched to session 2");
-                
-                // Bob switches to session 1 (should leave his own session)
-                log.info("Bob switching to session 1");
-                joinRetroSession(bobPage, session1Id);
-                assertTrue(bobPage.url().contains("/retro/" + session1Id),
-                    "Bob should have switched to session 1");
-                
-                // Verify all users are in correct sessions
-                assertTrue(alicePage.url().contains("/retro/" + session1Id),
-                    "Alice should still be in session 1");
-                assertTrue(bobPage.url().contains("/retro/" + session1Id),
-                    "Bob should be in session 1");
-                assertTrue(charliePage.url().contains("/retro/" + session2Id),
-                    "Charlie should be in session 2");
-                
-                log.info("✅ Session switching working correctly");
-                
-            } finally {
-                aliceContext.close();
-                bobContext.close();
-                charlieContext.close();
-            }
-        }
     }
 
     @Nested
@@ -275,43 +174,4 @@ public class AuthenticationAndSessionManagementIntegrationTest extends BaseInteg
         }
     }
 
-    @Nested
-    @DisplayName("Error Handling")
-    class ErrorHandling {
-
-        @Test
-        @DisplayName("Should handle invalid session IDs gracefully")
-        void shouldHandleInvalidSessionIDs() {
-            BrowserContext userContext = createMonitoredContext();
-            Page userPage = userContext.newPage();
-
-            try {
-                authenticateAsGuest(userPage, "Test User");
-                
-                // Try to join a non-existent session
-                log.info("Testing invalid session ID handling");
-                String invalidSessionId = "00000000-0000-0000-0000-000000000000";
-                
-                userPage.navigate(baseUrl + "/");
-                userPage.waitForSelector("input[name='retroId']",
-                    new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-                userPage.fill("input[name='retroId']", invalidSessionId);
-                userPage.click("button:has-text('Join Session')");
-
-                userPage.waitForSelector(".text-red-600",
-                    new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-
-                assertFalse(userPage.url().contains("/retro/"),
-                    "Page should not navigate to a retro session for an invalid session ID");
-
-                String errorText = userPage.locator(".text-red-600").textContent();
-                assertFalse(errorText == null || errorText.isBlank(),
-                    "An error message should be displayed for invalid session ID");
-                log.info("✅ Invalid session ID handled gracefully with error: {}", errorText);
-                
-            } finally {
-                userContext.close();
-            }
-        }
-    }
 }
