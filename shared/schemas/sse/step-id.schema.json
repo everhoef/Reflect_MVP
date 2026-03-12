@@ -1,8 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "step-id.schema.json",
-  "title": "StepId",
-  "description": "Payload for NOTE_UPDATED (batch reveal) SSE events. A plain integer representing the stepId when all notes in a step are revealed at once (responsesRevealed factory method).",
-  "type": "integer",
-  "minimum": 1
-}

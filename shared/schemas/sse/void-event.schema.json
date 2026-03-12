@@ -1,7 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "void-event.schema.json",
-  "title": "VoidEvent",
-  "description": "Payload for void SSE events (SESSION_STARTED, STEP_ADVANCED, RETRO_CREATED, TIMER_STARTED, TIMER_PAUSED, TIMER_FINISHED). The payload field will be null/absent in the envelope.",
-  "type": "null"
-}

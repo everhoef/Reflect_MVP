@@ -1,7 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "participant-name.schema.json",
-  "title": "ParticipantName",
-  "description": "Payload for PARTICIPANT_JOINED and PARTICIPANT_LEFT SSE events. A plain string (participant display name). Semantically equivalent to participant-event.schema.json; both are kept for naming-compatibility with the plan schema set.",
-  "$ref": "participant-event.schema.json"
-}

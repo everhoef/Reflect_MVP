@@ -1,3 +1,6 @@
+import type { ResponseData } from './generated/retro-event';
+export type { ResponseData };
+
 /**
  * SSE event types for Facilitator retrospective sessions.
  *
@@ -29,24 +32,6 @@ export const EventType = {
 } as const;
 
 export type EventType = (typeof EventType)[keyof typeof EventType];
-
-/**
- * ResponseData payload for NOTE events.
- *
- * Maps to `RetroEvent.ResponseData` Java record.
- * Fields match the record components:
- *   responseId, stepId, participantId, participantName,
- *   displaySummary, isVisible, submittedAt
- */
-export interface ResponseData {
-  responseId: string;
-  stepId: number;
-  participantId: string;
-  participantName: string;
-  displaySummary: string;
-  isVisible: boolean;
-  submittedAt: string; // ISO 8601 instant string
-}
 
 /**
  * Discriminated union for NOTE_UPDATED payload.

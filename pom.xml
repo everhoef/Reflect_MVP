@@ -236,6 +236,37 @@
 	<build>
 		<plugins>
 			<plugin>
+				<groupId>cz.habarta.typescript-generator</groupId>
+				<artifactId>typescript-generator-maven-plugin</artifactId>
+				<version>3.2.1263</version>
+				<executions>
+					<execution>
+						<id>generate-sse-types</id>
+						<goals><goal>generate</goal></goals>
+					</execution>
+				</executions>
+				<configuration>
+					<jsonLibrary>jackson2</jsonLibrary>
+					<classes>
+						<class>direct.reflect.facilitator.eventing.RetroEvent</class>
+						<class>direct.reflect.facilitator.eventing.RetroEvent$ResponseData</class>
+						<class>direct.reflect.facilitator.eventing.RetroEvent$EventType</class>
+					</classes>
+					<customTypeMappings>
+						<customTypeMapping>java.time.Instant:string</customTypeMapping>
+						<customTypeMapping>java.util.UUID:string</customTypeMapping>
+					</customTypeMappings>
+					<customTypeNaming>
+						<customTypeNaming>direct.reflect.facilitator.eventing.RetroEvent$ResponseData:ResponseData</customTypeNaming>
+					</customTypeNaming>
+					<outputKind>module</outputKind>
+					<outputFileType>implementationFile</outputFileType>
+					<outputFile>frontend/src/types/generated/retro-event.ts</outputFile>
+					<noFileComment>false</noFileComment>
+					<mapEnum>asUnion</mapEnum>
+				</configuration>
+			</plugin>
+			<plugin>
 				<groupId>com.github.eirslett</groupId>
 				<artifactId>frontend-maven-plugin</artifactId>
 				<version>1.15.0</version>
