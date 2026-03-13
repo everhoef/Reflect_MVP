@@ -56,48 +56,125 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
 
         try {
             log.info("═══════════════════════════════════════════════════════════════");
-            log.info("  COMPLETE RETROSPECTIVE FLOW TEST (24 STEPS)");
+            log.info("  COMPLETE RETROSPECTIVE FLOW TEST (23 STEPS - Default Template)");
+            log.info("  ESVP → Mad Sad Glad → Perfection Game → SSC → +/- Delta");
             log.info("═══════════════════════════════════════════════════════════════");
 
-            // Setup: Authenticate 3 users and create session
-            logTestProgress("SETUP", 1, 24, "Authenticating 3 users");
+            // ── SETUP ──────────────────────────────────────────────────────────────
+            logTestProgress("SETUP", 1, 23, "Authenticating 3 users");
             authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
             authenticateAsGuest(bobPage, "Bob");
             authenticateAsGuest(carolPage, "Carol");
 
-            logTestProgress("SETUP", 2, 24, "Creating session and joining participants");
+            logTestProgress("SETUP", 2, 23, "Creating session and joining participants");
             String sessionId = createRetroSession(facilitatorPage, "Complete Flow Test");
             joinRetroSession(bobPage, sessionId);
             joinRetroSession(carolPage, sessionId);
 
-            // Wait for SSE connections on participant pages before starting session
-            // Without this, session_started event may fire before SSE is ready
+            String retroUrl = baseUrl + "/retro/" + sessionId;
+
             log.info("Waiting for SSE connections on participant lobby pages...");
             waitForSseConnection(bobPage, UUID.fromString(sessionId));
             waitForSseConnection(carolPage, UUID.fromString(sessionId));
             log.info("\u2705 SSE connections established on all participant pages");
-            // Brief pause to ensure server-side SSE emitter registration is complete
-            // before starting session (avoids race between readyState=1 and localEmitters.put)
             Thread.sleep(500);
             startRetroSession(facilitatorPage);
 
-            // Wait for participant pages to transition to retro (startRetroSession only waits for facilitator)
             log.info("Waiting for participant pages to transition to retro...");
             waitForAllPagesElement("h2:has-text('Step')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
 
-            // ===== PHASE 1: SET_THE_STAGE - Happiness Histogram (4 steps) =====
-            log.info("\n┌─ PHASE 1: SET_THE_STAGE (Happiness Histogram)");
+            // ===== PHASE 1: SET_THE_STAGE — ESVP Check-in (2 steps) =====
+            log.info("\n┌─ PHASE 1: SET_THE_STAGE (ESVP Check-in)");
 
-            // Skip AUTO instruction step
-            logTestProgress("PHASE_1", 3, 24, "Skipping instruction step (AUTO)");
+            // Step 1 (orderIndex=1): ALL_RESPONDED — fast-forward past it to step 2 (reveal)
+            logTestProgress("PHASE_1", 3, 23, "Fast-forwarding past ESVP input step (ALL_RESPONDED)");
+            fastForwardSession(sessionId, RetroPhase.SET_THE_STAGE, 1);
+            facilitatorPage.navigate(retroUrl);
+            bobPage.navigate(retroUrl);
+            carolPage.navigate(retroUrl);
+
+            // Wait for ESVP reveal step — 4 columns should be present
+            waitForElement(facilitatorPage, "[data-column='Explorer']", DEFAULT_TIMEOUT_MS);
+            waitForAllPagesElement("[data-column='Explorer']", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
+
+            // Verify all 4 ESVP columns are visible
+            logTestProgress("PHASE_1", 4, 23, "Verifying ESVP columns visible at reveal step");
+            log.info("  ├─ Verifying 4 ESVP columns...");
+            assertTrue(facilitatorPage.locator("[data-column='Explorer']").isVisible(),
+                "Explorer column should be visible at ESVP reveal step");
+            assertTrue(facilitatorPage.locator("[data-column='Shopper']").isVisible(),
+                "Shopper column should be visible at ESVP reveal step");
+            assertTrue(facilitatorPage.locator("[data-column='Vacationer']").isVisible(),
+                "Vacationer column should be visible at ESVP reveal step");
+            assertTrue(facilitatorPage.locator("[data-column='Prisoner']").isVisible(),
+                "Prisoner column should be visible at ESVP reveal step");
+            log.info("  ├─ ✅ All 4 ESVP columns visible");
+
+            // Advance from reveal step (FACILITATOR_CLICK) → GATHER_DATA
             clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS, bobPage, carolPage);
+            log.info("  └─ ✓ Completed SET_THE_STAGE phase (ESVP)");
 
-            // RATING_SCALE step - all submit ratings WITH COMMENTS
-            logTestProgress("PHASE_1", 4, 24, "Submitting happiness ratings with comments");
-            log.info("  ├─ Testing RATING_SCALE with comments...");
+            // ===== PHASE 2: GATHER_DATA — Mad Sad Glad (5 steps) =====
+            log.info("\n├─ PHASE 2: GATHER_DATA (Mad Sad Glad)");
+
+            // After clicking Next from ESVP reveal, we are now at GATHER_DATA step 0
+            // (brainstorm step: TIMER_EXPIRES, allowInput=true, showContent=false)
+            // Submit notes HERE (before fast-forwarding), while input is allowed.
+            logTestProgress("PHASE_2", 5, 23, "Submitting Mad Sad Glad notes at brainstorm step");
+            log.info("  ├─ Testing MULTI_COLUMN_BOARD note submission at brainstorm step...");
+
+            waitForElement(facilitatorPage, "[data-column='Mad']", DEFAULT_TIMEOUT_MS);
+            waitForAllPagesElement("[data-column='Mad']", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
+
+            fillElement(bobPage, "[data-column='Mad'] textarea[name='content']", "Bob: Slow deployments");
+            clickElement(bobPage, "[data-column='Mad'] button[type='submit']");
+
+            fillElement(carolPage, "[data-column='Glad'] textarea[name='content']", "Carol: Great teamwork");
+            clickElement(carolPage, "[data-column='Glad'] button[type='submit']");
+
+            // Wait for both notes to be saved (visible on the submitters' pages)
+            waitForElement(bobPage, "p:has-text('Bob: Slow deployments')", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForElement(carolPage, "p:has-text('Carol: Great teamwork')", SSE_PROPAGATION_TIMEOUT_MS);
+            log.info("  ├─ ✅ Notes submitted at brainstorm step");
+
+            // Now fast-forward to step 1 (reveal+cluster: allowInput=false, showContent=true)
+            // to bypass the TIMER_EXPIRES trigger
+            logTestProgress("PHASE_2", 6, 23, "Fast-forwarding past MSG brainstorm (TIMER_EXPIRES) to reveal");
+            fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 1);
+            facilitatorPage.navigate(retroUrl);
+            bobPage.navigate(retroUrl);
+            carolPage.navigate(retroUrl);
+
+            // At the reveal step (showContent=true), all notes are visible to everyone
+            logTestProgress("PHASE_2", 7, 23, "Verifying cross-user visibility at reveal step");
+            waitForAllPagesElement("p:has-text('Bob: Slow deployments')", SSE_PROPAGATION_TIMEOUT_MS,
+                bobPage, carolPage, facilitatorPage);
+            waitForAllPagesElement("p:has-text('Carol: Great teamwork')", SSE_PROPAGATION_TIMEOUT_MS,
+                bobPage, carolPage, facilitatorPage);
+
+            assertTrue(bobPage.locator("[data-column='Glad'] p:has-text('Carol: Great teamwork')").isVisible(),
+                "Bob should see Carol's note at the reveal step (showContent=true)");
+            assertTrue(carolPage.locator("[data-column='Mad'] p:has-text('Bob: Slow deployments')").isVisible(),
+                "Carol should see Bob's note at the reveal step (showContent=true)");
+            log.info("  ├─ ✅ Cross-user visibility verified at reveal step");
+
+            // Advance through remaining MSG steps: vote, summary, AUTO transition, then into GENERATE_INSIGHTS
+            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // reveal+cluster → vote
+            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // vote → summary
+            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // summary → AUTO (index=4)
+            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // AUTO → GENERATE_INSIGHTS
+            log.info("  └─ ✓ Completed GATHER_DATA phase (Mad Sad Glad)");
+
+            // ===== PHASE 3: GENERATE_INSIGHTS — Perfection Game (6 steps) =====
+            log.info("\n├─ PHASE 3: GENERATE_INSIGHTS (Perfection Game)");
+
+            // Step 1 (orderIndex=1): RATING_SCALE, ALL_RESPONDED — submit from all 3 users
+            logTestProgress("PHASE_3", 8, 23, "Submitting Perfection Game ratings (RATING_SCALE)");
+            log.info("  ├─ Testing RATING_SCALE submission...");
+            waitForAllPagesElement("input[name='rating'][value='8']", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage, facilitatorPage);
 
             clickElement(bobPage, "input[name='rating'][value='8']");
-            fillElement(bobPage, "textarea[name='comment']", "Great sprint overall!");
+            fillElement(bobPage, "textarea[name='comment']", "Good sprint overall!");
             clickElement(bobPage, "button:has-text('Submit')");
 
             clickElement(carolPage, "input[name='rating'][value='6']");
@@ -108,39 +185,42 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             fillElement(facilitatorPage, "textarea[name='comment']", "Excellent team collaboration");
             clickElement(facilitatorPage, "button:has-text('Submit')");
 
-            // Advance from RATING_SCALE to HISTOGRAM_CHART
-            logTestProgress("PHASE_1", 5, 24, "Advancing to histogram visualization");
+            log.info("  ├─ ✅ Ratings submitted from all 3 users");
+
+            // Advance from RATING_SCALE (ALL_RESPONDED satisfied) to HISTOGRAM_CHART
+            logTestProgress("PHASE_3", 9, 23, "Advancing to Perfection Game histogram");
             clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS);
 
-            // Wait for histogram HTMX fragment to load - use a submitted comment as the signal
-            // (the histogram-data fragment is loaded asynchronously via HTMX; comments appear
-            //  only after the fragment loads and responses are revealed)
+            // Wait for histogram fragment to load (uses submitted comment as signal)
             waitForElement(facilitatorPage, "p:has-text('Excellent team collaboration')", DEFAULT_TIMEOUT_MS);
 
-            // Verify histogram visualization
-            logTestProgress("PHASE_1", 6, 24, "Validating histogram and comments display");
-            log.info("  ├─ Validating histogram visualization...");
+            // Verify histogram visualization and comments
+            logTestProgress("PHASE_3", 10, 23, "Validating histogram display and comments");
+            log.info("  ├─ Validating HISTOGRAM_CHART visualization...");
             assertTrue(facilitatorPage.locator("p:has-text('Excellent team collaboration')").isVisible(),
-                "Histogram should show facilitator's comment once responses are revealed");
-
-            // Verify comments are displayed
-            log.info("  ├─ Validating comments display...");
-            assertTrue(bobPage.locator("p:has-text('Great sprint overall!')").isVisible(),
-                "Bob's comment should be visible");
+                "Histogram should show facilitator's comment after responses are revealed");
+            assertTrue(bobPage.locator("p:has-text('Good sprint overall!')").isVisible(),
+                "Bob's comment should be visible on histogram step");
             assertTrue(carolPage.locator("p:has-text('Some blockers but we pushed through')").isVisible(),
-                "Carol's comment should be visible");
-            assertTrue(facilitatorPage.locator("p:has-text('Excellent team collaboration')").isVisible(),
-                "Facilitator's comment should be visible");
+                "Carol's comment should be visible on histogram step");
+            log.info("  ├─ ✅ HISTOGRAM_CHART display and comments validated");
 
-            log.info("  ├─ ✅ Histogram visualization and comments validated");
+            // Advance from HISTOGRAM_CHART to brainstorm step (TIMER_EXPIRES) — fast-forward past it
+            logTestProgress("PHASE_3", 11, 23, "Fast-forwarding past PG brainstorm (TIMER_EXPIRES)");
+            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // histogram → brainstorm
+            fastForwardSession(sessionId, RetroPhase.GENERATE_INSIGHTS, 3); // skip to reveal (step 4 = index 3)
+            facilitatorPage.navigate(retroUrl);
+            bobPage.navigate(retroUrl);
+            carolPage.navigate(retroUrl);
+            waitForElement(facilitatorPage, "[data-column]", DEFAULT_TIMEOUT_MS);
 
-            // Advance through remaining Phase 1 steps (histogram discussion + AUTO transition)
-            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // HISTOGRAM_CHART discussion
-            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // AUTO transition
-            log.info("  └─ ✓ Completed SET_THE_STAGE phase (4 steps)");
+            // Advance through remaining PG steps: vote, top results
+            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // reveal+cluster → vote
+            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // vote → top results
+            log.info("  └─ ✓ Completed GENERATE_INSIGHTS phase (Perfection Game)");
 
-            // ===== PHASE 2: GATHER_DATA - Mad Sad Glad (5 steps) =====
-            log.info("\n├─ PHASE 2: GATHER_DATA (Mad Sad Glad)");
+            // ===== PHASE 4: DECIDE_ACTIONS — Start Stop Continue (7 steps) =====
+            log.info("\n├─ PHASE 4: DECIDE_ACTIONS (Start Stop Continue)");
 
             // Skip AUTO instruction step
             logTestProgress("PHASE_2", 7, 24, "Skipping Mad/Sad/Glad instruction");
@@ -350,8 +430,9 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             bobPage.navigate(retroUrl);
             carolPage.navigate(retroUrl);
 
-            // Wait for facilitator to reach the AUTO step (Next button visible, step changed)
-            waitForElement(facilitatorPage, "[data-testid='next-step-button']", DEFAULT_TIMEOUT_MS);
+            // Verify SSC columns are visible at reveal step
+            waitForElement(facilitatorPage, "[data-column='Start']", DEFAULT_TIMEOUT_MS);
+            waitForAllPagesElement("[data-column='Start']", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
 
             // Advance through the AUTO step → transitions session to COMPLETED
             logTestProgress("PHASE_5", 2, 2, "Advancing AUTO step to complete session");
@@ -381,8 +462,8 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
                 new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS * 2)
             );
 
-            // Verify session completion
-            logTestProgress("COMPLETE", 2, 2, "Verifying session completion");
+            // Verify session completion — no Next button after final step
+            logTestProgress("COMPLETE", 23, 23, "Verifying session completion");
             assertFalse(facilitatorPage.locator("[data-testid='next-step-button']").isVisible(),
                 "Session should be complete - no Next button after final step");
 
@@ -390,13 +471,17 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
 
             log.info("\n═══════════════════════════════════════════════════════════════");
             log.info("  ✓ SUCCESSFULLY VALIDATED COMPLETE RETROSPECTIVE FLOW");
-            log.info("  - Histogram visualization + comments: ✅");
-            log.info("  - Privacy mode for MULTI_COLUMN_BOARD: ✅");
-            log.info("  - The Original Four columnId isolation: ✅");
-            log.info("  - Virtual facilitator chatbox: ✅");
-            log.info("  - Complete retro flow: ✅");
+            log.info("  - ESVP Check-in (4 columns): ✅");
+            log.info("  - Mad Sad Glad (cross-user visibility): ✅");
+            log.info("  - Perfection Game RATING_SCALE + HISTOGRAM_CHART: ✅");
+            log.info("  - Start Stop Continue columns: ✅");
+            log.info("  - +/- Delta feedback: ✅");
+            log.info("  - Complete retro flow (23 steps): ✅");
             log.info("═══════════════════════════════════════════════════════════════");
 
+        } catch (Exception e) {
+            reportTestFailure(facilitatorPage, "Complete Retro Flow", e);
+            throw e;
         } finally {
             facilitatorContext.close();
             bobContext.close();
