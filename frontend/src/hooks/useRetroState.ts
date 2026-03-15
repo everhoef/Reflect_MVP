@@ -8,9 +8,9 @@ import {
 export function useTimerState(): TimerState {
   return useRetroStateStore(
     useShallow((s) => ({
-      timerActive: s.timerActive,
-      timerStartedAt: s.timerStartedAt,
-      timerDurationSeconds: s.timerDurationSeconds,
+      remainingSeconds: s.remainingSeconds,
+      isPaused: s.isPaused,
+      timerState: s.timerState,
     }))
   );
 }
@@ -19,7 +19,6 @@ export function useRetroActions(): RetroStoreActions {
   return useRetroStateStore(
     useShallow((s) => ({
       setTimerState: s.setTimerState,
-      setTimerActive: s.setTimerActive,
       clearTimer: s.clearTimer,
       setCurrentStep: s.setCurrentStep,
       setCurrentPhase: s.setCurrentPhase,

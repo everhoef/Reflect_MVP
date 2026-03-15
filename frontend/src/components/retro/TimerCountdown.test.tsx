@@ -4,17 +4,17 @@ import { useRetroStateStore } from '@/store/retroStore'
 
 function setTimerInactive() {
   useRetroStateStore.setState({
-    timerActive: false,
-    timerStartedAt: null,
-    timerDurationSeconds: null,
+    remainingSeconds: null,
+    isPaused: false,
+    timerState: null,
   })
 }
 
-function setTimerActive(durationSeconds: number) {
+function setTimerActive(remainingSeconds: number) {
   useRetroStateStore.setState({
-    timerActive: true,
-    timerStartedAt: Date.now(),
-    timerDurationSeconds: durationSeconds,
+    remainingSeconds,
+    isPaused: false,
+    timerState: 'green',
   })
 }
 
@@ -36,23 +36,31 @@ describe('TimerCountdown', () => {
     expect(screen.getByText(/\d{2}:\d{2}/)).toBeInTheDocument()
   })
 
-  it('shows "Time\'s up!" when remaining time is zero', () => {
+  it('shows "Paused" indicator when isPaused is true', () => {
     act(() => {
       useRetroStateStore.setState({
-        timerActive: true,
-        timerStartedAt: Date.now() - 120_000,
-        timerDurationSeconds: 60,
+        remainingSeconds: 45,
+        isPaused: true,
+        timerState: 'yellow',
       })
+    })
+    render(<TimerCountdown durationSeconds={90} />)
+    expect(screen.getByText(/Paused/)).toBeInTheDocument()
+  })
+
+  it("shows \"Time's up!\" when remaining time reaches zero", () => {
+    act(() => {
+      setTimerActive(0)
     })
     render(<TimerCountdown durationSeconds={60} />)
     expect(screen.getByText("Time's up!")).toBeInTheDocument()
   })
 
-  it('renders 02:00 for a 120-second timer just started', () => {
+  it('renders 01:30 for a 90-second timer just started', () => {
     act(() => {
-      setTimerActive(120)
+      setTimerActive(90)
     })
-    render(<TimerCountdown durationSeconds={120} />)
-    expect(screen.getByText('02:00')).toBeInTheDocument()
+    render(<TimerCountdown durationSeconds={90} />)
+    expect(screen.getByText('01:30')).toBeInTheDocument()
   })
 })

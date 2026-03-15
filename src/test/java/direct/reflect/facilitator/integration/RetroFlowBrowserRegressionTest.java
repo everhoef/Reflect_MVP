@@ -10,19 +10,45 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DisplayName("SSC Retrospective Flow Integration Tests")
-public class SscRetroFlowTest extends BaseIntegrationTest {
+/**
+ * Golden-path retrospective regression test.
+ *
+ * <p>Canonical end-to-end browser test for a complete retrospective journey
+ * using the SSC (Start-Stop-Continue) reference template. Covers the full
+ * facilitator + participant flow including column color rendering, sticky note
+ * submission, clustering UI (drag handles), and voting UI.
+ *
+ * <p>Responsibility: Full golden-path regression. One stable reference template.
+ * Resilience scenarios (reconnect/refresh/leave-rejoin) belong in a separate suite.
+ *
+ * <p>Test scope:
+ * <ul>
+ *   <li>{@code shouldValidateSscRetroFlow} — SSC column colors + sticky note submission
+ *       on facilitator and participant browser contexts</li>
+ *   <li>{@code shouldValidateSscClusteringDisplay} — allowMerging=true step renders drag handles,
+ *       no dual-render of sticky notes</li>
+ *   <li>{@code shouldValidateSscVotingUi} — allowVoting=true step shows vote button,
+ *       button is clickable</li>
+ * </ul>
+ *
+ * <p>SSE transport/session sync smoke tests are in {@link SseTransportSmokeTest}.
+ * SSE → React UI update chain tests are in {@link SseUiChainTest}.
+ * Multi-user flow interaction tests are in {@link MultiUserRetroBrowserRegressionTest}.
+ */
+@DisplayName("Retro Flow Browser Regression Tests")
+public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
 
     private static final int SSC_GATHER_DATA_MASTERSHEET_ID = 21;
     private static final int SSC_INPUT_STEP_INDEX = 2;
 
     @Test
     @Timeout(300)
-    @DisplayName("Should validate SSC retrospective flow: column colors and sticky notes")
+    @DisplayName("Should validate retrospective flow: column colors and sticky notes")
     void shouldValidateSscRetroFlow() {
         BrowserContext facilitatorContext = createMonitoredContext();
         Page facilitatorPage = facilitatorContext.newPage();
@@ -128,7 +154,7 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
 
     @Test
     @Timeout(300)
-    @DisplayName("Should validate SSC clustering display: no dual-render, sortable UI visible")
+    @DisplayName("Should validate clustering display: no dual-render, sortable UI visible")
     void shouldValidateSscClusteringDisplay() {
         BrowserContext facilitatorContext = createMonitoredContext();
         Page facilitatorPage = facilitatorContext.newPage();
@@ -206,7 +232,7 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
 
     @Test
     @Timeout(300)
-    @DisplayName("Should validate SSC voting UI: vote button visible and clickable")
+    @DisplayName("Should validate voting UI: vote button visible and clickable")
     void shouldValidateSscVotingUi() {
         BrowserContext facilitatorContext = createMonitoredContext();
         Page facilitatorPage = facilitatorContext.newPage();
@@ -293,6 +319,204 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
     }
 
 
+    @Test
+    @Timeout(300)
+    @DisplayName("Should show pause-timer button for facilitator but not participant on timed step")
+    void shouldShowTimerControlsOnlyToFacilitator() {
+        BrowserContext facilitatorContext = createMonitoredContext();
+        Page facilitatorPage = facilitatorContext.newPage();
+        BrowserContext participantContext = createMonitoredContext();
+        Page participantPage = participantContext.newPage();
+
+        try {
+            // Wait for server ready
+            long deadline = System.currentTimeMillis() + 30_000;
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
+                        new java.net.URL(baseUrl + "/login").openConnection();
+                    conn.setConnectTimeout(1000);
+                    conn.setReadTimeout(3000);
+                    int status = conn.getResponseCode();
+                    conn.disconnect();
+                    if (status < 500) break;
+                } catch (Exception ignored) {}
+                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+            }
+
+            logTestProgress("SETUP", 1, 4, "Authenticating facilitator and participant");
+            authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
+            authenticateAsGuest(participantPage, "Bob");
+
+            logTestProgress("SETUP", 2, 4, "Creating retro session with SSC template");
+            String sessionId = createRetroSession(facilitatorPage, "Timer Controls Test");
+            RetroTemplate sscTemplate = buildSscTemplate();
+            RetroSession session = retroSessionRepository.findById(UUID.fromString(sessionId))
+                    .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
+            session.setTemplate(sscTemplate);
+            retroSessionRepository.save(session);
+
+            logTestProgress("SETUP", 3, 4, "Participant joining and starting session");
+            joinRetroSession(participantPage, sessionId);
+            startRetroSession(facilitatorPage);
+
+            // Fast-forward to SSC input step (TIMER_EXPIRES, durationSeconds=480)
+            // AND set stepStartedAt so the timer is active
+            logTestProgress("TIMER", 4, 4, "Fast-forwarding to timed SSC input step");
+            fastForwardToTimedStep(sessionId, SSC_INPUT_STEP_INDEX);
+
+            String retroUrl = baseUrl + "/retro/" + sessionId;
+            facilitatorPage.navigate(retroUrl);
+            participantPage.navigate(retroUrl);
+
+            waitForAllPagesElement("[data-column='Start']", facilitatorPage, participantPage);
+
+            // Timer state is loaded asynchronously by the React useTimer hook on page load.
+            // Wait until remainingSeconds is populated (store hydrated) by polling for
+            // pause-timer-button OR confirming it doesn't appear for participant.
+            facilitatorPage.waitForFunction(
+                    "() => !!document.querySelector('[data-testid=\"pause-timer-button\"]') " +
+                    "|| !!document.querySelector('[data-testid=\"resume-timer-button\"]')",
+                    null,
+                    new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+
+            // ── Facilitator MUST see pause/resume button ────────────────────────
+            logTestProgress("TIMER", 4, 4, "Asserting facilitator sees timer control button");
+            boolean facilitatorSeesPause = facilitatorPage.locator("[data-testid='pause-timer-button']").count() > 0;
+            boolean facilitatorSeesResume = facilitatorPage.locator("[data-testid='resume-timer-button']").count() > 0;
+            assertTrue(facilitatorSeesPause || facilitatorSeesResume,
+                    "Facilitator should see pause-timer-button or resume-timer-button on a timed step");
+
+            // ── Participant must NOT see either timer control button ─────────────
+            logTestProgress("TIMER", 4, 4, "Asserting participant does NOT see timer control buttons");
+            assertEquals(0, participantPage.locator("[data-testid='pause-timer-button']").count(),
+                    "Participant should NOT see pause-timer-button");
+            assertEquals(0, participantPage.locator("[data-testid='resume-timer-button']").count(),
+                    "Participant should NOT see resume-timer-button");
+
+        } catch (Exception e) {
+            reportTestFailure(facilitatorPage, "Timer Controls Role Visibility", e);
+            throw e;
+        } finally {
+            facilitatorContext.close();
+            participantContext.close();
+        }
+    }
+
+    @Test
+    @Timeout(300)
+    @DisplayName("Should render exactly one stage-progress-bar on an active retro page")
+    void shouldRenderSingleStageProgressBar() {
+        BrowserContext facilitatorContext = createMonitoredContext();
+        Page facilitatorPage = facilitatorContext.newPage();
+
+        try {
+            // Wait for server ready
+            long deadline = System.currentTimeMillis() + 30_000;
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
+                        new java.net.URL(baseUrl + "/login").openConnection();
+                    conn.setConnectTimeout(1000);
+                    conn.setReadTimeout(3000);
+                    int status = conn.getResponseCode();
+                    conn.disconnect();
+                    if (status < 500) break;
+                } catch (Exception ignored) {}
+                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+            }
+
+            logTestProgress("SETUP", 1, 3, "Authenticating facilitator");
+            authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
+
+            logTestProgress("SETUP", 2, 3, "Creating and starting retro session");
+            String sessionId = createRetroSession(facilitatorPage, "Phase Progress Sanity Test");
+            startRetroSession(facilitatorPage);
+
+            // Wait for the retro content to be fully rendered
+            waitForElement(facilitatorPage, "[data-testid='retro-content']");
+
+            // ── Assert exactly ONE stage-progress-bar is visible ───────────────
+            logTestProgress("PHASE_BAR", 3, 3, "Asserting exactly one stage-progress-bar");
+            int progressBarCount = facilitatorPage.locator("[data-testid='stage-progress-bar']").count();
+            assertEquals(1, progressBarCount,
+                    "Exactly one data-testid='stage-progress-bar' should render; found " + progressBarCount +
+                    " (T6 fix: inline duplicate removed, only Header renders the progress bar)");
+
+        } catch (Exception e) {
+            reportTestFailure(facilitatorPage, "Single Stage Progress Bar", e);
+            throw e;
+        } finally {
+            facilitatorContext.close();
+        }
+    }
+
+    @Test
+    @Timeout(300)
+    @DisplayName("Should display active timer countdown (not 'Timer not started') on a timed step")
+    void shouldDisplayTimerCountdownOnTimedStep() {
+        BrowserContext facilitatorContext = createMonitoredContext();
+        Page facilitatorPage = facilitatorContext.newPage();
+
+        try {
+            // Wait for server ready
+            long deadline = System.currentTimeMillis() + 30_000;
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
+                        new java.net.URL(baseUrl + "/login").openConnection();
+                    conn.setConnectTimeout(1000);
+                    conn.setReadTimeout(3000);
+                    int status = conn.getResponseCode();
+                    conn.disconnect();
+                    if (status < 500) break;
+                } catch (Exception ignored) {}
+                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+            }
+
+            logTestProgress("SETUP", 1, 3, "Authenticating facilitator");
+            authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
+
+            logTestProgress("SETUP", 2, 3, "Creating retro session with SSC template, starting session");
+            String sessionId = createRetroSession(facilitatorPage, "Timer Display Test");
+            RetroTemplate sscTemplate = buildSscTemplate();
+            RetroSession session = retroSessionRepository.findById(UUID.fromString(sessionId))
+                    .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
+            session.setTemplate(sscTemplate);
+            retroSessionRepository.save(session);
+            startRetroSession(facilitatorPage);
+
+            // Fast-forward to SSC input step with active timer (stepStartedAt set now)
+            logTestProgress("TIMER", 3, 3, "Fast-forwarding to SSC timed step and verifying countdown");
+            fastForwardToTimedStep(sessionId, SSC_INPUT_STEP_INDEX);
+
+            String retroUrl = baseUrl + "/retro/" + sessionId;
+            facilitatorPage.navigate(retroUrl);
+            waitForElement(facilitatorPage, "[data-column='Start']");
+
+            // Wait for timer to hydrate from backend (useTimer hook polls /api/retro/{id}/timer)
+            facilitatorPage.waitForFunction(
+                    "() => !document.body.textContent.includes('Timer not started') || " +
+                    "  document.querySelector('[data-testid=\"pause-timer-button\"]') !== null || " +
+                    "  document.querySelector('[data-testid=\"resume-timer-button\"]') !== null",
+                    null,
+                    new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+
+            // Timer should show a countdown value (MM:SS format) rather than "Timer not started"
+            String bodyText = facilitatorPage.textContent("body");
+            assertFalse(bodyText.contains("Timer not started"),
+                    "Timer should be active and showing a countdown, not 'Timer not started'. " +
+                    "This verifies the useTimer hook hydrates from the backend /api/retro/{id}/timer endpoint.");
+
+        } catch (Exception e) {
+            reportTestFailure(facilitatorPage, "Timer Display Countdown", e);
+            throw e;
+        } finally {
+            facilitatorContext.close();
+        }
+    }
+
+
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
     /**
@@ -336,6 +560,21 @@ public class SscRetroFlowTest extends BaseIntegrationTest {
                 .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
         session.setPhase(RetroPhase.GATHER_DATA);
         session.setCurrentStepIndex(stepIndex);
+        retroSessionRepository.save(session);
+    }
+
+    /**
+     * Like {@link #fastForwardToStep}, but also sets {@code stepStartedAt = now()} so
+     * the timer is considered active. Required for tests that assert timer-related UI.
+     */
+    private void fastForwardToTimedStep(String sessionId, int stepIndex) {
+        RetroSession session = retroSessionRepository.findById(UUID.fromString(sessionId))
+                .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
+        session.setPhase(RetroPhase.GATHER_DATA);
+        session.setCurrentStepIndex(stepIndex);
+        session.setStepStartedAt(java.time.LocalDateTime.now());
+        session.setTimerPausedAt(null);
+        session.setAccumulatedPauseSeconds(0L);
         retroSessionRepository.save(session);
     }
 

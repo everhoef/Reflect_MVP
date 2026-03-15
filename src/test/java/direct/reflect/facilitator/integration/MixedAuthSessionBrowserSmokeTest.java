@@ -14,18 +14,23 @@ import java.util.ArrayList;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Integration tests focused on authentication flows and session management.
- * 
- * Covers:
- * - OAuth2 and guest user authentication
- * - Multi-user session creation and joining 
+ * Mixed-auth session browser smoke tests.
+ *
+ * <p>Validates authentication flows and session management with mixed OAuth2 + guest users.
+ * Proves that mixed authentication scenarios work end-to-end in a real browser.
+ *
+ * <p>Responsibility: Mixed-auth browser smoke. One canonical mixed-auth scenario.
+ *
+ * <p>Covers:
+ * - OAuth2 and guest user authentication in the same session
+ * - Multi-user session creation and joining
  * - Session switching between users
  * - Participant list updates via SSE
  * - Error handling for invalid sessions
  */
-@DisplayName("Authentication and Session Management Integration Tests")
+@DisplayName("Mixed-Auth Session Browser Smoke Tests")
 @Slf4j
-public class AuthenticationAndSessionManagementIntegrationTest extends BaseIntegrationTest {
+public class MixedAuthSessionBrowserSmokeTest extends BaseIntegrationTest {
 
     @Nested
     @DisplayName("Multi-User Session Management")

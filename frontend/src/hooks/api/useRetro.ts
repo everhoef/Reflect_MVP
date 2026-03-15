@@ -4,6 +4,7 @@ import type { components } from "@/types/api.d.ts";
 
 type RetroStateDto = components["schemas"]["RetroStateDto"];
 type ParticipantDto = components["schemas"]["ParticipantDto"];
+type TimerStateDto = components["schemas"]["TimerStateDto"];
 
 export function useRetroState(retroId: string | undefined) {
   return useQuery<RetroStateDto>({
@@ -63,6 +64,44 @@ export function useStartSession(retroId: string | undefined) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["retroState", retroId] });
+    },
+  });
+}
+
+export function useTimer(retroId: string | undefined) {
+  return useQuery<TimerStateDto | null>({
+    queryKey: ["timer", retroId],
+    queryFn: async () => {
+      const { data, response } = await apiClient.GET("/api/retro/{retroId}/timer", {
+        params: { path: { retroId: retroId! } },
+      });
+      if (response.status === 204) return null;
+      if (!response.ok) throw new ApiError(response.status, `Failed to fetch timer: ${response.status}`);
+      return data as TimerStateDto;
+    },
+    enabled: !!retroId,
+    staleTime: 0,
+  });
+}
+
+export function usePauseTimer(retroId: string | undefined) {
+  return useMutation({
+    mutationFn: async () => {
+      const { response } = await apiClient.POST("/api/retro/{retroId}/timer/pause", {
+        params: { path: { retroId: retroId! } },
+      });
+      if (!response.ok) throw new ApiError(response.status, `Failed to pause timer: ${response.status}`);
+    },
+  });
+}
+
+export function useResumeTimer(retroId: string | undefined) {
+  return useMutation({
+    mutationFn: async () => {
+      const { response } = await apiClient.POST("/api/retro/{retroId}/timer/resume", {
+        params: { path: { retroId: retroId! } },
+      });
+      if (!response.ok) throw new ApiError(response.status, `Failed to resume timer: ${response.status}`);
     },
   });
 }

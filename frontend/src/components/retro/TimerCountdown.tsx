@@ -21,40 +21,41 @@ function colorClasses(remaining: number, total: number): string {
 }
 
 export function TimerCountdown({ durationSeconds }: TimerCountdownProps) {
-  const { timerActive, timerStartedAt, timerDurationSeconds } = useTimerState();
+  const { remainingSeconds, isPaused } = useTimerState();
   const [remaining, setRemaining] = useState<number>(durationSeconds);
 
   useEffect(() => {
-    if (!timerActive || timerStartedAt === null) {
+    if (remainingSeconds === null || isPaused) {
       return;
     }
 
-    const total = timerDurationSeconds ?? durationSeconds;
-
-    const calculate = () => {
-      const elapsed = Math.floor((Date.now() - timerStartedAt) / 1000);
-      return Math.max(0, total - elapsed);
-    };
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setRemaining(calculate());
+    setRemaining(remainingSeconds);
 
     const id = setInterval(() => {
-      const r = calculate();
-      setRemaining(r);
-      if (r <= 0) clearInterval(id);
+      setRemaining((prev) => {
+        const next = Math.max(0, prev - 1);
+        if (next <= 0) clearInterval(id);
+        return next;
+      });
     }, 1000);
 
     return () => clearInterval(id);
-  }, [timerActive, timerStartedAt, timerDurationSeconds, durationSeconds]);
+  }, [remainingSeconds, isPaused]);
 
-  const total = timerDurationSeconds ?? durationSeconds;
-
-  if (!timerActive && timerStartedAt === null) {
+  if (remainingSeconds === null) {
     return (
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-400 text-sm font-mono">
         <ClockIcon />
         <span>Timer not started</span>
+      </div>
+    );
+  }
+
+  if (isPaused) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-yellow-400 bg-yellow-50 text-yellow-700 text-sm font-mono">
+        <ClockIcon />
+        <span>Paused — {formatTime(remaining)}</span>
       </div>
     );
   }
@@ -68,7 +69,7 @@ export function TimerCountdown({ durationSeconds }: TimerCountdownProps) {
     );
   }
 
-  const classes = colorClasses(remaining, total);
+  const classes = colorClasses(remaining, durationSeconds);
 
   return (
     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-white text-sm font-mono font-semibold tabular-nums ${classes}`}>

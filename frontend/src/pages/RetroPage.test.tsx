@@ -3,8 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import RetroPage from './RetroPage'
+import MainLayout from '@/layouts/MainLayout'
 import { EventType } from '@/types/events'
 import { useSSESubscription } from '@/hooks/useSSEContext'
+import { useRetroStateStore } from '@/store/retroStore'
 
 type SSEHandlers = Partial<Record<EventType, (rawData: string) => void>>
 type OnConnected = (() => void) | undefined
@@ -93,6 +95,20 @@ function renderRetroPage(queryClient: QueryClient) {
       <MemoryRouter initialEntries={[`/retro/${RETRO_ID}`]}>
         <Routes>
           <Route path="/retro/:retroId" element={<RetroPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
+  )
+}
+
+function renderRetroPageWithLayout(queryClient: QueryClient) {
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[`/retro/${RETRO_ID}`]}>
+        <Routes>
+          <Route element={<MainLayout />}>
+            <Route path="/retro/:retroId" element={<RetroPage />} />
+          </Route>
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -379,6 +395,66 @@ describe('RetroPage SSE routing', () => {
   })
 })
 
+describe('RetroPage phase-progress bar (canonical behavior)', () => {
+  const gatherDataState = {
+    ...baseState,
+    phase: 'GATHER_DATA',
+    currentStepId: 2,
+    currentStepIndex: 1,
+    steps: [
+      {
+        id: 1,
+        title: 'Check-in',
+        componentType: 'MULTI_COLUMN_BOARD',
+        advancementTrigger: 'FACILITATOR_CLICK',
+        durationSeconds: null,
+        componentConfig: {},
+        guidance: null,
+      },
+      {
+        id: 2,
+        title: 'Mad Sad Glad',
+        componentType: 'MULTI_COLUMN_BOARD',
+        advancementTrigger: 'FACILITATOR_CLICK',
+        durationSeconds: null,
+        componentConfig: {},
+        guidance: null,
+      },
+    ],
+  }
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('Test A: renders exactly one stage-progress bar on the retro page', async () => {
+    mockFetchSuccess(gatherDataState)
+    renderRetroPageWithLayout(buildQueryClient())
+
+    await waitFor(() => {
+      expect(screen.getByTestId('retro-content')).toBeInTheDocument()
+    })
+
+    const bars = screen.getAllByTestId('stage-progress-bar')
+    expect(bars).toHaveLength(1)
+  })
+
+  it('Test B: active stage in the progress bar matches the backend phase', async () => {
+    mockFetchSuccess(gatherDataState)
+    renderRetroPageWithLayout(buildQueryClient())
+
+    await waitFor(() => {
+      expect(screen.getByTestId('retro-content')).toBeInTheDocument()
+    })
+
+    const bars = screen.getAllByTestId('stage-progress-bar')
+    const headerBar = bars[0]!
+    const currentStep = headerBar.querySelector('[aria-current="step"]')
+    expect(currentStep).not.toBeNull()
+    expect(currentStep).toHaveTextContent('Gather Data')
+  })
+})
+
 describe('RetroPage lobby phase', () => {
   const lobbyState = {
     ...baseState,
@@ -513,5 +589,86 @@ describe('RetroPage facilitator role', () => {
     })
 
     expect(screen.queryByTestId('start-retro-button')).not.toBeInTheDocument()
+  })
+})
+
+describe('RetroPage timer role visibility', () => {
+  const timedStep = {
+    id: 10,
+    title: 'Timed Activity',
+    componentType: 'MULTI_COLUMN_BOARD',
+    advancementTrigger: 'TIMER_EXPIRES',
+    durationSeconds: 120,
+    componentConfig: {},
+    guidance: null,
+  }
+
+  const timedStepState = {
+    ...baseState,
+    phase: 'SET_THE_STAGE',
+    currentStepId: 10,
+    currentStepIndex: 0,
+    steps: [timedStep],
+  }
+
+  function mockTimedFetch(stateOverride: Partial<typeof timedStepState> = {}, timerOverride?: { remainingSeconds: number; isPaused: boolean; state: string }) {
+    const state = { ...timedStepState, ...stateOverride }
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (url.includes('/state')) {
+        return Promise.resolve(new Response(JSON.stringify(state), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/participants')) {
+        return Promise.resolve(new Response(JSON.stringify(baseParticipants), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/timer')) {
+        if (timerOverride) {
+          return Promise.resolve(new Response(JSON.stringify(timerOverride), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+        }
+        return Promise.resolve(new Response(null, { status: 204 }))
+      }
+      return Promise.resolve(new Response('{}', { status: 404 }))
+    })
+  }
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    useRetroStateStore.setState({ remainingSeconds: null, isPaused: false, timerState: null })
+  })
+
+  it('facilitator sees pause button when timer is active and not paused', async () => {
+    mockTimedFetch({ isFacilitator: true }, { remainingSeconds: 90, isPaused: false, state: 'yellow' })
+    renderRetroPage(buildQueryClient())
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pause-timer-button')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('resume-timer-button')).not.toBeInTheDocument()
+  })
+
+  it('participant does NOT see pause button even when timer is active', async () => {
+    mockTimedFetch({ isFacilitator: false }, { remainingSeconds: 90, isPaused: false, state: 'yellow' })
+    renderRetroPage(buildQueryClient())
+
+    await waitFor(() => {
+      expect(screen.getByTestId('retro-content')).toBeInTheDocument()
+    })
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('pause-timer-button')).not.toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('resume-timer-button')).not.toBeInTheDocument()
+  })
+
+  it('facilitator sees resume button when timer is paused', async () => {
+    mockTimedFetch({ isFacilitator: true }, { remainingSeconds: 60, isPaused: true, state: 'yellow' })
+    renderRetroPage(buildQueryClient())
+
+    await waitFor(() => {
+      expect(screen.getByTestId('resume-timer-button')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('pause-timer-button')).not.toBeInTheDocument()
   })
 })

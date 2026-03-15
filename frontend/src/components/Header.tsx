@@ -44,7 +44,7 @@ export default function Header({ currentStage }: HeaderProps) {
           </Link>
 
           {isRetroPage && (
-            <nav aria-label="Retrospective stages" className="flex items-center gap-1">
+            <nav aria-label="Retrospective stages" data-testid="stage-progress-bar" className="flex items-center gap-1">
               {STAGES.map((stage, index) => {
                 const status = getStageStatus(stage.id, currentStage)
                 return (

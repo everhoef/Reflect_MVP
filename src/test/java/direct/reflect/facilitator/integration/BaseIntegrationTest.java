@@ -27,10 +27,10 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import com.redis.testcontainers.RedisContainer;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.annotation.DirtiesContext.ClassMode;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.annotation.DirtiesContext.ClassMode;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.UUID;
@@ -81,11 +81,11 @@ import java.util.stream.Collectors;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = "spring.profiles.active=test,import")
 @Testcontainers
+@DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 @org.springframework.context.annotation.Import({
     direct.reflect.facilitator.auth.TestAuthConfiguration.class, // Provides TestAuthController with /test/* endpoints
     direct.reflect.facilitator.config.TestSecurityOverride.class // Extends SecurityConfig to allow /test/* endpoints
 })
-@DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 @Slf4j
 
 public abstract class BaseIntegrationTest {

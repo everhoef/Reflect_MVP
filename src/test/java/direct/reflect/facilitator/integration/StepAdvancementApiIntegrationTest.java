@@ -42,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Testcontainers
 @ActiveProfiles({"import", "test"})
 @Slf4j
-class SscStepAdvancementTest {
+class StepAdvancementApiIntegrationTest {
 
     @Container
     @ServiceConnection

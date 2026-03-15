@@ -423,6 +423,45 @@ The `system-ui/` folder contains UI design screenshots with mock data that illus
 - **Flaky tests are bugs**: A flaky test indicates a real problem — race condition, missing synchronization, incorrect assumptions. Treat flaky tests as P1 bugs and fix immediately.
 - **Test reliability is non-negotiable**: All tests must pass reliably on every run. If a test passes "most of the time", it is broken and must be fixed.
 
+#### Test Layer Taxonomy
+
+All test classes in `src/test/java/.../integration/` belong to one of five layers. Each new test class MUST fit exactly one layer, and its name MUST follow the layer's naming convention.
+
+**Layer 1 — Browser regression** (extends `BaseIntegrationTest`, Playwright required):
+- `RetroFlowBrowserRegressionTest` — golden-path regression: column rendering, sticky notes, SSE propagation, clustering UI, voting UI, timer controls, stage progress bar
+- `MultiUserRetroBrowserRegressionTest` — multi-user flows, column isolation, privacy mode reveal
+- `MixedAuthSessionBrowserSmokeTest` — mixed OAuth2 + guest auth, session-switching with participant list updates
+
+**Layer 2 — SSE transport and UI chain** (extends `BaseIntegrationTest`, Playwright required):
+- `SseTransportSmokeTest` — SSE connection formation, session-level event broadcast (participant_joined, session_started)
+- `SseUiChainTest` — SSE event triggers visible DOM change (note_added, participant_joined update)
+
+**Layer 3 — Spring/API integration** (MockMvc, Testcontainers, no browser):
+- `StepAdvancementApiIntegrationTest` — step index increment, 403 for non-facilitator
+- `ParticipantStateDataIntegrationTest` — participant LEFT/ACTIVE state, FK-safe response preservation
+- `ClusteringApiIntegrationTest` — merge/unmerge/rename/list endpoints
+- `VotingIntegrationTest` — voting API and data contract
+- `SscCsvImportTest` — SSC stage data integrity (template-specific naming is intentional here)
+
+**Layer 4 — Data/repository** (no browser, no MockMvc):
+- `ClusteringDataModelTest` — repository query correctness and entity persistence
+
+**Layer 5 — Contract** (no browser, no Spring context beyond what's needed):
+- `RetroTemplateContractTest` — template structure contracts
+
+#### Test Class Naming Rules
+
+A test class name MUST communicate the layer it operates at and the behaviour it guards. Template names (`Ssc`, `MadSadGlad`, `StartStopContinue`, `HappinessHistogram`, `OriginalFour`) are **banned** in any generic browser regression or API/data test class name. They are only allowed where the class intentionally tests template-specific data integrity (e.g., `SscCsvImportTest`).
+
+Suffix conventions:
+- `BrowserRegressionTest` — Playwright, broad regression scope
+- `BrowserSmokeTest` — Playwright, narrow proof-of-concept check
+- `SseTransportSmokeTest` — Playwright, SSE connection layer only
+- `SseUiChainTest` — Playwright, SSE event to DOM update chain
+- `ApiIntegrationTest` — MockMvc, HTTP contract
+- `DataIntegrationTest` — SpringBootTest, real DB, no browser
+- `DataModelTest` — repository query contract
+
 ### Security Considerations
 - Always validate user permissions before operations
 - Use SecurityContext for authentication checks
@@ -476,7 +515,7 @@ A feature is READY FOR REVIEW when ALL of the following conditions are true:
 Additional REQUIRED rules for feature delivery:
 
 - **Integration tests**: REQUIRED for every new endpoint (API, View, or Event controller). Use `@SpringBootTest` + Testcontainers. Follow patterns in existing test classes.
-- **Playwright E2E tests**: REQUIRED for every user-facing feature. Tests MUST live in `src/test/java/.../integration/` alongside existing tests (e.g., `SscRetroFlowTest`). MUST capture screenshot evidence.
+- **Playwright E2E tests**: REQUIRED for every user-facing feature. Tests MUST live in `src/test/java/.../integration/` alongside existing tests (e.g., `RetroFlowBrowserRegressionTest`). MUST capture screenshot evidence.
 - **Regression gate**: `./mvnw clean test` MUST show zero failures TOTAL — not just new tests passing, but ALL existing tests still passing.
 
 **Definitions**:

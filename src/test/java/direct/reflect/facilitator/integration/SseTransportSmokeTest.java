@@ -19,18 +19,29 @@ import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Integration test for SSE (Server-Sent Events) infrastructure.
+ * Focused SSE infrastructure smoke tests.
  *
- * Tests verify that:
- * 1. SSE connections remain stable without unnecessary reconnections
- * 2. Events are broadcast to all participants in a session (participant_joined, session_started)
- * 3. Our EventService correctly publishes events that trigger UI updates
+ * <p>Validates that SSE connections are established, maintained, and that
+ * session-level events (participant join/leave, session start) propagate
+ * correctly to connected clients. Does NOT test full retrospective flow logic.
  *
- * Component behavior and retrospective flow tests are in {@link RetroFlowIntegrationTest}.
+ * <p>Responsibility: SSE transport layer and session synchronization only.
+ *
+ * <p>Test scope:
+ * <ul>
+ *   <li>{@code shouldBroadcastParticipantJoinedToAllParticipants} — {@code participant_joined}
+ *       event broadcast verified on all connected browser contexts</li>
+ *   <li>{@code shouldBroadcastSessionStartedEventToAllParticipants} — {@code session_started}
+ *       event transitions all clients from lobby to active retro state</li>
+ * </ul>
+ *
+ * <p>Full retrospective flow tests are in {@link MultiUserRetroBrowserRegressionTest}.
+ * Golden-path regression is in {@link RetroFlowBrowserRegressionTest}.
+ * SSE → React UI update chain is in {@link SseUiChainTest}.
  */
-@DisplayName("SSE Infrastructure Integration Tests")
+@DisplayName("SSE Transport Smoke Tests")
 @Slf4j
-public class SSEConnectionIntegrationTest extends BaseIntegrationTest {
+public class SseTransportSmokeTest extends BaseIntegrationTest {
 
 
 

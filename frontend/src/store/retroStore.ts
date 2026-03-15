@@ -1,9 +1,9 @@
 import { create } from "zustand";
 
 export interface TimerState {
-  timerActive: boolean;
-  timerStartedAt: number | null;
-  timerDurationSeconds: number | null;
+  remainingSeconds: number | null;  // null = no timer active
+  isPaused: boolean;
+  timerState: string | null;        // "green" | "yellow" | "red" | null
 }
 
 export interface StepState {
@@ -13,7 +13,6 @@ export interface StepState {
 
 export interface RetroStoreActions {
   setTimerState: (state: TimerState) => void;
-  setTimerActive: (active: boolean) => void;
   clearTimer: () => void;
   setCurrentStep: (stepId: number | null) => void;
   setCurrentPhase: (phase: string) => void;
@@ -22,27 +21,24 @@ export interface RetroStoreActions {
 export type RetroStoreState = TimerState & StepState & RetroStoreActions;
 
 export const useRetroStateStore = create<RetroStoreState>()((set) => ({
-  timerActive: false,
-  timerStartedAt: null,
-  timerDurationSeconds: null,
+  remainingSeconds: null,
+  isPaused: false,
+  timerState: null,
   currentStepId: null,
   currentPhase: null,
 
-  setTimerState: (timerState: TimerState) =>
+  setTimerState: (state: TimerState) =>
     set({
-      timerActive: timerState.timerActive,
-      timerStartedAt: timerState.timerStartedAt,
-      timerDurationSeconds: timerState.timerDurationSeconds,
+      remainingSeconds: state.remainingSeconds,
+      isPaused: state.isPaused,
+      timerState: state.timerState,
     }),
-
-  setTimerActive: (active: boolean) =>
-    set({ timerActive: active }),
 
   clearTimer: () =>
     set({
-      timerActive: false,
-      timerStartedAt: null,
-      timerDurationSeconds: null,
+      remainingSeconds: null,
+      isPaused: false,
+      timerState: null,
     }),
 
   setCurrentStep: (stepId: number | null) =>

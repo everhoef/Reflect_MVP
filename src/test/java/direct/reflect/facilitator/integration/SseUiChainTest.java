@@ -11,23 +11,27 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.UUID;
 
 /**
- * Integration test verifying the SSE → UI update chain.
+ * SSE → React UI update chain tests.
  *
- * Tests verify the full end-to-end chain:
- * Backend action → SSE event published → React Query invalidation → DOM updated
+ * <p>Validates that SSE events trigger correct UI updates in the React frontend.
+ * Focuses on the event propagation path: backend event → SSE stream → browser DOM update.
+ * Does NOT own full retrospective journey assertions.
  *
- * Verification is DOM-based (not window.eventSource) because the React useSSE hook
- * creates a local EventSource that is not exposed on window.
+ * <p>Responsibility: SSE event → UI rendering chain only.
  *
- * Test scenarios:
- * 1. Submit a note via the UI → SSE note_added event fires → note appears on
- *    all connected browser contexts (multi-user real-time update chain).
- * 2. New participant joins → SSE participant_joined event fires → participant
- *    list updates on all existing connected browser contexts.
+ * <p>Test scope:
+ * <ul>
+ *   <li>{@code shouldBroadcastNoteAddedToAllParticipantsWhenNoteSubmitted} — submit note via UI
+ *       → SSE {@code note_added} event fires → note visible on all connected browser contexts</li>
+ * </ul>
+ *
+ * <p>SSE transport/session sync smoke tests are in {@link SseTransportSmokeTest}.
+ * Golden-path regression is in {@link RetroFlowBrowserRegressionTest}.
+ * Multi-user flow interaction tests are in {@link MultiUserRetroBrowserRegressionTest}.
  */
-@DisplayName("SSE → UI Update Integration Tests")
+@DisplayName("SSE to UI Update Chain Tests")
 @Slf4j
-public class SseReactIntegrationTest extends BaseIntegrationTest {
+public class SseUiChainTest extends BaseIntegrationTest {
 
     /**
      * Verifies the full chain: submit note via UI → SSE note_added event fires →
@@ -125,86 +129,6 @@ public class SseReactIntegrationTest extends BaseIntegrationTest {
         } finally {
             facilitatorContext.close();
             participantContext.close();
-        }
-    }
-
-    /**
-     * Verifies the full chain: new participant joins → SSE participant_joined event fires →
-     * participant list updates on all connected browser contexts.
-     *
-     * Chain validated:
-     * 1. Facilitator creates and starts a session (SSE connected)
-     * 2. Participant 1 joins and connects to SSE
-     * 3. Participant 2 joins the already-started session
-     * 4. Backend publishes SSE participant_joined event
-     * 5. Facilitator's page and Participant 1's page both see Participant 2 in the list
-     *    without manual refresh
-     */
-    @Test
-    @DisplayName("Should broadcast participant_joined SSE event so participant list updates on all pages")
-    void shouldUpdateParticipantListViaSSEWhenNewParticipantJoins() throws InterruptedException {
-        BrowserContext facilitatorContext = createMonitoredContext();
-        BrowserContext participant1Context = createMonitoredContext();
-        BrowserContext participant2Context = createMonitoredContext();
-
-        Page facilitatorPage = facilitatorContext.newPage();
-        Page participant1Page = participant1Context.newPage();
-        Page participant2Page = participant2Context.newPage();
-
-        try {
-            log.info("=== SSE participant_joined BROADCAST TEST ===");
-
-            // Authenticate users
-            authenticateAsGuest(facilitatorPage, "Facilitator");
-            authenticateAsGuest(participant1Page, "Alice");
-
-            // Facilitator creates session and Participant 1 joins
-            String sessionId = createRetroSession(facilitatorPage, "SSE Participant Join Test");
-            joinRetroSession(participant1Page, sessionId);
-
-            // Verify both are in lobby
-            waitForElement(facilitatorPage, "h2:has-text('Session Lobby')");
-            waitForElement(participant1Page, "h2:has-text('Session Lobby')");
-
-            // Establish SSE connections before starting session
-            waitForSseConnection(facilitatorPage, UUID.fromString(sessionId));
-            waitForSseConnection(participant1Page, UUID.fromString(sessionId));
-            log.info("Facilitator and Participant1 SSE connections established in lobby");
-
-            // Brief pause to ensure server-side SSE emitter registration is complete
-            Thread.sleep(500);
-
-            // Start the session so SSE stays active for retro steps
-            startRetroSession(facilitatorPage);
-
-            // Wait for Participant1 to also transition to retro
-            participant1Page.waitForFunction(
-                "() => !document.body.textContent.includes('Session Lobby')",
-                null,
-                new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-
-            // Verify both SSE connections are active on retro page by checking retro content is visible
-            waitForSseConnection(facilitatorPage, UUID.fromString(sessionId));
-            waitForSseConnection(participant1Page, UUID.fromString(sessionId));
-            log.info("Both SSE connections active on retro page");
-
-            // Now participant2 joins — this should trigger participant_joined SSE event
-            log.info("Participant2 joining the active session...");
-            authenticateAsGuest(participant2Page, "Bob");
-            joinRetroSession(participant2Page, sessionId);
-            log.info("Bob joined session");
-
-            // Verify participant list updates on facilitator's page and participant1's page via SSE
-            waitForAllPagesParticipantList(
-                new String[]{"Facilitator", "Alice", "Bob"},
-                facilitatorPage, participant1Page);
-
-            log.info("✅ SSE participant_joined chain verified: Bob joined → participant list updated on facilitator and Alice's pages");
-
-        } finally {
-            facilitatorContext.close();
-            participant1Context.close();
-            participant2Context.close();
         }
     }
 }

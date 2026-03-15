@@ -3,11 +3,9 @@ package direct.reflect.facilitator.integration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
-import com.microsoft.playwright.Response;
 import com.microsoft.playwright.options.LoadState;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -18,20 +16,30 @@ import direct.reflect.facilitator.facilitation.RetroSession;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Integration tests for complete retrospective flow validation.
+ * Broad retrospective flow integration tests.
  *
- * Tests the entire 24-step retrospective flow including:
- * - Histogram visualization and comments display
- * - MULTI_COLUMN_BOARD privacy controls
- * - The Original Four columnId isolation (critical bug fix)
- * - Voting/clustering UI readiness
- * - Virtual facilitator chatbox instructions display
+ * <p>Tests multi-step retrospective flows including participant interactions,
+ * note submission, voting, and phase transitions. For canonical golden-path
+ * regression see {@link RetroFlowBrowserRegressionTest}.
  *
- * SSE event propagation basics are tested in {@link SSEConnectionIntegrationTest}.
+ * <p>Responsibility: Multi-user interaction flows and component integration.
+ * Unique regression coverage only — overlap with golden-path suite is intentional
+ * only where the specific multi-user scenario cannot be verified in the golden path.
+ *
+ * <p>Test scope:
+ * <ul>
+ *   <li>{@code shouldValidateCompleteRetroFlowWithColumnIsolation} — 24-step complete flow:
+ *       histogram, privacy controls, The Original Four columnId isolation (critical bug fix),
+ *       clustering/voting UI readiness.</li>
+ * </ul>
+ *
+ * <p>SSE transport/session sync smoke tests are in {@link SseTransportSmokeTest}.
+ * SSE → React UI update chain tests are in {@link SseUiChainTest}.
+ * Golden-path regression is in {@link RetroFlowBrowserRegressionTest}.
  */
-@DisplayName("Retrospective Flow Integration Tests")
+@DisplayName("Multi-User Retro Browser Regression Tests")
 @Slf4j
-public class RetroFlowIntegrationTest extends BaseIntegrationTest {
+public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
 
     @Test
     @Timeout(600) // 10 minutes max - flow test has many steps with multi-page sync
@@ -376,105 +384,6 @@ public class RetroFlowIntegrationTest extends BaseIntegrationTest {
             facilitatorContext.close();
             bobContext.close();
             carolContext.close();
-        }
-    }
-
-    @Test
-    @DisplayName("Should deliver participant updates via SSE across all users")
-    void shouldDeliverParticipantUpdatesViaSSE() throws InterruptedException {
-        BrowserContext facilitatorContext = createMonitoredContext();
-        BrowserContext participant1Context = createMonitoredContext();
-        BrowserContext participant2Context = createMonitoredContext();
-
-        Page facilitatorPage = facilitatorContext.newPage();
-        Page participant1Page = participant1Context.newPage();
-        Page participant2Page = participant2Context.newPage();
-
-        try {
-            authenticateAsGuest(facilitatorPage, "Facilitator");
-            authenticateAsGuest(participant1Page, "Participant1");
-
-            String sessionId = createRetroSession(facilitatorPage, "SSE Test Session");
-            joinRetroSession(participant1Page, sessionId);
-
-            waitForSseConnection(participant1Page, UUID.fromString(sessionId));
-            Thread.sleep(500);
-
-            Response startResponse = facilitatorPage.waitForResponse(
-                response -> response.url().contains("/start") && response.request().method().equals("POST"),
-                () -> clickElement(facilitatorPage, "[data-testid='start-retro-button']"));
-
-            log.info("Start response status: {}", startResponse.status());
-
-            waitForAllPagesTransition("Session Lobby", "[data-testid='next-step-button']", facilitatorPage);
-            waitForAllPagesTransition("Session Lobby", "h2:has-text('Step')", SSE_PROPAGATION_TIMEOUT_MS, participant1Page);
-
-            waitForSseConnection(facilitatorPage, UUID.fromString(sessionId));
-            waitForSseConnection(participant1Page, UUID.fromString(sessionId));
-            log.info("✅ SSE connections established on both pages");
-
-            log.info("Adding third participant to test SSE event delivery");
-            authenticateAsGuest(participant2Page, "Participant2");
-            joinRetroSession(participant2Page, sessionId);
-
-            waitForParticipantList(facilitatorPage, SSE_PROPAGATION_TIMEOUT_MS, "Facilitator", "Participant1", "Participant2");
-            waitForParticipantList(participant1Page, SSE_PROPAGATION_TIMEOUT_MS, "Facilitator", "Participant1", "Participant2");
-
-            log.info("✅ SSE event delivery confirmed - participant list updated on all pages");
-
-            waitForSseConnection(participant2Page, UUID.fromString(sessionId));
-            assertTrue(participant2Page.locator("[data-testid='retro-content']").count() > 0,
-                "Participant2 should have active SSE connection after joining");
-
-            log.info("✅ Participant2 SSE connection confirmed");
-
-        } finally {
-            facilitatorContext.close();
-            participant1Context.close();
-            participant2Context.close();
-        }
-    }
-
-    @Test
-    @DisplayName("Should handle SSE connection stability during session switching")
-    void shouldHandleSSEStabilityDuringSessionSwitching() throws InterruptedException {
-        BrowserContext user1Context = createMonitoredContext();
-        BrowserContext user2Context = createMonitoredContext();
-
-        Page user1Page = user1Context.newPage();
-        Page user2Page = user2Context.newPage();
-
-        try {
-            // Set up two users
-            authenticateAsGuest(user1Page, "User1");
-            authenticateAsGuest(user2Page, "User2");
-
-            // User1 creates first session
-            String session1Id = createRetroSession(user1Page, "First Session");
-
-            // User2 joins first session
-            joinRetroSession(user2Page, session1Id);
-
-            // Verify both users see both participants in session 1
-            waitForAllPagesParticipantList(new String[]{"User1", "User2"}, user1Page, user2Page);
-
-            log.info("User2 switching to new session");
-            user2Page.navigate(baseUrl + "/");
-            user2Page.waitForSelector("input[name='sessionName']",
-                new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-            String session2Id = createRetroSession(user2Page, "Second Session");
-
-            // Verify User1 now sees only itself in session 1 (User2 left)
-            waitForParticipantList(user1Page, "User1");
-
-            // Verify User2 sees only itself in session 2
-            waitForParticipantList(user2Page, "User2");
-
-            log.info("✅ SSE stability during session switching verified");
-
-        } finally {
-            user1Context.close();
-            user2Context.close();
         }
     }
 

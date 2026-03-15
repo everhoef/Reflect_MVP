@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSSE } from "@/hooks/useSSE";
@@ -8,8 +8,10 @@ import { GuidanceSidebar } from "@/components/retro/GuidanceSidebar";
 import { TimerCountdown } from "@/components/retro/TimerCountdown";
 import { SSEProvider } from "@/contexts/SSEContext";
 import { useSSEContextDispatch } from "@/hooks/useSSEContext";
-import { useRetroState, useParticipants, useNextStep, useStartSession } from "@/hooks/api/useRetro";
+import { useRetroState, useParticipants, useNextStep, useStartSession, useTimer, usePauseTimer, useResumeTimer } from "@/hooks/api/useRetro";
+import { useTimerState } from "@/hooks/useRetroState";
 import { ApiError } from "@/lib/api-client";
+import { useRetroStateStore } from "@/store/retroStore";
 import type { components } from "@/types/api.d.ts";
 
 // Normalized local types with required fields (schema generates optional fields from OpenAPI)
@@ -72,53 +74,6 @@ function InitialsAvatar({ name }: { name: string }) {
   );
 }
 
-function StageProgressBar({ steps, currentStepIndex }: { steps: StepSummaryDto[]; currentStepIndex: number }) {
-  const STAGE_LABELS = [
-    "Set the Stage",
-    "Gather Data",
-    "Generate Insights",
-    "Decide Actions",
-    "Close Retro",
-  ];
-  const stepsPerStage = Math.max(1, Math.ceil(steps.length / 5));
-  const currentStage = Math.floor(currentStepIndex / stepsPerStage);
-
-  return (
-    <nav className="flex items-center gap-1" aria-label="Retrospective stages">
-      {STAGE_LABELS.map((label, idx) => {
-        const isDone = idx < currentStage;
-        const isActive = idx === currentStage;
-        return (
-          <div key={label} className="flex items-center">
-            {idx > 0 && (
-              <div
-                className={`w-6 h-px mx-1 ${isDone ? "bg-amber-400" : "bg-gray-200"}`}
-              />
-            )}
-            <div
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                isDone
-                  ? "bg-amber-100 text-amber-700"
-                  : isActive
-                  ? "bg-amber-500 text-white shadow-sm"
-                  : "bg-gray-100 text-gray-400"
-              }`}
-              aria-current={isActive ? "step" : undefined}
-            >
-              {isDone && (
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-              {isActive && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
-              <span className="hidden sm:inline">{label}</span>
-            </div>
-          </div>
-        );
-      })}
-    </nav>
-  );
-}
 
 export default function RetroPage() {
   return (
@@ -159,8 +114,38 @@ function RetroPageInner() {
     void queryClient.invalidateQueries({ queryKey: ["participants", retroId] });
   }, [queryClient, retroId]);
 
+  const { data: timerData } = useTimer(retroId);
+  const setTimerState = useRetroStateStore((s) => s.setTimerState);
+  const clearTimer = useRetroStateStore((s) => s.clearTimer);
+  const setCurrentPhase = useRetroStateStore((s) => s.setCurrentPhase);
+  const pauseTimerMutation = usePauseTimer(retroId);
+  const resumeTimerMutation = useResumeTimer(retroId);
+  const { remainingSeconds, isPaused } = useTimerState();
+
+  useEffect(() => {
+    if (timerData != null) {
+      setTimerState({
+        remainingSeconds: timerData.remainingSeconds ?? null,
+        isPaused: timerData.isPaused ?? false,
+        timerState: timerData.state ?? null,
+      });
+    } else if (timerData === null) {
+      clearTimer();
+    }
+  }, [timerData, setTimerState, clearTimer]);
+
+  useEffect(() => {
+    if (rawState?.phase) {
+      setCurrentPhase(rawState.phase);
+    }
+  }, [rawState?.phase, setCurrentPhase]);
+
   useSSE(retroId, {
-    [EventType.STEP_ADVANCED]: (data) => { refreshState(); sseDispatch(EventType.STEP_ADVANCED, data); },
+    [EventType.STEP_ADVANCED]: (data) => {
+      refreshState();
+      void queryClient.invalidateQueries({ queryKey: ["timer", retroId] });
+      sseDispatch(EventType.STEP_ADVANCED, data);
+    },
     [EventType.SESSION_STARTED]: (data) => { refreshState(); sseDispatch(EventType.SESSION_STARTED, data); },
     [EventType.PHASE_STARTED]: (data) => { refreshState(); sseDispatch(EventType.PHASE_STARTED, data); },
     [EventType.PARTICIPANT_JOINED]: (data) => { refreshParticipants(); sseDispatch(EventType.PARTICIPANT_JOINED, data); },
@@ -170,6 +155,9 @@ function RetroPageInner() {
     [EventType.NOTE_DELETED]: (data) => sseDispatch(EventType.NOTE_DELETED, data),
     [EventType.VOTE_ADDED]: (data) => sseDispatch(EventType.VOTE_ADDED, data),
     [EventType.VOTE_REMOVED]: (data) => sseDispatch(EventType.VOTE_REMOVED, data),
+    [EventType.TIMER_STARTED]: () => { void queryClient.invalidateQueries({ queryKey: ["timer", retroId] }); },
+    [EventType.TIMER_PAUSED]: () => { void queryClient.invalidateQueries({ queryKey: ["timer", retroId] }); },
+    [EventType.TIMER_FINISHED]: () => { void queryClient.invalidateQueries({ queryKey: ["timer", retroId] }); },
   }, () => setSseConnected(true));
 
   const handleNext = () => {
@@ -226,13 +214,29 @@ function RetroPageInner() {
     >
 
       {currentStep && (
-        <div className="bg-white border-b border-amber-100 px-6 py-3 flex items-center justify-between gap-4">
-          <div className="flex-1 flex justify-center">
-            <StageProgressBar steps={state.steps} currentStepIndex={state.currentStepIndex} />
-          </div>
+        <div className="bg-white border-b border-amber-100 px-6 py-3 flex items-center justify-end gap-4">
           {currentStep.durationSeconds != null && currentStep.durationSeconds > 0 && (
-            <div className="shrink-0">
+            <div className="shrink-0 flex items-center gap-2">
               <TimerCountdown durationSeconds={currentStep.durationSeconds} />
+              {state.isFacilitator && remainingSeconds !== null && (
+                isPaused ? (
+                  <button
+                    data-testid="resume-timer-button"
+                    onClick={() => resumeTimerMutation.mutate()}
+                    className="px-3 py-1.5 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
+                  >
+                    ▶ Resume
+                  </button>
+                ) : (
+                  <button
+                    data-testid="pause-timer-button"
+                    onClick={() => pauseTimerMutation.mutate()}
+                    className="px-3 py-1.5 text-xs font-medium bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors"
+                  >
+                    ⏸ Pause
+                  </button>
+                )
+              )}
             </div>
           )}
         </div>
