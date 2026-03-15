@@ -67,7 +67,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
                     int status = conn.getResponseCode();
                     conn.disconnect();
                     if (status < 500) break;
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) { /* server not ready yet, retry */ }
                 try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
             }
 
@@ -171,7 +171,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
                     int status = conn.getResponseCode();
                     conn.disconnect();
                     if (status < 500) break;
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) { /* server not ready yet, retry */ }
                 try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
             }
 
@@ -251,7 +251,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
                     int status = conn.getResponseCode();
                     conn.disconnect();
                     if (status < 500) break;
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) { /* server not ready yet, retry */ }
                 try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
             }
 
@@ -340,7 +340,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
                     int status = conn.getResponseCode();
                     conn.disconnect();
                     if (status < 500) break;
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) { /* server not ready yet, retry */ }
                 try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
             }
 
@@ -422,7 +422,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
                     int status = conn.getResponseCode();
                     conn.disconnect();
                     if (status < 500) break;
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) { /* server not ready yet, retry */ }
                 try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
             }
 
@@ -470,7 +470,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
                     int status = conn.getResponseCode();
                     conn.disconnect();
                     if (status < 500) break;
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) { /* server not ready yet, retry */ }
                 try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
             }
 
