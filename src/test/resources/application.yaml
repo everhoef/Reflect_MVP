@@ -10,7 +10,7 @@ spring:
       max-lifetime: 1800000
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: create
     show-sql: false
   session:
     timeout: 15m
@@ -37,6 +37,7 @@ spring:
             user-name-attribute: login
 
 server:
+  shutdown: immediate
   tomcat:
     threads:
       max: 400

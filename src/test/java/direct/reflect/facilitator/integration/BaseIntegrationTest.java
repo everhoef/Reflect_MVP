@@ -29,8 +29,7 @@ import com.redis.testcontainers.RedisContainer;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.annotation.DirtiesContext.ClassMode;
+
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.UUID;
@@ -81,7 +80,6 @@ import java.util.stream.Collectors;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = "spring.profiles.active=test,import")
 @Testcontainers
-@DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 @org.springframework.context.annotation.Import({
     direct.reflect.facilitator.auth.TestAuthConfiguration.class, // Provides TestAuthController with /test/* endpoints
     direct.reflect.facilitator.config.TestSecurityOverride.class // Extends SecurityConfig to allow /test/* endpoints
@@ -375,6 +373,7 @@ public abstract class BaseIntegrationTest {
 
     @BeforeAll
     static void setUpPlaywright() {
+        if (playwright != null) return; // Already initialized — reuse existing instance across subclasses
         boolean debugMode = Boolean.parseBoolean(System.getenv("PLAYWRIGHT_DEBUG"));
         BrowserType.LaunchOptions launchOptions = new BrowserType.LaunchOptions()
             .setHeadless(!debugMode)
@@ -388,12 +387,17 @@ public abstract class BaseIntegrationTest {
         }
         playwright = Playwright.create();
         browser = playwright.chromium().launch(launchOptions);
+        // Register shutdown hook so the single shared instance is always cleaned up
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (browser != null) { try { browser.close(); } catch (Exception ignored) {} }
+            if (playwright != null) { try { playwright.close(); } catch (Exception ignored) {} }
+        }));
     }
 
     @AfterAll
     static void tearDownPlaywright() {
-        if (browser != null) browser.close();
-        if (playwright != null) playwright.close();
+        // Do NOT close here — the playwright/browser instances are reused across all subclasses.
+        // The JVM shutdown hook registered in setUpPlaywright() handles final cleanup.
     }
     @BeforeEach
     void setUp(TestInfo testInfo) {
