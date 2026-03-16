@@ -45,7 +45,12 @@ public class EventService {
 
     // Local SSE connections for this pod instance
     private final ConcurrentHashMap<String, EmitterConnection> localEmitters = new ConcurrentHashMap<>();
-    private final ScheduledExecutorService keepAliveExecutor = Executors.newScheduledThreadPool(2);
+    private final ScheduledExecutorService keepAliveExecutor = Executors.newScheduledThreadPool(2,
+        r -> {
+            Thread t = new Thread(r, "sse-keepalive-" + System.nanoTime());
+            t.setDaemon(true);
+            return t;
+        });
 
     @PostConstruct
     public void init() {
