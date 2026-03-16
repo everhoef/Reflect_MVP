@@ -60,7 +60,7 @@ public class TestSecurityOverride {
                 .requestMatchers("/api/user/**").authenticated()
                 .requestMatchers("/profile/**").authenticated()
                 .requestMatchers("/admin/**").authenticated()
-                .anyRequest().permitAll()
+                .anyRequest().authenticated()
             )
             .exceptionHandling(exceptions -> exceptions
                 .authenticationEntryPoint((request, response, ex) -> {

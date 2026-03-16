@@ -106,8 +106,7 @@ public class SecurityConfig {
                 // Admin endpoints - require authentication + application-level admin check
                 .requestMatchers("/admin/**").authenticated()
                 
-                // Default: allow access, enforce business rules in service layer
-                .anyRequest().permitAll()
+                .anyRequest().authenticated()
             )
             // Exception handling
             .exceptionHandling(exceptions -> exceptions
