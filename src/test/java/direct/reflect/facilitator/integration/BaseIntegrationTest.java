@@ -32,6 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import lombok.extern.slf4j.Slf4j;
 
+
 import java.util.UUID;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -86,7 +87,6 @@ import java.util.stream.Collectors;
     direct.reflect.facilitator.config.TestRedisConfig.class // Caps Redis retry backoff to prevent infinite reconnect loops
 })
 @Slf4j
-
 public abstract class BaseIntegrationTest {
 
     // ==================== PLAYWRIGHT CONFIGURATION ====================
@@ -445,7 +445,8 @@ public abstract class BaseIntegrationTest {
 
         // Close browser context (browser and playwright are closed in @AfterAll)
         if (context != null) context.close();
-        // Use @DirtiesContext instead of manual cleanup to avoid connection pool issues
+        // Spring context is reused across all subclasses — @DirtiesContext is intentionally absent
+        // to prevent Spring Boot 4 / Testcontainers @ServiceConnection incompatibility on context rebuild
         clearActivityTrail();
     }
 

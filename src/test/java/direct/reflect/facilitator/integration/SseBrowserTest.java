@@ -139,39 +139,48 @@ public class SseBrowserTest extends BaseIntegrationTest {
                     null,
                     new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
 
-                log.info("Navigating to Mad/Sad/Glad input step...");
-                int maxSkips = 15;
+                log.info("Navigating to first multi-column input step (with textarea)...");
+                int maxSkips = 20;
                 boolean foundInputStep = false;
-
                 for (int i = 0; i < maxSkips; i++) {
-                    if (participantPage.locator("[data-column=\"Mad\"] textarea[name='content']").count() > 0) {
-                        log.info("Found Mad/Sad/Glad input step at iteration {}", i);
+                    if (participantPage.locator("[data-column] textarea[name='content']").count() > 0) {
+                        log.info("Found multi-column input step (textarea present) at skip iteration {}", i);
                         foundInputStep = true;
                         break;
                     }
+                    if (facilitatorPage.locator("[data-testid='next-step-button']").count() == 0) {
+                        log.error("No Next button found while looking for input step (iteration {})", i);
+                        break;
+                    }
+                    log.info("No textarea yet, advancing to next step (iteration {})", i);
                     clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS, participantPage);
                 }
-
                 if (!foundInputStep) {
-                    throw new AssertionError("Failed to find Mad/Sad/Glad input step after " + maxSkips + " iterations");
+                    throw new AssertionError(
+                        "Failed to find multi-column input step with textarea after " + maxSkips + " skip iterations");
                 }
 
+                String firstColumnTitle = (String) participantPage.evaluate(
+                    "() => document.querySelector('[data-column] textarea[name=\\'content\\']')?.closest('[data-column]')?.getAttribute('data-column')");
+                log.info("Using column: {}", firstColumnTitle);
+
+                String columnSelector = "[data-column='" + firstColumnTitle + "']";
                 String noteContent = "SSE test note: " + System.currentTimeMillis();
 
-                fillElement(participantPage, "[data-column=\"Mad\"] textarea[name='content']", noteContent);
-                clickElement(participantPage, "[data-column=\"Mad\"] button:has-text('➕')");
-                log.info("Participant submitted note: {}", noteContent);
+                fillElement(participantPage, columnSelector + " textarea[name='content']", noteContent);
+                clickElement(participantPage, columnSelector + " button:has-text('➕')");
+                log.info("Participant submitted note to column '{}': {}", firstColumnTitle, noteContent);
 
-                waitForElement(participantPage, "[data-column=\"Mad\"] p:has-text('" + noteContent + "')",
+                waitForElement(participantPage, columnSelector + " p:has-text('" + noteContent + "')",
                     DEFAULT_TIMEOUT_MS);
                 log.info("Note visible on participant's own page");
 
-                waitForElement(facilitatorPage, "[data-column=\"Mad\"] p:has-text('[Hidden until revealed]')",
+                waitForElement(facilitatorPage, columnSelector + " p:has-text('[Hidden until revealed]')",
                     SSE_PROPAGATION_TIMEOUT_MS);
 
                 assertTrue(facilitatorPage.locator(
-                    "[data-column=\"Mad\"] p:has-text('[Hidden until revealed]')").first().isVisible(),
-                    "Facilitator's Mad column should show a hidden card after SSE note_added event propagates");
+                    columnSelector + " p:has-text('[Hidden until revealed]')").first().isVisible(),
+                    "Facilitator's column should show a hidden card after SSE note_added event propagates");
 
                 log.info("✅ SSE note_added chain verified: note submitted by participant → visible on facilitator's page");
 

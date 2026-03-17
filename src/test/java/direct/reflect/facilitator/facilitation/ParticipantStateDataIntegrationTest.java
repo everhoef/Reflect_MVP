@@ -19,7 +19,8 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -27,12 +28,14 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -72,6 +75,18 @@ class ParticipantStateDataIntegrationTest {
     @MockitoBean
     private AuthService authService;
 
+    /** Pre-built authentication token injected into each request via authentication() post-processor. */
+    private UsernamePasswordAuthenticationToken testAuth;
+
+    @BeforeEach
+    void setUp() {
+        testAuth = new UsernamePasswordAuthenticationToken(
+                "test-user",
+                null,
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+        );
+    }
+
     @AfterEach
     void cleanUp() {
         participantRepository.deleteAll();
@@ -79,7 +94,6 @@ class ParticipantStateDataIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "GUEST")
     void shouldMarkOldParticipantAsLeftWhenUserCreatesNewSession() throws Exception {
         UUID fixedParticipantId = UUID.randomUUID();
 
@@ -88,6 +102,7 @@ class ParticipantStateDataIntegrationTest {
 
         // ── Step 1: Create first session ──────────────────────────────────────────
         mockMvc.perform(post("/api/retro/create")
+                        .with(authentication(testAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sessionName\": \"First Session\"}")
                         .with(csrf()))
@@ -111,6 +126,7 @@ class ParticipantStateDataIntegrationTest {
 
         // ── Step 2: Create second session (same user) ──────────────────────────────
         mockMvc.perform(post("/api/retro/create")
+                        .with(authentication(testAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sessionName\": \"Second Session\"}")
                         .with(csrf()))

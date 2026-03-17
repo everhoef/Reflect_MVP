@@ -1,12 +1,14 @@
 package direct.reflect.facilitator.facilitation;
 
 import com.redis.testcontainers.RedisContainer;
+import direct.reflect.facilitator.config.TestSecurityOverride;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.RetroStepRepository;
 import direct.reflect.facilitator.facilitation.Participant;
 import direct.reflect.facilitator.facilitation.ParticipantRepository;
 import direct.reflect.facilitator.facilitation.ParticipantRole;
 import direct.reflect.facilitator.facilitation.ParticipantStatus;
+import direct.reflect.facilitator.facilitation.ParticipantService;
 import direct.reflect.facilitator.facilitation.RetroSession;
 import direct.reflect.facilitator.facilitation.RetroSessionRepository;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponse;
@@ -16,28 +18,29 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.http.MediaType;
-import direct.reflect.facilitator.config.TestSecurityOverride;
-import direct.reflect.facilitator.facilitation.ParticipantService;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -89,8 +92,17 @@ class ClusteringApiIntegrationTest {
     private Participant testParticipant;
     private RetroStep testStep;
 
+    /** Pre-built authentication token injected into each request via authentication() post-processor. */
+    private UsernamePasswordAuthenticationToken testAuth;
+
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
+        testAuth = new UsernamePasswordAuthenticationToken(
+                "test-user",
+                null,
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+        );
+
         RetroSession session = new RetroSession();
         testSession = sessionRepository.save(session);
 
@@ -114,7 +126,6 @@ class ClusteringApiIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "USER")
     void mergeResponses_ValidRequest_ReturnsMergedClusterId() throws Exception {
         // Given: two unclustered responses
         ParticipantResponse r1 = buildResponse("daily standups are too long");
@@ -126,6 +137,7 @@ class ClusteringApiIntegrationTest {
         // When: POST merge
         String responseJson = mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/cluster/merge",
                         testSession.getId(), testStep.getId())
+                        .with(authentication(testAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mergeBody))
@@ -134,7 +146,6 @@ class ClusteringApiIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
 
         // Then: both responses share the same non-null clusterId
-        // Parse clusterId from JSON response: {"clusterId":"<uuid>"}
         UUID clusterId = UUID.fromString(responseJson.replaceAll(".*\"clusterId\":\"([^\"]+)\".*", "$1"));
 
         ParticipantResponse loaded1 = responseRepository.findById(r1.getId()).orElseThrow();
@@ -144,7 +155,6 @@ class ClusteringApiIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "USER")
     void unmergeResponse_ValidRequest_ClearsCluster() throws Exception {
         // Given: a response already in a cluster
         UUID clusterId = UUID.randomUUID();
@@ -160,6 +170,7 @@ class ClusteringApiIntegrationTest {
 
         mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/cluster/unmerge",
                         testSession.getId(), testStep.getId())
+                        .with(authentication(testAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(unmergeBody))
@@ -174,7 +185,6 @@ class ClusteringApiIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "USER")
     void renameCluster_ValidRequest_UpdatesAllResponsesInCluster() throws Exception {
         // Given: two responses in the same cluster
         UUID clusterId = UUID.randomUUID();
@@ -190,6 +200,7 @@ class ClusteringApiIntegrationTest {
 
         mockMvc.perform(put("/api/retro/{retroId}/step/{stepId}/cluster/{clusterId}/name",
                         testSession.getId(), testStep.getId(), clusterId)
+                        .with(authentication(testAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(renameBody))
@@ -203,7 +214,6 @@ class ClusteringApiIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "USER")
     void getClusters_ReturnsClustersAndUnclustered() throws Exception {
         // Given: mixed clustered and unclustered responses
         UUID clusterId = UUID.randomUUID();
@@ -218,7 +228,8 @@ class ClusteringApiIntegrationTest {
 
         // When: GET clusters
         mockMvc.perform(get("/api/retro/{retroId}/step/{stepId}/clusters",
-                        testSession.getId(), testStep.getId()))
+                        testSession.getId(), testStep.getId())
+                        .with(authentication(testAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.clustered").isMap())
                 .andExpect(jsonPath("$.unclustered").isArray())
