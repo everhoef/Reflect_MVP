@@ -139,7 +139,7 @@ The app guides teams from vague intentions to SMART action points:
 
 ### Project Overview
 
-Spring Boot 4.0.0 application built with Java 25, Spring MVC (not WebFlux), Spring Security, Spring Data JPA, PostgreSQL, Redis, and a React + Vite + TypeScript frontend. The backend still retains Thymeleaf for a few server-rendered routes, but the primary UI is the React SPA.
+Spring Boot 4.0.0 application built with Java 25, Spring MVC (not WebFlux), Spring Security, Spring Data JPA, PostgreSQL, Redis, and a React + Vite + TypeScript frontend. The React SPA serves all UI; the backend is purely API-based (REST + SSE) with server-side auth redirects for guest login and logout.
 
 ### Core Technology Stack
 - **Backend**: Spring Boot 4.0.0, **Spring MVC** (Web MVC, not WebFlux), Spring Security, Spring Data JPA
@@ -167,7 +167,6 @@ The application follows **function-oriented modular architecture** organized aro
 - **facilitation**: Sessions, participants, retrospective flow control
 - **eventing**: Real-time SSE event streaming and notifications
 - **auth**: Authentication (OIDC + guest mode with CookieAuthenticationToken)
-- **web**: View controllers and remaining server-rendered routes
 - **common**: Shared utilities, exceptions, configurations
 
 ### Domain Model
@@ -185,10 +184,10 @@ The application follows **function-oriented modular architecture** organized aro
 
 ### Controller Separation
 
-The application maintains **strict separation** between three types of controllers:
+The application maintains **strict separation** between controller types:
 
-- **View Controllers** (`*ViewController`): Handle Thymeleaf template rendering and web page navigation
-- **API Controllers** (`*ApiController`): Handle REST API endpoints for data operations
+- **Auth Controller** (`AuthController`): Handles guest login and logout via server-side redirects
+- **API Controllers** (`*ApiController`): Handle REST API endpoints returning JSON for the React frontend
 - **Event Controllers** (`*EventController`): Handle Server-Sent Events (SSE) streaming
 
 **Never mix responsibilities** - each controller type has a single purpose.
@@ -377,8 +376,8 @@ Facilitators can ALWAYS advance - the system shows warnings but never blocks. Th
 - **Always use imports for class types** - Never use fully-qualified class names in code
 
 ### Controller Separation Standards
-- **Strict separation** between View, API, and Event controllers
-- **View Controllers**: Only web page navigation and any remaining Thymeleaf-rendered routes
+- **Strict separation** between Auth, API, and Event controllers
+- **Auth Controller**: Only guest login/logout with server-side redirects
 - **API Controllers**: Only REST endpoints returning JSON for the React frontend
 - **Event Controllers**: Only SSE streaming for real-time updates
 - **Never mix responsibilities**
@@ -541,11 +540,6 @@ Additional REQUIRED rules for feature delivery:
 ---
 
 ## Key Technical Rules
-
-### Thymeleaf (Server-Rendered Routes)
-- Thymeleaf is still used for a small number of server-rendered routes (for example auth/error flows), but not for the active retro SPA.
-- Never use `session` as variable name in Thymeleaf templates (reserved in web context). Always use `retroSession`.
-- Avoid complex SpEL in templates. Use Thymeleaf utilities (`#aggregates.sum()`, `#numbers.sequence()`) instead of stream operations.
 
 ### DTO Pattern
 - Always convert entities to DTOs before passing them to any rendering layer or API response
