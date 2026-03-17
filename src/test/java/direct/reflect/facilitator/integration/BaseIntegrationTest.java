@@ -18,13 +18,12 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import com.redis.testcontainers.RedisContainer;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -80,7 +79,6 @@ import java.util.stream.Collectors;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = "spring.profiles.active=test,import")
-@Testcontainers
 @org.springframework.context.annotation.Import({
     direct.reflect.facilitator.auth.TestAuthConfiguration.class, // Provides TestAuthController with /test/* endpoints
     direct.reflect.facilitator.config.TestSecurityOverride.class, // Extends SecurityConfig to allow /test/* endpoints
@@ -102,19 +100,34 @@ public abstract class BaseIntegrationTest {
     @LocalServerPort
     protected int port;
 
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17-alpine")
+    // Singleton containers — started once for the entire test run via static initializer,
+    // never stopped between test classes. This prevents the "Failed to start bean
+    // 'springSessionRedisMessageListenerContainer'" failure that occurs when Testcontainers
+    // stops/restarts containers between classes (per-class store in TestcontainersExtension).
+    @SuppressWarnings("resource")
+    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17-alpine")
             .withDatabaseName("facilitator_test")
             .withUsername("test")
             .withPassword("test");
 
-    @Container
-    @ServiceConnection
     @SuppressWarnings("resource")
-    static RedisContainer redis = new RedisContainer("redis:alpine")
+    static final RedisContainer redis = new RedisContainer("redis:alpine")
             .withExposedPorts(6379)
             .waitingFor(Wait.forLogMessage(".*Ready to accept connections.*", 1));
+
+    static {
+        postgres.start();
+        redis.start();
+    }
+
+    @DynamicPropertySource
+    static void registerContainerProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.data.redis.host", redis::getHost);
+        registry.add("spring.data.redis.port", redis::getFirstMappedPort);
+    }
 
     protected static Playwright playwright;
     protected static Browser browser;
