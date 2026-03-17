@@ -565,18 +565,25 @@ Additional REQUIRED rules for feature delivery:
 
 ### Starting the Full Stack
 
-The application runs as two separate processes:
+Spring Boot automatically starts PostgreSQL, Redis, and the frontend dev server via Docker Compose integration (`spring.docker.compose.enabled: true`). Docker Desktop must be running, but you don't need to run `docker compose up -d` manually.
 
 ```bash
-# 1. Start PostgreSQL, Redis, and the React/Vite frontend dev server
-docker compose up -d
-
-# 2. Start the Spring Boot backend in a separate terminal
+# Single command starts everything (Docker services + Spring Boot backend)
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=import
 ```
 
 - App: http://localhost:8080
 - Frontend dev server: http://localhost:5173
+
+If the automatic startup fails or you need to manage Docker services independently (e.g., to keep them running between backend restarts), you can start them manually as a fallback:
+
+```bash
+# Manual fallback: start Docker services separately
+docker compose up -d
+
+# Then start the backend
+./mvnw spring-boot:run -Dspring-boot.run.profiles=import
+```
 
 ### Maven Commands
 - **Build the project**: `./mvnw clean compile`
@@ -585,7 +592,7 @@ docker compose up -d
 - **Package the application**: `./mvnw clean package`
 
 ### Docker Commands
-- **Start services** (PostgreSQL + Redis + frontend dev server): `docker compose up -d`
+- **Start services manually** (fallback, or to keep services running between backend restarts): `docker compose up -d`
 - **Stop services**: `docker compose down`
 
 ### Frontend Commands (inside `frontend/`)

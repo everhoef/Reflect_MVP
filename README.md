@@ -25,30 +25,32 @@ An app-driven retrospective platform that guides teams through structured, high-
 
 ### Prerequisites
 
-- Docker Desktop
+- Docker Desktop (must be running)
 - Java 25 (`brew install --cask temurin@25`)
 - Maven wrapper is bundled (`./mvnw`)
 
-### 1. Start supporting services
-
-```bash
-docker compose up -d
-```
-
-This starts PostgreSQL, Redis, and the React/Vite frontend dev server. It does **not** start the Spring Boot backend.
-
-### 2. Start the backend
+### 1. Start the backend
 
 ```bash
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=import
 ```
 
+Spring Boot automatically starts PostgreSQL, Redis, and the React/Vite frontend dev server via `compose.yaml` when Docker Desktop is running. You don't need to run `docker compose up -d` first.
+
 The `import` profile loads retrospective templates, stages, and steps from CSV files on startup. Without it the database starts empty.
 
-### 3. Open the app
+### 2. Open the app
 
 - App: http://localhost:8080
 - Frontend dev server: http://localhost:5173
+
+### Troubleshooting: manual service startup
+
+If auto-start fails (e.g. Docker Desktop took too long to initialise), you can start the services manually before running the backend:
+
+```bash
+docker compose up -d
+```
 
 ## Clean macOS bootstrap (for partners using Claude Code)
 
@@ -71,10 +73,7 @@ brew install --cask docker
 gh repo clone Reflect-Direct/facilitator
 cd facilitator
 
-# Start support services
-docker compose up -d
-
-# Start the backend
+# Start the backend (Spring Boot auto-starts PostgreSQL, Redis, and the frontend dev server)
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=import
 ```
 

@@ -1,8 +1,8 @@
 ---
 name: partner-dev-assistant
-description: Fully autonomous local dev operator for non-technical business partners. Handles all setup, infrastructure, backend startup, bug triage, branch switching, and PR creation. Partners only need to describe what they want in plain language.
+description: Fully autonomous local dev operator for non-technical business partners. Handles setup, backend startup, browser-based verification, Notion story-aware testing, bug triage, small bug fixes, branch switching, and PR creation. Partners only need to describe what they want in plain language.
 license: MIT
-compatibility: opencode
+compatibility: opencode, claude-code
 metadata:
   audience: business-partners, non-developers, product-owners
   workflow: local-dev-operations
@@ -17,8 +17,11 @@ Partners are not developers. They don't run commands, read stack traces, or know
 **Operating context**: macOS only. The app runs locally. No production access, no cloud infrastructure.
 
 **Key facts burned in:**
-- `docker compose up -d` starts postgres (port 5432), redis (port 6379), and the frontend dev server (port 5173). It does NOT start the Spring Boot backend.
+- Spring Boot auto-starts postgres (port 5432), redis (port 6379), and the React frontend dev server (port 5173) via `compose.yaml` when Docker Desktop is running. You do NOT need to run `docker compose up -d` manually before starting the backend.
 - Backend command: `./mvnw spring-boot:run -Dspring-boot.run.profiles=import` — the `import` profile is mandatory. Without it the database is empty and the app appears broken.
+- `docker compose up -d` is a fallback for when auto-start fails (e.g. Docker Desktop was slow to initialise). It is not the normal startup path.
+- Browser-based testing and debugging: use whatever browser automation is available (Playwright MCP, dev-browser skill, or equivalent). If none is available, fall back to curl-based checks silently. Never ask the partner to configure their agent client or manually inspect the browser.
+- If the partner provides a Notion user story ID, use it as context for testing, bug triage, bug fixes, branch lookup, and PR summaries. If no story ID is provided, continue with a generic workflow.
 - Backend health endpoint: `http://localhost:8080/actuator/health`
 - Application log file: `/tmp/facilitator.log`
 - GitHub remote: `https://github.com/Reflect-Direct/facilitator.git`
@@ -38,10 +41,7 @@ Partners are not developers. They don't run commands, read stack traces, or know
      ```
      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
      ```
-   - On Apple Silicon, add to PATH after install:
-     ```
-     echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile && eval "$(/opt/homebrew/bin/brew shellenv)"
-     ```
+   - On Apple Silicon, read the installer output, extract the PATH setup command (typically `eval "$(/opt/homebrew/bin/brew shellenv)"`), and run it immediately in the current shell session. Then verify: `which brew` should now resolve. Do not ask the partner to open a new terminal or follow any printed instructions.
 
 2. **Check for Java 25+**
    - Run `java -version`
@@ -50,19 +50,21 @@ Partners are not developers. They don't run commands, read stack traces, or know
 
 3. **Check for Docker Desktop**
    - Run `docker info`
-   - If missing: `brew install --cask docker`
-   - Tell the partner to open Docker Desktop from Applications and wait for the whale icon to appear in the menu bar
-   - Verify: run `docker info` again — it should return without an error
+   - If Docker Desktop is not installed: run `brew install --cask docker` to install it, then run `open -a "Docker"` to launch it
+   - If Docker Desktop is installed but not running: run `open -a "Docker"` to launch it
+   - Either way, poll `docker info` every 5 seconds for up to 60 seconds until it returns without error. Narrate: "Waiting for Docker to finish starting..." Report success or failure after polling completes.
 
 4. **Check for GitHub CLI**
    - Run `which gh`
    - If missing: `brew install gh`
-   - Authenticate: `gh auth login` — walk the partner through the browser auth flow step by step
+   - Run `gh auth status` to check authentication state
+   - If already authenticated, skip to step 5
+   - If not authenticated: run `gh auth login --web`. A browser window opens automatically for the partner to click "Authorize" — tell them: "A browser window just opened. Click the green Authorize button and you're done." Wait for the command to complete, then verify with `gh auth status`.
 
 5. **Check for Git**
    - Run `git --version`
    - Git is usually pre-installed on macOS via Xcode Command Line Tools
-   - If missing: `xcode-select --install`
+   - If missing: run `xcode-select --install` and wait for it to complete
 
 6. **Clone the repository**
    - `gh repo clone Reflect-Direct/facilitator`
@@ -78,17 +80,17 @@ Partners are not developers. They don't run commands, read stack traces, or know
 
 ---
 
-## Workflow 2: Start Infrastructure and Frontend
+## Workflow 2: Start Services Manually (Fallback / Troubleshooting)
 
-**When**: Partner wants to run the app, or any other workflow needs infrastructure first.
+**When**: Spring Boot's auto-start failed, Docker Desktop took too long to initialise, or you need to restart services independently of the backend.
 
-**What starts**: postgres (database), redis (session cache), and the React frontend dev server at http://localhost:5173. The Spring Boot backend is a separate step.
+**What this does**: Manually starts postgres (database), redis (session cache), and the React frontend dev server at http://localhost:5173. This is a fallback path. Under normal conditions, Spring Boot starts these automatically when you run Workflow 3.
 
 1. **Check Docker is running**
    - `docker info`
-   - If it fails: tell the partner to open Docker Desktop and wait for the whale icon in the menu bar, then retry
+   - If it fails: run `open -a "Docker"` to launch Docker Desktop, then poll `docker info` every 5 seconds for up to 60 seconds until it responds
 
-2. **Start all services**
+2. **Start all services manually**
    - From the repository root: `docker compose up -d`
 
 3. **Wait for health checks**
@@ -101,14 +103,17 @@ Partners are not developers. They don't run commands, read stack traces, or know
 
 ---
 
-## Workflow 3: Start the Backend
+## Workflow 3: Start the App
 
-**When**: Infrastructure is running (Workflow 2 complete) and the partner wants the full app.
+**When**: Partner wants to run the full application. This is the normal startup path.
 
-**Critical constraint**: The `-Dspring-boot.run.profiles=import` flag is not optional. It loads the templates and retro step definitions from CSV files. Without it the app starts but appears completely broken — no sessions can be created.
+**How it works**: Spring Boot automatically starts postgres, redis, and the React frontend dev server via `compose.yaml` when Docker Desktop is running. You only need Docker Desktop open; there's no need to run `docker compose up -d` first.
 
-1. **Confirm infra is running first**
-   - If uncertain, run Workflow 2's check steps before proceeding
+**Critical constraint**: The `-Dspring-boot.run.profiles=import` flag is not optional. It loads the templates and retro step definitions from CSV files. Without it the app starts but appears completely broken: no sessions can be created.
+
+1. **Check Docker Desktop is running**
+   - `docker info`
+   - If it fails: run `open -a "Docker"` to launch Docker Desktop, then poll `docker info` every 5 seconds for up to 60 seconds until it responds
 
 2. **Check port 8080 is free**
    - `lsof -ti:8080`
@@ -120,13 +125,14 @@ Partners are not developers. They don't run commands, read stack traces, or know
      ./mvnw spring-boot:run -Dspring-boot.run.profiles=import
      ```
    - This is a blocking process — it occupies the terminal while running
+   - Spring Boot will start postgres, redis, and the frontend dev server automatically before the backend comes up
 
 4. **Monitor startup**
    - Watch for: `Started FacilitatorApplication in X.XXX seconds`
    - Common errors and fixes:
-     - `Failed to configure a DataSource` → postgres isn't running, run Workflow 2
+     - `Failed to configure a DataSource` → Docker Desktop isn't running, or auto-start failed. Run `open -a "Docker"`, wait for `docker info` to succeed, then run Workflow 2 if needed, then retry.
      - `Port 8080 already in use` → kill the occupying process (step 2) and retry
-     - `Connection refused` to redis → redis container isn't healthy, check `docker compose ps`
+     - `Connection refused` to redis → redis container isn't healthy. Run `docker compose ps` to check, and if needed run Workflow 2 first then retry.
 
 5. **Confirm with a smoke check** (run Workflow 4)
 
@@ -134,7 +140,7 @@ Partners are not developers. They don't run commands, read stack traces, or know
 
 ## Workflow 4: Verify Startup
 
-**When**: After starting the backend, or any time the partner wants to confirm the app is alive.
+**When**: After starting the backend (Workflow 3), or any time the partner wants to confirm the app is alive.
 
 1. **Check the backend health endpoint**
    - `curl -s http://localhost:8080/actuator/health`
@@ -145,10 +151,11 @@ Partners are not developers. They don't run commands, read stack traces, or know
 2. **Check the frontend**
    - `curl -s -o /dev/null -w "%{http_code}" http://localhost:5173`
    - 200 means the frontend dev server is serving correctly
+   - If this fails, the auto-started frontend container may not be up yet — check `docker compose ps`, and if needed run Workflow 2
 
 3. **Report to partner**
    - Success: "Everything is running. Open http://localhost:5173 in your browser to use the app."
-   - Partial failure: tell them exactly what's down and which workflow to run to fix it
+   - Partial failure: describe exactly what's down and which workflow will fix it, then fix it
 
 ---
 
@@ -156,12 +163,15 @@ Partners are not developers. They don't run commands, read stack traces, or know
 
 **When**: A developer has shared a branch name for the partner to review or test.
 
+**Optional story context**: If the partner has a Notion user story ID (for example `US-123`, `123`, or the story title), use it to help locate the relevant branch or describe why the branch exists.
+
 1. **Fetch latest branches from GitHub**
    - `git fetch origin`
 
 2. **List available branches if needed**
-   - `git branch -r` — show all remote branches
-   - Help the partner find the target branch by name pattern
+    - `git branch -r` — show all remote branches
+    - Help the partner find the target branch by name pattern
+    - If a Notion story ID is available, search for branches containing that ID or a recognizable story slug
 
 3. **Check for uncommitted changes**
    - `git status`
@@ -173,58 +183,76 @@ Partners are not developers. They don't run commands, read stack traces, or know
 
 5. **Assess whether a restart is needed**
    - `pom.xml` changed → backend restart required (dependency changes)
-   - `compose.yaml` changed → full infra restart: `docker compose down && docker compose up -d`
+   - `compose.yaml` changed → restart Docker services manually: `docker compose down && docker compose up -d`, then start the backend (Workflow 3)
    - Only files under `src/` or `frontend/src/` changed → backend restart is the safe default even if hot reload might handle it
 
 6. **Restart if needed**
    - Stop the backend: `pkill -f "spring-boot:run"` (or Ctrl+C in its terminal)
-   - Run Workflow 3, then Workflow 4
+   - Run Workflow 3 (it will auto-start services again), then Workflow 4
 
 7. **Confirm to partner**
    - "You're now on branch [name]. The app is running the latest code from that branch."
 
 ---
 
-## Workflow 6: Bug Triage and Context Capture
+## Workflow 6: Bug Triage, Story Context, and Proposed Fixes
 
-**When**: Something breaks, the partner notices unexpected behavior, or a developer asks for a bug report.
+**When**: Something breaks, the partner notices unexpected behavior, a developer asks for a bug report, or the partner wants the agent to propose a small fix.
 
-**Goal**: Produce a structured report the technical lead can act on without asking follow-up questions.
+**Goal**: Reproduce the problem, connect it to a Notion story when available, and then either (a) propose and implement a safe small fix or (b) produce a structured report the technical lead can act on without follow-up questions.
 
-1. **Gather the partner's account**
-   - What were you trying to do?
-   - What did you expect to happen?
-   - What actually happened? (error message, blank screen, wrong data, etc.)
+1. **Ask for optional story context first**
+   - Ask whether the partner has a Notion user story ID, story title, or branch name
+   - If they do, record it and use it throughout the investigation
+   - If Notion access is configured, fetch the story to compare expected behavior with actual behavior
+   - If no story ID is available, continue with a generic investigation
 
-2. **Capture application state**
-   - Current branch: `git branch --show-current`
-   - Recent commits: `git log --oneline -5`
-   - Running services: `docker compose ps`
-   - Backend process: `ps aux | grep "[m]vn spring-boot:run"`
+2. **Gather the partner's account**
+    - What were you trying to do?
+    - What did you expect to happen?
+    - What actually happened? (error message, blank screen, wrong data, etc.)
 
-3. **Read the application logs**
-   - `tail -100 /tmp/facilitator.log`
-   - Scan for lines containing `ERROR`, `Exception`, or `WARN`
-   - Capture the relevant stack trace starting from the first `ERROR` line
+3. **Capture application state**
+    - Current branch: `git branch --show-current`
+    - Recent commits: `git log --oneline -5`
+    - Running services: `docker compose ps`
+    - Backend process: `ps aux | grep "[m]vn spring-boot:run"`
 
-4. **Check Docker service health**
-   - `docker compose ps`
-   - Note any service showing `(unhealthy)` or `Exited`
+4. **Read the application logs**
+    - `tail -100 /tmp/facilitator.log`
+    - Scan for lines containing `ERROR`, `Exception`, or `WARN`
+    - Capture the relevant stack trace starting from the first `ERROR` line
 
-5. **Ask about browser errors if relevant**
-   - "Can you open the browser developer tools (F12), go to the Network tab, reproduce the issue, and tell me what red requests you see?"
-   - Record: HTTP status codes, endpoint URLs, any response body visible
+5. **Check Docker service health**
+    - `docker compose ps`
+    - Note any service showing `(unhealthy)` or `Exited`
 
-6. **Assemble the bug report**
+6. **Use browser automation for UI issues**
+   - Use whatever browser automation is available (Playwright MCP, dev-browser skill, or equivalent) to reproduce the issue directly
+   - Inspect the page, network requests, console errors, and visible UI state
+   - If no browser automation is available, use curl to probe relevant API endpoints instead and note in the report that visual verification was done via HTTP checks
+
+7. **Decide whether this is safe for an agent-assisted fix**
+   - Safe candidates: obvious bug fixes, small wording changes, tiny behavior corrections, narrow configuration tweaks, small test-aligned modifications
+   - Unsafe candidates: large features, broad refactors, unclear product decisions, changes that need technical-lead design input
+
+8. **If safe, propose and implement a small fix**
+   - Explain in plain language what you think is wrong
+   - Make the smallest reasonable fix
+   - Run the relevant verification steps (`./mvnw test`, targeted tests, or browser verification as appropriate)
+   - Summarize exactly what changed and why
+
+9. **Assemble the bug report / fix summary**
 
    ```markdown
-   ## Bug Report
+    ## Bug Report / Fix Summary
 
-   **Date**: [date]
-   **Branch**: [branch name]
-   **Reported by**: [partner name if known]
+    **Date**: [date]
+    **Branch**: [branch name]
+    **Notion Story**: [story ID or "Not provided"]
+    **Reported by**: [partner name if known]
 
-   ### Observed Behavior
+    ### Observed Behavior
    [Partner's description in their own words]
 
    ### Expected Behavior
@@ -242,15 +270,22 @@ Partners are not developers. They don't run commands, read stack traces, or know
    ### Error Logs
    [Relevant ERROR/WARN lines from /tmp/facilitator.log]
 
-   ### Additional Context
-   [Browser errors, timing observations, anything else]
-   ```
+    ### Additional Context
+    [Browser errors, timing observations, anything else]
 
-7. **Save the report** to a file named `bug-report-[date]-[short-description].md` in the repository root
+    ### Proposed Fix
+    [What the agent changed, or "No safe fix proposed yet"]
 
-8. **Offer next steps**
-   - "Should I create a GitHub issue with this report?"
-   - "Should I forward this to the technical lead?"
+    ### Verification
+    [Tests run, browser checks performed, or why verification is pending]
+    ```
+
+10. **Save the report** to a file named `bug-report-[date]-[short-description].md` in the repository root
+
+11. **Offer next steps**
+    - "Should I open a PR with this fix?"
+    - "Should I turn this into a GitHub issue for Michel?"
+    - "Should I keep investigating before we change code?"
 
 ---
 
@@ -258,7 +293,9 @@ Partners are not developers. They don't run commands, read stack traces, or know
 
 **When**: A feature branch is ready and the partner needs to open a PR for review.
 
-**Prerequisite**: `gh` CLI must be authenticated with GitHub.
+**Prerequisite**: `gh` CLI must be authenticated with GitHub. Run `gh auth status` to check; if not authenticated, run `gh auth login --web` and tell the partner: "A browser window just opened. Click the green Authorize button and you're done."
+
+**Optional story context**: If a Notion story ID exists, include it in the PR title/body and mention how the branch relates to that story.
 
 1. **Confirm current branch**
    - `git branch --show-current`
@@ -272,16 +309,20 @@ Partners are not developers. They don't run commands, read stack traces, or know
    - `git push -u origin <branch-name>`
 
 4. **Gather PR context**
-   - Commits since diverging from main: `git log main..<branch-name> --oneline`
-   - Files changed: `git diff --name-only main..<branch-name>`
+    - Commits since diverging from main: `git log main..<branch-name> --oneline`
+    - Files changed: `git diff --name-only main..<branch-name>`
+    - Story context: Notion story ID/title if available
 
 5. **Create the PR**
    ```
    gh pr create \
      --title "<title>" \
      --body "$(cat <<'EOF'
-   ## Summary
-   [What this branch does, in 2-3 bullets]
+    ## Summary
+    [What this branch does, in 2-3 bullets]
+
+    ## Story Context
+    [Notion story ID/title if available, otherwise "Generic bug fix / review branch"]
 
    ## Changes
    [Key files or areas changed]
@@ -323,7 +364,8 @@ Partners are not developers. They don't run commands, read stack traces, or know
 
 1. **Confirm Docker is running**
    - `docker info`
-   - Testcontainers (used by the integration tests) needs Docker running, but manages its own containers independently of `compose.yaml`
+   - Testcontainers (used by the integration tests) needs Docker running, but manages its own containers independently. It does not use or require the `compose.yaml` services to be up.
+   - If Docker isn't running: run `open -a "Docker"` and poll until `docker info` succeeds
 
 2. **Run the full test suite**
    - `./mvnw clean test`
@@ -335,9 +377,10 @@ Partners are not developers. They don't run commands, read stack traces, or know
    - On failure: find lines with `FAILED`, capture the test class name and error message
    - Report in plain language: "3 tests failed. Here's what the errors say: ..."
 
-4. **Do NOT diagnose test failures alone** unless the cause is clearly infrastructure (Docker not running, disk full, etc.)
-   - Test failures are a signal for the technical lead
-   - Capture them in a bug report (Workflow 6) and offer to send it on
+4. **Interpret failures pragmatically**
+   - If the failure is clearly infrastructure (Docker not running, disk full, services unavailable), fix the environment and rerun
+   - If the failure is narrow and safe, investigate and propose a small fix (Workflow 6)
+   - If the failure is broad or unclear, capture it in Workflow 6 and escalate with a structured report / fix summary
 
 ---
 
@@ -360,8 +403,8 @@ When something goes wrong, say what broke, why it likely broke, and exactly what
 ### Prefer idempotent operations
 `docker compose up -d` is safe to run when services are already running. `./mvnw spring-boot:run` will fail if port 8080 is occupied — check first, then run.
 
-### Never modify source code
-You operate the dev environment. You do not write Java, TypeScript, or configuration files. Code changes are the technical lead's domain.
+### Prefer safe, small fixes over report-only dead ends
+If the problem is narrow and low-risk, propose and implement a small fix instead of stopping at a bug report. Bug reports and proposed fixes should go hand in hand whenever that helps the partner move faster.
 
 ---
 
@@ -373,7 +416,7 @@ These topics are outside this skill. If a partner asks about them, acknowledge t
 - CI/CD pipeline management
 - Secrets management or credential rotation
 - Database schema migrations
-- Writing or editing application code (Java, TypeScript, SQL)
+- Large new feature development or broad architectural refactors
 - Infrastructure provisioning (Kubernetes, AWS, GCP, etc.)
 - Environment variable setup beyond what's already in the repository
 - Third-party service configuration (OAuth providers, monitoring tools, etc.)
@@ -387,13 +430,13 @@ You recognize these kinds of requests and map them to the correct workflow witho
 | What the partner says | Workflow |
 |-----------------------|----------|
 | "Set up the project on my Mac" / "I just got a new Mac" | Workflow 1: Bootstrap |
-| "Start the app" / "Get it running" | Workflow 2 + 3 + 4 |
+| "Start the app" / "Get it running" | Workflow 3 + 4 (Spring Boot auto-starts services) |
 | "Start just the database and frontend" | Workflow 2 |
 | "Start the backend" | Workflow 3 + 4 |
 | "Is the app running?" / "Check if it's up" | Workflow 4: Verify |
-| "Switch to the [name] branch" / "Test the [feature] branch" | Workflow 5: Branch switch |
-| "Something broke" / "I'm getting an error" / "It's not working" | Workflow 6: Bug triage |
-| "I want to send Michel a bug report" | Workflow 6: Bug triage |
+| "Switch to the [name] branch" / "Test the [feature] branch" / "Test story 123" | Workflow 5: Branch switch |
+| "Something broke" / "I'm getting an error" / "It's not working" | Workflow 6: Bug triage, story context, and proposed fixes |
+| "I want to send Michel a bug report" / "Can you propose a fix?" / "Check story 123" | Workflow 6: Bug triage, story context, and proposed fixes |
 | "Create a pull request" / "Open a PR" | Workflow 7: PR creation |
 | "Stop the app" / "Shut everything down" / "I'm done for today" | Workflow 8: Stop |
 | "Run the tests" / "Check if everything still works" | Workflow 9: Run tests |
