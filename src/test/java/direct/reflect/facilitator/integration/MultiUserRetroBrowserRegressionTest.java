@@ -368,18 +368,26 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             // We cannot use clickNextAndWait here because it relies on waitForStepChange which
             // requires [data-step-index] to be present — but in COMPLETED state the UI may not
             // render that attribute, causing a timeout.
-            Locator nextBtn = facilitatorPage.locator("[data-testid='next-step-button']");
-            facilitatorPage.waitForResponse(
-                response -> response.url().contains("/next") && response.request().method().equals("POST"),
-                new Page.WaitForResponseOptions().setTimeout(DEFAULT_TIMEOUT_MS),
-                () -> nextBtn.click(new Locator.ClickOptions().setTimeout(DEFAULT_TIMEOUT_MS))
-            );
-            // Wait for the Next button to disappear (UI reflects COMPLETED state)
+            // Click Next to advance the final AUTO step → transitions session to COMPLETED.
+            // We do NOT use waitForResponse here because under load the Tomcat thread pool may be
+            // saturated by active SSE connections, causing the /next POST response to be delayed
+            // well beyond SSE_PROPAGATION_TIMEOUT_MS.  Instead we click the button and wait
+            // directly for the UI to reflect the COMPLETED phase — which is the signal we actually
+            // care about.  We use 2× SSE_PROPAGATION_TIMEOUT_MS to give the server enough time
+            // even when the thread pool is under pressure from parallel test runs.
+            facilitatorPage.locator("[data-testid='next-step-button']")
+                .click(new Locator.ClickOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+            // Wait for COMPLETED phase to be reflected in the UI (data-phase attribute is set
+            // directly from server state and is the most reliable completion signal).
+            // The [data-step-index] attribute remains present even in COMPLETED state,
+            // but [data-phase="COMPLETED"] only appears after the React re-fetch settles.
             facilitatorPage.waitForFunction(
-                "() => !document.querySelector('[data-testid=\"next-step-button\"]') || " +
-                "  !document.querySelector('[data-testid=\"next-step-button\"]').offsetParent",
+                "() => { " +
+                "  const el = document.querySelector('[data-phase]'); " +
+                "  return el && el.getAttribute('data-phase') === 'COMPLETED'; " +
+                "}",
                 null,
-                new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS)
+                new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS * 2)
             );
 
             // Verify session completion

@@ -149,6 +149,15 @@ public class SseBrowserTest extends BaseIntegrationTest {
                 int maxSkips = 20;
                 boolean foundInputStep = false;
                 for (int i = 0; i < maxSkips; i++) {
+                    // Wait for any MultiColumnBoard loading spinner to clear before checking
+                    // for the textarea. Without this, the useClusters hook may still be
+                    // fetching data and the component renders a spinner (no [data-column] yet),
+                    // causing the loop to skip the correct step under load.
+                    participantPage.waitForFunction(
+                        "() => !document.querySelector('[class*=\"animate-spin\"]')",
+                        null,
+                        new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS)
+                    );
                     if (participantPage.locator("[data-column] textarea[name='content']").count() > 0) {
                         log.info("Found multi-column input step (textarea present) at skip iteration {}", i);
                         foundInputStep = true;
