@@ -82,7 +82,8 @@ import java.util.stream.Collectors;
 @Testcontainers
 @org.springframework.context.annotation.Import({
     direct.reflect.facilitator.auth.TestAuthConfiguration.class, // Provides TestAuthController with /test/* endpoints
-    direct.reflect.facilitator.config.TestSecurityOverride.class // Extends SecurityConfig to allow /test/* endpoints
+    direct.reflect.facilitator.config.TestSecurityOverride.class, // Extends SecurityConfig to allow /test/* endpoints
+    direct.reflect.facilitator.config.TestRedisConfig.class // Caps Redis retry backoff to prevent infinite reconnect loops
 })
 @Slf4j
 

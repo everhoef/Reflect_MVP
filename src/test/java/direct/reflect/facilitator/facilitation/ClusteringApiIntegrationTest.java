@@ -1,4 +1,4 @@
-package direct.reflect.facilitator.integration;
+package direct.reflect.facilitator.facilitation;
 
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.configurator.RetroStep;
@@ -20,8 +20,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
+import direct.reflect.facilitator.config.TestSecurityOverride;
 import direct.reflect.facilitator.facilitation.ParticipantService;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import static org.mockito.ArgumentMatchers.any;
@@ -47,6 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Testcontainers
 @ActiveProfiles({"import", "test"})
+@Import(TestSecurityOverride.class)
 @Slf4j
 class ClusteringApiIntegrationTest {
 
@@ -87,7 +90,7 @@ class ClusteringApiIntegrationTest {
     private RetroStep testStep;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         RetroSession session = new RetroSession();
         testSession = sessionRepository.save(session);
 

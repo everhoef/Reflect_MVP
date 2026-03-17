@@ -1,18 +1,15 @@
-package direct.reflect.facilitator.integration;
+package direct.reflect.facilitator.configurator;
 
-import com.redis.testcontainers.RedisContainer;
-import direct.reflect.facilitator.configurator.ComponentType;
-import direct.reflect.facilitator.configurator.RetroStage;
-import direct.reflect.facilitator.configurator.RetroStageRepository;
-import direct.reflect.facilitator.configurator.RetroStep;
-import direct.reflect.facilitator.configurator.RetroStepRepository;
+import direct.reflect.facilitator.eventing.EventService;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -22,11 +19,14 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @Testcontainers
 @ActiveProfiles("import")
 @Slf4j
-class SscCsvImportTest {
+class TemplateImportIntegrationTest {
+
+    @MockitoBean
+    private EventService eventService;
 
     @Container
     @ServiceConnection
@@ -39,7 +39,7 @@ class SscCsvImportTest {
     @Container
     @ServiceConnection
     @SuppressWarnings("resource")
-    static RedisContainer redisContainer = new RedisContainer("redis:alpine")
+    static GenericContainer<?> redisContainer = new GenericContainer<>("redis:alpine")
             .withExposedPorts(6379);
 
     @Autowired
