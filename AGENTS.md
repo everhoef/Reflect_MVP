@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to AI agents (Claude, Cursor, etc.) when working with the Facilitator codebase - a Spring Boot application for team retrospectives.
+This file provides guidance to AI agents (Claude, Cursor, etc.) when working with the Facilitator codebase - a full-stack retrospective platform with a Spring Boot backend and a React/Vite frontend.
 
 **Source of Truth for Stories & Roadmap**: Notion (stories, BDD scenarios, implementation status, timelines)
 **Source of Truth for Technical Guidance**: This file (architecture, patterns, conventions)
@@ -139,15 +139,17 @@ The app guides teams from vague intentions to SMART action points:
 
 ### Project Overview
 
-Spring Boot 3.5.3 application built with Java 21, Spring MVC (not WebFlux), Spring Security, Spring Data JPA, PostgreSQL, Redis, and Thymeleaf + HTMX.
+Spring Boot 4.0.0 application built with Java 25, Spring MVC (not WebFlux), Spring Security, Spring Data JPA, PostgreSQL, Redis, and a React + Vite + TypeScript frontend. The backend still retains Thymeleaf for a few server-rendered routes, but the primary UI is the React SPA.
 
 ### Core Technology Stack
-- **Backend**: Spring Boot 3.5.3, **Spring MVC** (Web MVC, not WebFlux), Spring Security, Spring Data JPA
-- **Database**: PostgreSQL with Hibernate
+- **Backend**: Spring Boot 4.0.0, **Spring MVC** (Web MVC, not WebFlux), Spring Security, Spring Data JPA
+- **Database**: PostgreSQL 17 with Hibernate
 - **Session Management**: Redis for session storage
-- **Frontend**: Thymeleaf templates with HTMX for dynamic interactions
-- **Real-time Updates**: Server-Sent Events (SSE) for targeted component reloading
-- **Testing**: JUnit 5, Testcontainers, Spring Boot Test
+- **Frontend**: React 19 + Vite + TypeScript
+- **Frontend libraries**: React Router, TanStack Query, Tailwind CSS v4, shadcn/ui, Zustand, React Hook Form, Zod, dnd-kit
+- **Real-time Updates**: Server-Sent Events (SSE) consumed by the React frontend
+- **Testing**: JUnit 5, Testcontainers, Spring Boot Test, Playwright, Vitest
+- **Type generation**: TypeScript types are generated from backend models and OpenAPI
 - **Tools**: Lombok for boilerplate reduction
 
 ### Design Principles (GRASP)
@@ -165,7 +167,7 @@ The application follows **function-oriented modular architecture** organized aro
 - **facilitation**: Sessions, participants, retrospective flow control
 - **eventing**: Real-time SSE event streaming and notifications
 - **auth**: Authentication (OIDC + guest mode with CookieAuthenticationToken)
-- **web**: View controllers and template data services (Thymeleaf rendering)
+- **web**: View controllers and remaining server-rendered routes
 - **common**: Shared utilities, exceptions, configurations
 
 ### Domain Model
@@ -226,28 +228,16 @@ Custom cookie-based authentication supporting two modes:
 
 When a participant submits a response, **ALL participants** in that session see the update in real-time:
 
-1. **Client submits**: User fills form → HTMX POST to `/api/retro/{retroId}/step/{stepId}/{pattern}`
-   - Form includes `hx-swap="none"` (no HTML returned to submitter)
+1. **Client submits**: The React frontend sends a POST to `/api/retro/{retroId}/step/{stepId}/...` via fetch/TanStack Query.
 
 2. **Server processes**:
    - Controller validates and delegates to ResponseService
    - ResponseService saves response to database
    - ResponseService publishes SSE event to ALL participants via EventService
 
-3. **All clients update** (HTMX-driven, no JavaScript needed):
-   - HTML elements have `hx-trigger="sse:note_added from:body"`
-   - When SSE event arrives, HTMX automatically triggers GET request to refresh that component
-   - HTMX swaps the fresh HTML fragment into place
+3. **All clients update**: The React frontend subscribes to the SSE stream. When an event arrives, it re-fetches the relevant data and re-renders the affected components.
 
-**Example** (category lane auto-refresh):
-```html
-<div id="category-lane-Mad"
-     hx-get="/retro/{retroId}/step/{stepId}/responses/categorical?category=Mad"
-     hx-trigger="sse:note_added from:body, sse:note_updated from:body"
-     hx-swap="innerHTML">
-    <!-- Sticky notes render here -->
-</div>
-```
+**Principle**: The backend owns persistence and event broadcasting; the React frontend owns rendering for active retro flows.
 
 ### Transactional Event Publishing
 
@@ -346,22 +336,7 @@ All configuration is stored as pure JSON in the `componentConfig` field. No Java
 
 ### Facilitator Override Principle
 
-Facilitators can ALWAYS advance - the system shows warnings but never blocks:
-
-```html
-<!-- Next button ALWAYS enabled for facilitator -->
-<button th:if="${isFacilitator}"
-        hx-post="/api/retro/{retroId}/next"
-        class="btn-primary">
-    Next
-</button>
-
-<!-- Warning shown if blocking condition not met -->
-<div th:if="${!canAdvance}" class="warning">
-    ⚠️ Only 3 of 5 participants responded.
-    You can still proceed if needed.
-</div>
-```
+Facilitators can ALWAYS advance - the system shows warnings but never blocks. The React frontend should always render the facilitator's "Next" control, while still warning when recommended preconditions have not been met.
 
 **Why this matters**: Trust facilitator judgment over rigid system rules. Prevents bugs from blocking the entire team.
 
@@ -383,14 +358,9 @@ Facilitators can ALWAYS advance - the system shows warnings but never blocks:
 - **Quality boost without annoyance**: Detailed enough to improve facilitation quality, concise enough to avoid cognitive overload
 
 ### Design Philosophy
-- **Clean and straightforward**: Professional appearance inspired by system-ui mockups
+- **Clean and straightforward**: Professional appearance with clear visual hierarchy
 - **Minimal cognitive load**: Clear visual hierarchy, focused content areas, embedded guidance
 - **Zero facilitation skills required**: Step-by-step instructions eliminate need for training
-
-### Design Reference
-The `system-ui/` folder contains UI design screenshots with mock data that illustrate the intended visual direction. Note: mockups serve as initial design inspiration but may become outdated as implementation evolves.
-
----
 
 ## Code Conventions
 
@@ -408,8 +378,8 @@ The `system-ui/` folder contains UI design screenshots with mock data that illus
 
 ### Controller Separation Standards
 - **Strict separation** between View, API, and Event controllers
-- **View Controllers**: Only Thymeleaf rendering and web navigation
-- **API Controllers**: Only REST endpoints returning JSON
+- **View Controllers**: Only web page navigation and any remaining Thymeleaf-rendered routes
+- **API Controllers**: Only REST endpoints returning JSON for the React frontend
 - **Event Controllers**: Only SSE streaming for real-time updates
 - **Never mix responsibilities**
 
@@ -572,14 +542,13 @@ Additional REQUIRED rules for feature delivery:
 
 ## Key Technical Rules
 
-### Thymeleaf Reserved Words
-- Never use `session` as variable name (reserved in web context). Always use `retroSession`.
-
-### SpEL Expressions
+### Thymeleaf (Server-Rendered Routes)
+- Thymeleaf is still used for a small number of server-rendered routes (for example auth/error flows), but not for the active retro SPA.
+- Never use `session` as variable name in Thymeleaf templates (reserved in web context). Always use `retroSession`.
 - Avoid complex SpEL in templates. Use Thymeleaf utilities (`#aggregates.sum()`, `#numbers.sequence()`) instead of stream operations.
 
 ### DTO Pattern
-- Always convert entities to DTOs before template rendering
+- Always convert entities to DTOs before passing them to any rendering layer or API response
 - DTOs implement `ComponentResponseDto.toResponseData()`
 
 ### Error Handling
@@ -595,21 +564,46 @@ Additional REQUIRED rules for feature delivery:
 
 ## Build and Development Commands
 
-### Maven Commands
-- **Build the project**: `mvn clean compile`
-- **Run tests**: `mvn test`
-- **Run specific test**: `mvn test -Dtest=ClassName#methodName`
-- **Run the application**: `mvn spring-boot:run -Dspring-boot.run.profiles=import`
-- **Package the application**: `mvn clean package`
+### Prerequisites
+- Docker Desktop
+- Java 25 (`brew install --cask temurin@25`)
+- Maven wrapper is bundled (`./mvnw`) — no separate Maven install needed
 
-### Docker Dependencies
-- **Start services** (PostgreSQL + Redis): `docker compose up -d`
+### Starting the Full Stack
+
+The application runs as two separate processes:
+
+```bash
+# 1. Start PostgreSQL, Redis, and the React/Vite frontend dev server
+docker compose up -d
+
+# 2. Start the Spring Boot backend in a separate terminal
+./mvnw spring-boot:run -Dspring-boot.run.profiles=import
+```
+
+- App: http://localhost:8080
+- Frontend dev server: http://localhost:5173
+
+### Maven Commands
+- **Build the project**: `./mvnw clean compile`
+- **Run tests**: `./mvnw test`
+- **Run specific test**: `./mvnw test -Dtest=ClassName#methodName`
+- **Package the application**: `./mvnw clean package`
+
+### Docker Commands
+- **Start services** (PostgreSQL + Redis + frontend dev server): `docker compose up -d`
 - **Stop services**: `docker compose down`
 
+### Frontend Commands (inside `frontend/`)
+- **Dev server**: `npm run dev`
+- **Type check**: `npm run typecheck`
+- **Unit tests**: `npm test`
+- **Regenerate API types**: `npm run generate-types`
+
 ### Testing with Testcontainers
-- Tests use Testcontainers for PostgreSQL and Redis - no manual setup needed
-- Containers managed automatically during test execution
-- Simply run `mvn test` to execute integration tests
+- Tests use Testcontainers for PostgreSQL and Redis — no manual setup needed
+- Playwright E2E tests run as part of the Maven test suite
+- `./mvnw test` runs unit, integration, and Playwright tests
 
 ### Important Notes
 - **Always use `import` profile** when running the application
@@ -625,7 +619,7 @@ Additional REQUIRED rules for feature delivery:
 **User runs the application in a separate iTerm2 terminal tab.**
 
 #### How It Works
-- User runs: `mvn spring-boot:run -Dspring-boot.run.profiles=import` in dedicated terminal
+- User runs: `./mvnw spring-boot:run -Dspring-boot.run.profiles=import` in dedicated terminal
 - Spring Boot logs to **both** console (for user) **and** `/tmp/facilitator.log` (for Claude)
 - User sees live logs in their terminal, Claude reads from log file
 
@@ -638,7 +632,7 @@ Additional REQUIRED rules for feature delivery:
 2. **If not running**, tell the user:
    > "Please start the application in a separate iTerm2 tab:
    > ```bash
-   > mvn spring-boot:run -Dspring-boot.run.profiles=import
+   > ./mvnw spring-boot:run -Dspring-boot.run.profiles=import
    > ```"
 
 3. Wait for user confirmation before proceeding
