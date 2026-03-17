@@ -35,8 +35,11 @@ spring:
             token-uri: https://github.com/login/oauth/access_token
             user-info-uri: https://api.github.com/user
             user-name-attribute: login
+  lifecycle:
+    timeout-per-shutdown-phase: 5s
 
 server:
+  shutdown: graceful
   tomcat:
     threads:
       max: 400
