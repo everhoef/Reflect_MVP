@@ -37,7 +37,6 @@ spring:
             user-name-attribute: login
 
 server:
-  shutdown: immediate
   tomcat:
     threads:
       max: 400
