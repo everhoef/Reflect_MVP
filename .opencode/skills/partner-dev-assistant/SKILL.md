@@ -20,7 +20,7 @@ Partners are not developers. They don't run commands, read stack traces, or know
 - Spring Boot auto-starts postgres (port 5432), redis (port 6379), and the React frontend dev server (port 5173) via `compose.yaml` when Docker Desktop is running. You do NOT need to run `docker compose up -d` manually before starting the backend.
 - Backend command: `./mvnw spring-boot:run -Dspring-boot.run.profiles=import` — the `import` profile is mandatory. Without it the database is empty and the app appears broken.
 - `docker compose up -d` is a fallback for when auto-start fails (e.g. Docker Desktop was slow to initialise). It is not the normal startup path.
-- Browser-based testing and debugging: use whatever browser automation is available (Playwright MCP, dev-browser skill, or equivalent). If none is available, fall back to curl-based checks silently. Never ask the partner to configure their agent client or manually inspect the browser.
+- Browser-based testing and debugging: use the Playwright MCP server (`@playwright/mcp@latest`), which is installed during Workflow 1 bootstrap. Never ask the partner to configure their agent client or manually inspect the browser.
 - If the partner provides a Notion user story ID, use it as context for testing, bug triage, bug fixes, branch lookup, and PR summaries. If no story ID is provided, continue with a generic workflow.
 - Backend health endpoint: `http://localhost:8080/actuator/health`
 - Application log file: `/tmp/facilitator.log`
@@ -61,22 +61,43 @@ Partners are not developers. They don't run commands, read stack traces, or know
    - If already authenticated, skip to step 5
    - If not authenticated: run `gh auth login --web`. A browser window opens automatically for the partner to click "Authorize" — tell them: "A browser window just opened. Click the green Authorize button and you're done." Wait for the command to complete, then verify with `gh auth status`.
 
-5. **Check for Git**
+5. **Check for Node.js**
+   - Run `node --version`
+   - If missing or below v18: `brew install node`
+   - Verify: `node --version` and `npx --version` should both resolve
+
+6. **Install the Playwright MCP server**
+   - Run: `npx @playwright/mcp@latest --version` to confirm it can be fetched
+   - Add it to the Claude Code project MCP config by running:
+     ```bash
+     claude mcp add playwright -- npx @playwright/mcp@latest
+     ```
+   - If the `claude` CLI is not available (OpenCode environment), add the entry manually to `.claude.json` under `projects.<repo-path>.mcpServers`:
+     ```json
+     "playwright": {
+       "type": "stdio",
+       "command": "npx",
+       "args": ["@playwright/mcp@latest"]
+     }
+     ```
+   - Narrate: "Browser automation is now set up. I can open and inspect the app directly."
+
+7. **Check for Git**
    - Run `git --version`
    - Git is usually pre-installed on macOS via Xcode Command Line Tools
    - If missing: run `xcode-select --install` and wait for it to complete
 
-6. **Clone the repository**
+8. **Clone the repository**
    - `gh repo clone Reflect-Direct/facilitator`
    - Change into the cloned directory
 
-7. **Make the Maven wrapper executable**
+9. **Make the Maven wrapper executable**
    - `chmod +x mvnw`
    - Narrate: "This lets us run the build tool without installing anything else"
 
-8. **Verify clone integrity**
-   - Confirm that `pom.xml`, `compose.yaml`, `mvnw`, and a `frontend/` directory all exist
-   - Report in plain language: "The project is ready on your Mac"
+10. **Verify clone integrity**
+    - Confirm that `pom.xml`, `compose.yaml`, `mvnw`, and a `frontend/` directory all exist
+    - Report in plain language: "The project is ready on your Mac"
 
 ---
 
