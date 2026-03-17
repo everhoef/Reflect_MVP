@@ -423,44 +423,61 @@ The `system-ui/` folder contains UI design screenshots with mock data that illus
 - **Flaky tests are bugs**: A flaky test indicates a real problem — race condition, missing synchronization, incorrect assumptions. Treat flaky tests as P1 bugs and fix immediately.
 - **Test reliability is non-negotiable**: All tests must pass reliably on every run. If a test passes "most of the time", it is broken and must be fixed.
 
+#### Test Package Architecture
+
+The test package structure mirrors `src/main/java` as closely as practical:
+
+- **`integration/`** — Browser/E2E tests ONLY (enforced by `IntegrationPackageBrowserOnlyTest`). Any non-browser test in this package is a violation.
+- **`facilitation/`** — MockMvc/API and data tests for the facilitation module
+- **`configurator/`** — Import, template, and configurator tests
+- **`auth/`** — Authentication controller and service tests
+- **`eventing/`** — SSE event and contract tests
+- **`common/`** — Architecture enforcement tests (e.g., `IntegrationPackageBrowserOnlyTest`)
+- **`config/`** — Test configuration classes (`TestSecurityOverride`, `TestRedisConfig`)
+
 #### Test Layer Taxonomy
 
-All test classes in `src/test/java/.../integration/` belong to one of five layers. Each new test class MUST fit exactly one layer, and its name MUST follow the layer's naming convention.
+Each test class belongs to exactly one layer. The layer determines the package and naming convention.
 
-**Layer 1 — Browser regression** (extends `BaseIntegrationTest`, Playwright required):
+**Layer 1 — Browser regression** (`integration/`, extends `BaseIntegrationTest`, Playwright required):
 - `RetroFlowBrowserRegressionTest` — golden-path regression: column rendering, sticky notes, SSE propagation, clustering UI, voting UI, timer controls, stage progress bar
 - `MultiUserRetroBrowserRegressionTest` — multi-user flows, column isolation, privacy mode reveal
-- `MixedAuthSessionBrowserSmokeTest` — mixed OAuth2 + guest auth, session-switching with participant list updates
+- `SseBrowserTest` — SSE transport (connection, participant_joined, session_started) and UI chain (SSE event → DOM update)
 
-**Layer 2 — SSE transport and UI chain** (extends `BaseIntegrationTest`, Playwright required):
-- `SseTransportSmokeTest` — SSE connection formation, session-level event broadcast (participant_joined, session_started)
-- `SseUiChainTest` — SSE event triggers visible DOM change (note_added, participant_joined update)
-
-**Layer 3 — Spring/API integration** (MockMvc, Testcontainers, no browser):
+**Layer 2 — Spring/API integration** (`facilitation/`, MockMvc, Testcontainers, no browser):
 - `StepAdvancementApiIntegrationTest` — step index increment, 403 for non-facilitator
 - `ParticipantStateDataIntegrationTest` — participant LEFT/ACTIVE state, FK-safe response preservation
 - `ClusteringApiIntegrationTest` — merge/unmerge/rename/list endpoints
 - `VotingIntegrationTest` — voting API and data contract
-- `SscCsvImportTest` — SSC stage data integrity (template-specific naming is intentional here)
+- `AuthorizationMatrixIntegrationTest` — unauthenticated → 401 JSON for all /api/** endpoints
 
-**Layer 4 — Data/repository** (no browser, no MockMvc):
+**Layer 3 — Configurator/import** (`configurator/`, SpringBootTest, real DB, no browser):
+- `TemplateImportIntegrationTest` — template CSV import integrity and stage data contracts
+
+**Layer 4 — Data/repository** (`facilitation/`, no browser, no MockMvc):
 - `ClusteringDataModelTest` — repository query correctness and entity persistence
 
-**Layer 5 — Contract** (no browser, no Spring context beyond what's needed):
+**Layer 5 — Contract** (module-aligned package, no browser, no Spring context beyond what's needed):
 - `RetroTemplateContractTest` — template structure contracts
 
 #### Test Class Naming Rules
 
-A test class name MUST communicate the layer it operates at and the behaviour it guards. Template names (`Ssc`, `MadSadGlad`, `StartStopContinue`, `HappinessHistogram`, `OriginalFour`) are **banned** in any generic browser regression or API/data test class name. They are only allowed where the class intentionally tests template-specific data integrity (e.g., `SscCsvImportTest`).
+A test class name MUST communicate the layer it operates at and the behaviour it guards. Template names (`Ssc`, `MadSadGlad`, `StartStopContinue`, `HappinessHistogram`, `OriginalFour`) are **banned** in any generic browser regression or API/data test class name. They are only allowed where the class intentionally tests template-specific data integrity (e.g., `TemplateImportIntegrationTest`).
 
 Suffix conventions:
 - `BrowserRegressionTest` — Playwright, broad regression scope
 - `BrowserSmokeTest` — Playwright, narrow proof-of-concept check
-- `SseTransportSmokeTest` — Playwright, SSE connection layer only
-- `SseUiChainTest` — Playwright, SSE event to DOM update chain
+- `BrowserTest` — Playwright, focused browser test (e.g., SSE browser tests)
 - `ApiIntegrationTest` — MockMvc, HTTP contract
 - `DataIntegrationTest` — SpringBootTest, real DB, no browser
 - `DataModelTest` — repository query contract
+
+#### Security Testing Approach
+
+- **Transport gate**: `anyRequest().authenticated()` in both `SecurityConfig` and `TestSecurityOverride` — unauthenticated requests to `/api/**` return 401 JSON (not 302 redirect)
+- **`@WithMockUser`**: Acceptable in tests that mock `AuthService`/`ParticipantService` via `@MockitoBean`. The annotation satisfies the transport gate; the mock controls business authorization.
+- **Do NOT use `@WithMockUser`** in security-critical tests that test the authorization matrix itself — use `SecurityMockMvcRequestPostProcessors.authentication()` + `MockHttpSession` with `authType`/`authenticatedUser` attributes instead.
+- **`spring.security.enabled: false`** must NOT appear in test config — it silently disables all `@PreAuthorize` checks.
 
 ### Security Considerations
 - Always validate user permissions before operations
