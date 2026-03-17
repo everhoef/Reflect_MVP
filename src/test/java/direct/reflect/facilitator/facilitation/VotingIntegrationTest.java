@@ -45,6 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Testcontainers
 @ActiveProfiles({"import", "test"})
+@org.springframework.context.annotation.Import(direct.reflect.facilitator.config.TestRedisConfig.class)
 @Slf4j
 class VotingIntegrationTest {
 

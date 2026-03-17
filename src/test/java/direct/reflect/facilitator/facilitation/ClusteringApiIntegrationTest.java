@@ -52,7 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Testcontainers
 @ActiveProfiles({"import", "test"})
-@Import(TestSecurityOverride.class)
+@Import({TestSecurityOverride.class, direct.reflect.facilitator.config.TestRedisConfig.class})
 @Slf4j
 class ClusteringApiIntegrationTest {
 

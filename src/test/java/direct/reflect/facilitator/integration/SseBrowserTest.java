@@ -139,6 +139,12 @@ public class SseBrowserTest extends BaseIntegrationTest {
                     null,
                     new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
 
+                // Wait for participant page to fully render at the starting step before
+                // beginning the skip loop — without this, the loop races ahead of the
+                // participant page's React render and lands on the wrong step.
+                waitForElement(participantPage, "[data-step-index]", DEFAULT_TIMEOUT_MS);
+                log.info("Participant page rendered at step index: {}", getCurrentStepIndex(participantPage));
+
                 log.info("Navigating to first multi-column input step (with textarea)...");
                 int maxSkips = 20;
                 boolean foundInputStep = false;

@@ -33,6 +33,7 @@ import static org.assertj.core.groups.Tuple.tuple;
 @SpringBootTest
 @Testcontainers
 @ActiveProfiles({"import", "test"})
+@org.springframework.context.annotation.Import(direct.reflect.facilitator.config.TestRedisConfig.class)
 @Slf4j
 class ClusteringDataModelTest {
 

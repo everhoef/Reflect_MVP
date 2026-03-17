@@ -174,9 +174,11 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             assertFalse(carolPage.locator("[data-testid=\"column-mad\"] p:has-text('Bob Mad: Slow deployments')").isVisible(),
                 "Carol should NOT see Bob's response before reveal (privacy mode)");
 
-            // Each user should see their OWN responses (use p selector to avoid matching hidden textarea in edit mode)
+            // Each user should see their OWN responses (wait for network round-trip + React re-render)
+            waitForElement(bobPage, "[data-testid=\"column-mad\"] p:has-text('Bob Mad: Slow deployments')", DEFAULT_TIMEOUT_MS);
             assertTrue(bobPage.locator("[data-testid=\"column-mad\"] p:has-text('Bob Mad: Slow deployments')").isVisible(),
                 "Bob should see his own responses");
+            waitForElement(carolPage, "[data-testid=\"column-glad\"] p:has-text('Carol Glad: Great teamwork')", DEFAULT_TIMEOUT_MS);
             assertTrue(carolPage.locator("[data-testid=\"column-glad\"] p:has-text('Carol Glad: Great teamwork')").isVisible(),
                 "Carol should see her own responses");
 
@@ -362,7 +364,23 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
 
             // Advance through the AUTO step → transitions session to COMPLETED
             logTestProgress("PHASE_5", 2, 2, "Advancing AUTO step to complete session");
-            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS);
+            // Click Next and wait for the response, then wait for the Next button to disappear.
+            // We cannot use clickNextAndWait here because it relies on waitForStepChange which
+            // requires [data-step-index] to be present — but in COMPLETED state the UI may not
+            // render that attribute, causing a timeout.
+            Locator nextBtn = facilitatorPage.locator("[data-testid='next-step-button']");
+            facilitatorPage.waitForResponse(
+                response -> response.url().contains("/next") && response.request().method().equals("POST"),
+                new Page.WaitForResponseOptions().setTimeout(DEFAULT_TIMEOUT_MS),
+                () -> nextBtn.click(new Locator.ClickOptions().setTimeout(DEFAULT_TIMEOUT_MS))
+            );
+            // Wait for the Next button to disappear (UI reflects COMPLETED state)
+            facilitatorPage.waitForFunction(
+                "() => !document.querySelector('[data-testid=\"next-step-button\"]') || " +
+                "  !document.querySelector('[data-testid=\"next-step-button\"]').offsetParent",
+                null,
+                new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS)
+            );
 
             // Verify session completion
             logTestProgress("COMPLETE", 2, 2, "Verifying session completion");

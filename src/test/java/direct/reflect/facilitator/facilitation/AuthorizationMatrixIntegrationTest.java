@@ -44,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Testcontainers
 @ActiveProfiles({"import", "test"})
-@Import(TestSecurityOverride.class)
+@Import({TestSecurityOverride.class, direct.reflect.facilitator.config.TestRedisConfig.class})
 @DisplayName("Authorization Matrix — unauthenticated /api/** requests return 401")
 @Slf4j
 class AuthorizationMatrixIntegrationTest {
