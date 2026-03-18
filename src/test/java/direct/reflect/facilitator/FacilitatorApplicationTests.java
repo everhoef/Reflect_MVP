@@ -14,7 +14,8 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import lombok.extern.slf4j.Slf4j;
 
 @SpringBootTest
-@Testcontainers  
+@Testcontainers
+@org.springframework.context.annotation.Import(direct.reflect.facilitator.config.TestRedisConfig.class)
 @Slf4j
 class FacilitatorApplicationTests {
     

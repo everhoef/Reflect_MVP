@@ -55,7 +55,7 @@ public class RetroSession {
   }
 
   public void advancePhase() {
-    setPhase(RetroPhase.values()[getPhase().ordinal() + 1]);
+    setPhase(getPhase().next());
     currentStepIndex = -1;
   }
 }

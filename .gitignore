@@ -75,3 +75,7 @@ logs/
 ### AI Agents ###
 .claude/
 .sisyphus/
+
+### Frontend ###
+frontend/node_modules/
+frontend/dist/

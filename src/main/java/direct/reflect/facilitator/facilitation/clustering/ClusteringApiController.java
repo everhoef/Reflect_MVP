@@ -2,6 +2,7 @@ package direct.reflect.facilitator.facilitation.clustering;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +26,7 @@ import java.util.UUID;
 @RequestMapping("/api/retro/{retroId}/step/{stepId}")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Clustering API", description = "Response clustering and merging operations")
 public class ClusteringApiController {
 
     private final ClusteringService clusteringService;

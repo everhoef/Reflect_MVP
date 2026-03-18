@@ -3,6 +3,7 @@ package direct.reflect.facilitator.eventing;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -36,15 +37,21 @@ public class EventService {
     private final ApplicationEventPublisher applicationEventPublisher;
     private final AtomicInteger activeConnections = new AtomicInteger(0);
 
+    @Value("${facilitator.sse.timeout-ms:3600000}")
+    private long sseTimeoutMs;
+
     // Record to store SSE emitter with participant info
     private record EmitterConnection(SseEmitter emitter, String participantName) {}
 
     // Local SSE connections for this pod instance
     private final ConcurrentHashMap<String, EmitterConnection> localEmitters = new ConcurrentHashMap<>();
-    private final ScheduledExecutorService keepAliveExecutor = Executors.newScheduledThreadPool(2);
+    private final ScheduledExecutorService keepAliveExecutor = Executors.newScheduledThreadPool(2,
+        r -> {
+            Thread t = new Thread(r, "sse-keepalive-" + System.nanoTime());
+            t.setDaemon(true);
+            return t;
+        });
 
-    private static final long SSE_TIMEOUT = 3600000L; // 1 hour
-    
     @PostConstruct
     public void init() {
         log.info("EventService initializing with Redis Pub/Sub");
@@ -127,7 +134,7 @@ public class EventService {
             cleanupConnection(connectionId, existingConnection.emitter(), participantInfo, retroId);
         }
 
-        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
+        SseEmitter emitter = new SseEmitter(sseTimeoutMs);
 
         // Store locally with participant name
         localEmitters.put(connectionId, new EmitterConnection(emitter, participantName));
@@ -220,22 +227,22 @@ public class EventService {
         int failureCount = 0;
 
         for (Map.Entry<String, EmitterConnection> entry : matchingEmitters) {
+            String participantName = entry.getValue().participantName();
             try {
-                // Send properly formatted SSE event using SseEmitter.event() builder
-                // Use the event type as the SSE event name, and pass the actual payload as data
-                String eventData = event.payload() != null ? event.payload().toString() : "refresh";
+                String eventData = event.payload() != null
+                        ? objectMapper.writeValueAsString(event.payload())
+                        : "null";
                 entry.getValue().emitter().send(SseEmitter.event()
-                    .id(event.correlationId())  // Include correlation ID in SSE message
+                    .id(event.correlationId())
                     .name(event.type().name().toLowerCase())
                     .data(eventData));
 
-                log.trace("[{}] Delivered to {}",
-                    event.correlationId(), entry.getValue().participantName());
+                log.trace("[{}] Delivered to {}", event.correlationId(), participantName);
                 successCount++;
 
-            } catch (IOException e) {
+            } catch (Exception e) {
                 log.warn("[{}] Failed to deliver to {}: {}",
-                    event.correlationId(), entry.getValue().participantName(), e.getMessage());
+                    event.correlationId(), participantName, e.getMessage());
                 failureCount++;
                 // Don't manually cleanup here - let the emitter's error handler deal with it
                 // This prevents double-cleanup and negative connection counts

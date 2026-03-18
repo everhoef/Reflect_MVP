@@ -16,7 +16,6 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.logout.SimpleUrlLogoutSuccessHandler;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.stereotype.Component;
 
 import jakarta.servlet.ServletException;
@@ -54,15 +53,12 @@ public class SecurityConfig {
                 .loginPage("/login")
                 .successHandler(oidcSuccessHandler())
             )
-            // CSRF Configuration
-            .csrf(csrf -> csrf
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-            )
+            .csrf(csrf -> csrf.spa())
             // Authorization rules - permissive approach with service-level enforcement
             .authorizeHttpRequests(requests -> requests
                 // Public static resources
-                .requestMatchers("/css/**", "/js/**", "/images/**", "/img/**", "/static/**", "/webjars/**").permitAll()
-                .requestMatchers("/favicon.ico", "/htmx.min.js", "/sse.js", "/json-enc.js", "/script.js").permitAll()
+                .requestMatchers("/css/**", "/js/**", "/images/**", "/img/**", "/static/**", "/webjars/**", "/assets/**").permitAll()
+                .requestMatchers("/favicon.ico", "/favicon.svg", "/vite.svg").permitAll()
                 
                 // Public pages
                 .requestMatchers("/login").permitAll()
@@ -75,6 +71,9 @@ public class SecurityConfig {
                 
                 // Health checks for monitoring
                 .requestMatchers("/actuator/health/**").permitAll()
+                
+                // OpenAPI / Swagger UI - no auth required
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 
                 // Mixed endpoints - require authentication (either OIDC or guest session)
                 // Service layer handles business logic authorization  
@@ -90,8 +89,7 @@ public class SecurityConfig {
                 // Admin endpoints - require authentication + application-level admin check
                 .requestMatchers("/admin/**").authenticated()
                 
-                // Default: allow access, enforce business rules in service layer
-                .anyRequest().permitAll()
+                .anyRequest().authenticated()
             )
             // Exception handling
             .exceptionHandling(exceptions -> exceptions
@@ -129,10 +127,6 @@ public class SecurityConfig {
         return handler;
     }
     
-    /**
-     * OIDC Authentication Success Handler
-     * Extracts user identity and stores in session for application use
-     */
     @Component
     public static class OidcSuccessHandler implements AuthenticationSuccessHandler {
         

@@ -60,10 +60,6 @@
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-thymeleaf</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 		<dependency>
@@ -73,10 +69,6 @@
 		<dependency>
 			<groupId>org.springframework.session</groupId>
 			<artifactId>spring-session-data-redis</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.thymeleaf.extras</groupId>
-			<artifactId>thymeleaf-extras-springsecurity6</artifactId>
 		</dependency>
 
 		<!-- Database Drivers -->
@@ -121,31 +113,11 @@
 			<scope>provided</scope>
 		</dependency>
 
-		<!-- HTMX via WebJARs-->
+		<!-- OpenAPI / Swagger UI -->
 		<dependency>
-			<groupId>org.webjars</groupId>
-			<artifactId>webjars-locator</artifactId>
-			<version>0.52</version>
-		</dependency>
-		<dependency>
-			<groupId>org.webjars.npm</groupId>
-			<artifactId>htmx.org</artifactId>
-			<version>2.0.4</version>
-		</dependency>
-		<dependency>
-			<groupId>org.webjars.npm</groupId>
-			<artifactId>htmx-ext-sse</artifactId>
-			<version>2.2.3</version>
-		</dependency>
-		<dependency>
-			<groupId>org.webjars.npm</groupId>
-			<artifactId>htmx-ext-json-enc</artifactId>
-			<version>2.0.2</version>
-		</dependency>
-		<dependency>
-			<groupId>org.webjars.npm</groupId>
-			<artifactId>sortablejs</artifactId>
-			<version>1.15.6</version>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>3.0.2</version>
 		</dependency>
 
 		<!-- RUNTIME DEPENDENCIES -->
@@ -263,6 +235,78 @@
 
 	<build>
 		<plugins>
+			<plugin>
+				<groupId>cz.habarta.typescript-generator</groupId>
+				<artifactId>typescript-generator-maven-plugin</artifactId>
+				<version>3.2.1263</version>
+				<executions>
+					<execution>
+						<id>generate-sse-types</id>
+						<goals><goal>generate</goal></goals>
+					</execution>
+				</executions>
+				<configuration>
+					<jsonLibrary>jackson2</jsonLibrary>
+					<classes>
+						<class>direct.reflect.facilitator.eventing.RetroEvent</class>
+						<class>direct.reflect.facilitator.eventing.RetroEvent$ResponseData</class>
+						<class>direct.reflect.facilitator.eventing.RetroEvent$EventType</class>
+					</classes>
+					<customTypeMappings>
+						<customTypeMapping>java.time.Instant:string</customTypeMapping>
+						<customTypeMapping>java.util.UUID:string</customTypeMapping>
+					</customTypeMappings>
+					<customTypeNaming>
+						<customTypeNaming>direct.reflect.facilitator.eventing.RetroEvent$ResponseData:ResponseData</customTypeNaming>
+					</customTypeNaming>
+					<outputKind>module</outputKind>
+					<outputFileType>implementationFile</outputFileType>
+					<outputFile>frontend/src/types/generated/retro-event.ts</outputFile>
+					<noFileComment>false</noFileComment>
+					<mapEnum>asUnion</mapEnum>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>com.github.eirslett</groupId>
+				<artifactId>frontend-maven-plugin</artifactId>
+				<version>1.15.0</version>
+				<configuration>
+					<workingDirectory>frontend</workingDirectory>
+					<installDirectory>target</installDirectory>
+				</configuration>
+				<executions>
+					<execution>
+						<id>install node and npm</id>
+						<phase>generate-resources</phase>
+						<goals>
+							<goal>install-node-and-npm</goal>
+						</goals>
+						<configuration>
+							<nodeVersion>v22.14.0</nodeVersion>
+						</configuration>
+					</execution>
+					<execution>
+						<id>npm install</id>
+						<phase>generate-resources</phase>
+						<goals>
+							<goal>npm</goal>
+						</goals>
+						<configuration>
+							<arguments>install</arguments>
+						</configuration>
+					</execution>
+					<execution>
+						<id>npm run build</id>
+						<phase>generate-resources</phase>
+						<goals>
+							<goal>npm</goal>
+						</goals>
+						<configuration>
+							<arguments>run build</arguments>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>

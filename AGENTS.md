@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to AI agents (Claude, Cursor, etc.) when working with the Facilitator codebase - a Spring Boot application for team retrospectives.
+This file provides guidance to AI agents (Claude, Cursor, etc.) when working with the Facilitator codebase - a full-stack retrospective platform with a Spring Boot backend and a React/Vite frontend.
 
 **Source of Truth for Stories & Roadmap**: Notion (stories, BDD scenarios, implementation status, timelines)
 **Source of Truth for Technical Guidance**: This file (architecture, patterns, conventions)
@@ -139,15 +139,17 @@ The app guides teams from vague intentions to SMART action points:
 
 ### Project Overview
 
-Spring Boot 3.5.3 application built with Java 21, Spring MVC (not WebFlux), Spring Security, Spring Data JPA, PostgreSQL, Redis, and Thymeleaf + HTMX.
+Spring Boot 4.0.0 application built with Java 25, Spring MVC (not WebFlux), Spring Security, Spring Data JPA, PostgreSQL, Redis, and a React + Vite + TypeScript frontend. The React SPA serves all UI; the backend is purely API-based (REST + SSE) with server-side auth redirects for guest login and logout.
 
 ### Core Technology Stack
-- **Backend**: Spring Boot 3.5.3, **Spring MVC** (Web MVC, not WebFlux), Spring Security, Spring Data JPA
-- **Database**: PostgreSQL with Hibernate
+- **Backend**: Spring Boot 4.0.0, **Spring MVC** (Web MVC, not WebFlux), Spring Security, Spring Data JPA
+- **Database**: PostgreSQL 17 with Hibernate
 - **Session Management**: Redis for session storage
-- **Frontend**: Thymeleaf templates with HTMX for dynamic interactions
-- **Real-time Updates**: Server-Sent Events (SSE) for targeted component reloading
-- **Testing**: JUnit 5, Testcontainers, Spring Boot Test
+- **Frontend**: React 19 + Vite + TypeScript
+- **Frontend libraries**: React Router, TanStack Query, Tailwind CSS v4, shadcn/ui, Zustand, React Hook Form, Zod, dnd-kit
+- **Real-time Updates**: Server-Sent Events (SSE) consumed by the React frontend
+- **Testing**: JUnit 5, Testcontainers, Spring Boot Test, Playwright, Vitest
+- **Type generation**: TypeScript types are generated from backend models and OpenAPI
 - **Tools**: Lombok for boilerplate reduction
 
 ### Design Principles (GRASP)
@@ -165,7 +167,6 @@ The application follows **function-oriented modular architecture** organized aro
 - **facilitation**: Sessions, participants, retrospective flow control
 - **eventing**: Real-time SSE event streaming and notifications
 - **auth**: Authentication (OIDC + guest mode with CookieAuthenticationToken)
-- **web**: View controllers and template data services (Thymeleaf rendering)
 - **common**: Shared utilities, exceptions, configurations
 
 ### Domain Model
@@ -183,10 +184,10 @@ The application follows **function-oriented modular architecture** organized aro
 
 ### Controller Separation
 
-The application maintains **strict separation** between three types of controllers:
+The application maintains **strict separation** between controller types:
 
-- **View Controllers** (`*ViewController`): Handle Thymeleaf template rendering and web page navigation
-- **API Controllers** (`*ApiController`): Handle REST API endpoints for data operations
+- **Auth Controller** (`AuthController`): Handles guest login and logout via server-side redirects
+- **API Controllers** (`*ApiController`): Handle REST API endpoints returning JSON for the React frontend
 - **Event Controllers** (`*EventController`): Handle Server-Sent Events (SSE) streaming
 
 **Never mix responsibilities** - each controller type has a single purpose.
@@ -226,28 +227,16 @@ Custom cookie-based authentication supporting two modes:
 
 When a participant submits a response, **ALL participants** in that session see the update in real-time:
 
-1. **Client submits**: User fills form → HTMX POST to `/api/retro/{retroId}/step/{stepId}/{pattern}`
-   - Form includes `hx-swap="none"` (no HTML returned to submitter)
+1. **Client submits**: The React frontend sends a POST to `/api/retro/{retroId}/step/{stepId}/...` via fetch/TanStack Query.
 
 2. **Server processes**:
    - Controller validates and delegates to ResponseService
    - ResponseService saves response to database
    - ResponseService publishes SSE event to ALL participants via EventService
 
-3. **All clients update** (HTMX-driven, no JavaScript needed):
-   - HTML elements have `hx-trigger="sse:note_added from:body"`
-   - When SSE event arrives, HTMX automatically triggers GET request to refresh that component
-   - HTMX swaps the fresh HTML fragment into place
+3. **All clients update**: The React frontend subscribes to the SSE stream. When an event arrives, it re-fetches the relevant data and re-renders the affected components.
 
-**Example** (category lane auto-refresh):
-```html
-<div id="category-lane-Mad"
-     hx-get="/retro/{retroId}/step/{stepId}/responses/categorical?category=Mad"
-     hx-trigger="sse:note_added from:body, sse:note_updated from:body"
-     hx-swap="innerHTML">
-    <!-- Sticky notes render here -->
-</div>
-```
+**Principle**: The backend owns persistence and event broadcasting; the React frontend owns rendering for active retro flows.
 
 ### Transactional Event Publishing
 
@@ -346,22 +335,7 @@ All configuration is stored as pure JSON in the `componentConfig` field. No Java
 
 ### Facilitator Override Principle
 
-Facilitators can ALWAYS advance - the system shows warnings but never blocks:
-
-```html
-<!-- Next button ALWAYS enabled for facilitator -->
-<button th:if="${isFacilitator}"
-        hx-post="/api/retro/{retroId}/next"
-        class="btn-primary">
-    Next
-</button>
-
-<!-- Warning shown if blocking condition not met -->
-<div th:if="${!canAdvance}" class="warning">
-    ⚠️ Only 3 of 5 participants responded.
-    You can still proceed if needed.
-</div>
-```
+Facilitators can ALWAYS advance - the system shows warnings but never blocks. The React frontend should always render the facilitator's "Next" control, while still warning when recommended preconditions have not been met.
 
 **Why this matters**: Trust facilitator judgment over rigid system rules. Prevents bugs from blocking the entire team.
 
@@ -383,14 +357,9 @@ Facilitators can ALWAYS advance - the system shows warnings but never blocks:
 - **Quality boost without annoyance**: Detailed enough to improve facilitation quality, concise enough to avoid cognitive overload
 
 ### Design Philosophy
-- **Clean and straightforward**: Professional appearance inspired by system-ui mockups
+- **Clean and straightforward**: Professional appearance with clear visual hierarchy
 - **Minimal cognitive load**: Clear visual hierarchy, focused content areas, embedded guidance
 - **Zero facilitation skills required**: Step-by-step instructions eliminate need for training
-
-### Design Reference
-The `system-ui/` folder contains UI design screenshots with mock data that illustrate the intended visual direction. Note: mockups serve as initial design inspiration but may become outdated as implementation evolves.
-
----
 
 ## Code Conventions
 
@@ -407,9 +376,9 @@ The `system-ui/` folder contains UI design screenshots with mock data that illus
 - **Always use imports for class types** - Never use fully-qualified class names in code
 
 ### Controller Separation Standards
-- **Strict separation** between View, API, and Event controllers
-- **View Controllers**: Only Thymeleaf rendering and web navigation
-- **API Controllers**: Only REST endpoints returning JSON
+- **Strict separation** between Auth, API, and Event controllers
+- **Auth Controller**: Only guest login/logout with server-side redirects
+- **API Controllers**: Only REST endpoints returning JSON for the React frontend
 - **Event Controllers**: Only SSE streaming for real-time updates
 - **Never mix responsibilities**
 
@@ -422,6 +391,62 @@ The `system-ui/` folder contains UI design screenshots with mock data that illus
 - **NEVER skip, disable, or ignore failing tests**: If a test fails, it is your responsibility to fix the root cause. Do not use `@Disabled`, `@Ignore`, `@Tag("flaky")`, or any mechanism to skip tests.
 - **Flaky tests are bugs**: A flaky test indicates a real problem — race condition, missing synchronization, incorrect assumptions. Treat flaky tests as P1 bugs and fix immediately.
 - **Test reliability is non-negotiable**: All tests must pass reliably on every run. If a test passes "most of the time", it is broken and must be fixed.
+
+#### Test Package Architecture
+
+The test package structure mirrors `src/main/java` as closely as practical:
+
+- **`integration/`** — Browser/E2E tests ONLY (enforced by `IntegrationPackageBrowserOnlyTest`). Any non-browser test in this package is a violation.
+- **`facilitation/`** — MockMvc/API and data tests for the facilitation module
+- **`configurator/`** — Import, template, and configurator tests
+- **`auth/`** — Authentication controller and service tests
+- **`eventing/`** — SSE event and contract tests
+- **`common/`** — Architecture enforcement tests (e.g., `IntegrationPackageBrowserOnlyTest`)
+- **`config/`** — Test configuration classes (`TestSecurityOverride`, `TestRedisConfig`)
+
+#### Test Layer Taxonomy
+
+Each test class belongs to exactly one layer. The layer determines the package and naming convention.
+
+**Layer 1 — Browser regression** (`integration/`, extends `BaseIntegrationTest`, Playwright required):
+- `RetroFlowBrowserRegressionTest` — golden-path regression: column rendering, sticky notes, SSE propagation, clustering UI, voting UI, timer controls, stage progress bar
+- `MultiUserRetroBrowserRegressionTest` — multi-user flows, column isolation, privacy mode reveal
+- `SseBrowserTest` — SSE transport (connection, participant_joined, session_started) and UI chain (SSE event → DOM update)
+
+**Layer 2 — Spring/API integration** (`facilitation/`, MockMvc, Testcontainers, no browser):
+- `StepAdvancementApiIntegrationTest` — step index increment, 403 for non-facilitator
+- `ParticipantStateDataIntegrationTest` — participant LEFT/ACTIVE state, FK-safe response preservation
+- `ClusteringApiIntegrationTest` — merge/unmerge/rename/list endpoints
+- `VotingIntegrationTest` — voting API and data contract
+- `AuthorizationMatrixIntegrationTest` — unauthenticated → 401 JSON for all /api/** endpoints
+
+**Layer 3 — Configurator/import** (`configurator/`, SpringBootTest, real DB, no browser):
+- `TemplateImportIntegrationTest` — template CSV import integrity and stage data contracts
+
+**Layer 4 — Data/repository** (`facilitation/`, no browser, no MockMvc):
+- `ClusteringDataModelTest` — repository query correctness and entity persistence
+
+**Layer 5 — Contract** (module-aligned package, no browser, no Spring context beyond what's needed):
+- `RetroTemplateContractTest` — template structure contracts
+
+#### Test Class Naming Rules
+
+A test class name MUST communicate the layer it operates at and the behaviour it guards. Template names (`Ssc`, `MadSadGlad`, `StartStopContinue`, `HappinessHistogram`, `OriginalFour`) are **banned** in any generic browser regression or API/data test class name. They are only allowed where the class intentionally tests template-specific data integrity (e.g., `TemplateImportIntegrationTest`).
+
+Suffix conventions:
+- `BrowserRegressionTest` — Playwright, broad regression scope
+- `BrowserSmokeTest` — Playwright, narrow proof-of-concept check
+- `BrowserTest` — Playwright, focused browser test (e.g., SSE browser tests)
+- `ApiIntegrationTest` — MockMvc, HTTP contract
+- `DataIntegrationTest` — SpringBootTest, real DB, no browser
+- `DataModelTest` — repository query contract
+
+#### Security Testing Approach
+
+- **Transport gate**: `anyRequest().authenticated()` in both `SecurityConfig` and `TestSecurityOverride` — unauthenticated requests to `/api/**` return 401 JSON (not 302 redirect)
+- **`@WithMockUser`**: Acceptable in tests that mock `AuthService`/`ParticipantService` via `@MockitoBean`. The annotation satisfies the transport gate; the mock controls business authorization.
+- **Do NOT use `@WithMockUser`** in security-critical tests that test the authorization matrix itself — use `SecurityMockMvcRequestPostProcessors.authentication()` + `MockHttpSession` with `authType`/`authenticatedUser` attributes instead.
+- **`spring.security.enabled: false`** must NOT appear in test config — it silently disables all `@PreAuthorize` checks.
 
 ### Security Considerations
 - Always validate user permissions before operations
@@ -476,7 +501,7 @@ A feature is READY FOR REVIEW when ALL of the following conditions are true:
 Additional REQUIRED rules for feature delivery:
 
 - **Integration tests**: REQUIRED for every new endpoint (API, View, or Event controller). Use `@SpringBootTest` + Testcontainers. Follow patterns in existing test classes.
-- **Playwright E2E tests**: REQUIRED for every user-facing feature. Tests MUST live in `src/test/java/.../integration/` alongside existing tests (e.g., `SscRetroFlowTest`). MUST capture screenshot evidence.
+- **Playwright E2E tests**: REQUIRED for every user-facing feature. Tests MUST live in `src/test/java/.../integration/` alongside existing tests (e.g., `RetroFlowBrowserRegressionTest`). MUST capture screenshot evidence.
 - **Regression gate**: `./mvnw clean test` MUST show zero failures TOTAL — not just new tests passing, but ALL existing tests still passing.
 
 **Definitions**:
@@ -516,14 +541,8 @@ Additional REQUIRED rules for feature delivery:
 
 ## Key Technical Rules
 
-### Thymeleaf Reserved Words
-- Never use `session` as variable name (reserved in web context). Always use `retroSession`.
-
-### SpEL Expressions
-- Avoid complex SpEL in templates. Use Thymeleaf utilities (`#aggregates.sum()`, `#numbers.sequence()`) instead of stream operations.
-
 ### DTO Pattern
-- Always convert entities to DTOs before template rendering
+- Always convert entities to DTOs before passing them to any rendering layer or API response
 - DTOs implement `ComponentResponseDto.toResponseData()`
 
 ### Error Handling
@@ -539,21 +558,53 @@ Additional REQUIRED rules for feature delivery:
 
 ## Build and Development Commands
 
-### Maven Commands
-- **Build the project**: `mvn clean compile`
-- **Run tests**: `mvn test`
-- **Run specific test**: `mvn test -Dtest=ClassName#methodName`
-- **Run the application**: `mvn spring-boot:run -Dspring-boot.run.profiles=import`
-- **Package the application**: `mvn clean package`
+### Prerequisites
+- Docker Desktop
+- Java 25 (`brew install --cask temurin@25`)
+- Maven wrapper is bundled (`./mvnw`) — no separate Maven install needed
 
-### Docker Dependencies
-- **Start services** (PostgreSQL + Redis): `docker compose up -d`
+### Starting the Full Stack
+
+Spring Boot automatically starts PostgreSQL, Redis, and the frontend dev server via Docker Compose integration (`spring.docker.compose.enabled: true`). Docker Desktop must be running, but you don't need to run `docker compose up -d` manually.
+
+```bash
+# Single command starts everything (Docker services + Spring Boot backend)
+./mvnw spring-boot:run -Dspring-boot.run.profiles=import
+```
+
+- App: http://localhost:8080
+- Frontend dev server: http://localhost:5173
+
+If the automatic startup fails or you need to manage Docker services independently (e.g., to keep them running between backend restarts), you can start them manually as a fallback:
+
+```bash
+# Manual fallback: start Docker services separately
+docker compose up -d
+
+# Then start the backend
+./mvnw spring-boot:run -Dspring-boot.run.profiles=import
+```
+
+### Maven Commands
+- **Build the project**: `./mvnw clean compile`
+- **Run tests**: `./mvnw test`
+- **Run specific test**: `./mvnw test -Dtest=ClassName#methodName`
+- **Package the application**: `./mvnw clean package`
+
+### Docker Commands
+- **Start services manually** (fallback, or to keep services running between backend restarts): `docker compose up -d`
 - **Stop services**: `docker compose down`
 
+### Frontend Commands (inside `frontend/`)
+- **Dev server**: `npm run dev`
+- **Type check**: `npm run typecheck`
+- **Unit tests**: `npm test`
+- **Regenerate API types**: `npm run generate-types`
+
 ### Testing with Testcontainers
-- Tests use Testcontainers for PostgreSQL and Redis - no manual setup needed
-- Containers managed automatically during test execution
-- Simply run `mvn test` to execute integration tests
+- Tests use Testcontainers for PostgreSQL and Redis — no manual setup needed
+- Playwright E2E tests run as part of the Maven test suite
+- `./mvnw test` runs unit, integration, and Playwright tests
 
 ### Important Notes
 - **Always use `import` profile** when running the application
@@ -569,7 +620,7 @@ Additional REQUIRED rules for feature delivery:
 **User runs the application in a separate iTerm2 terminal tab.**
 
 #### How It Works
-- User runs: `mvn spring-boot:run -Dspring-boot.run.profiles=import` in dedicated terminal
+- User runs: `./mvnw spring-boot:run -Dspring-boot.run.profiles=import` in dedicated terminal
 - Spring Boot logs to **both** console (for user) **and** `/tmp/facilitator.log` (for Claude)
 - User sees live logs in their terminal, Claude reads from log file
 
@@ -582,7 +633,7 @@ Additional REQUIRED rules for feature delivery:
 2. **If not running**, tell the user:
    > "Please start the application in a separate iTerm2 tab:
    > ```bash
-   > mvn spring-boot:run -Dspring-boot.run.profiles=import
+   > ./mvnw spring-boot:run -Dspring-boot.run.profiles=import
    > ```"
 
 3. Wait for user confirmation before proceeding

@@ -18,20 +18,19 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import com.redis.testcontainers.RedisContainer;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.annotation.DirtiesContext.ClassMode;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.beans.factory.annotation.Autowired;
+
 import lombok.extern.slf4j.Slf4j;
+
 
 import java.util.UUID;
 import java.util.ArrayList;
@@ -80,14 +79,12 @@ import java.util.stream.Collectors;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = "spring.profiles.active=test,import")
-@Testcontainers
 @org.springframework.context.annotation.Import({
     direct.reflect.facilitator.auth.TestAuthConfiguration.class, // Provides TestAuthController with /test/* endpoints
-    direct.reflect.facilitator.config.TestSecurityOverride.class // Extends SecurityConfig to allow /test/* endpoints
+    direct.reflect.facilitator.config.TestSecurityOverride.class, // Extends SecurityConfig to allow /test/* endpoints
+    direct.reflect.facilitator.config.TestRedisConfig.class // Caps Redis retry backoff to prevent infinite reconnect loops
 })
-@DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 @Slf4j
-
 public abstract class BaseIntegrationTest {
 
     // ==================== PLAYWRIGHT CONFIGURATION ====================
@@ -103,19 +100,34 @@ public abstract class BaseIntegrationTest {
     @LocalServerPort
     protected int port;
 
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17-alpine")
+    // Singleton containers — started once for the entire test run via static initializer,
+    // never stopped between test classes. This prevents the "Failed to start bean
+    // 'springSessionRedisMessageListenerContainer'" failure that occurs when Testcontainers
+    // stops/restarts containers between classes (per-class store in TestcontainersExtension).
+    @SuppressWarnings("resource")
+    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17-alpine")
             .withDatabaseName("facilitator_test")
             .withUsername("test")
             .withPassword("test");
 
-    @Container
-    @ServiceConnection
     @SuppressWarnings("resource")
-    static RedisContainer redis = new RedisContainer("redis:alpine")
+    static final RedisContainer redis = new RedisContainer("redis:alpine")
             .withExposedPorts(6379)
             .waitingFor(Wait.forLogMessage(".*Ready to accept connections.*", 1));
+
+    static {
+        postgres.start();
+        redis.start();
+    }
+
+    @DynamicPropertySource
+    static void registerContainerProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.data.redis.host", redis::getHost);
+        registry.add("spring.data.redis.port", redis::getFirstMappedPort);
+    }
 
     protected static Playwright playwright;
     protected static Browser browser;
@@ -375,6 +387,7 @@ public abstract class BaseIntegrationTest {
 
     @BeforeAll
     static void setUpPlaywright() {
+        if (playwright != null) return; // Already initialized — reuse existing instance across subclasses
         boolean debugMode = Boolean.parseBoolean(System.getenv("PLAYWRIGHT_DEBUG"));
         BrowserType.LaunchOptions launchOptions = new BrowserType.LaunchOptions()
             .setHeadless(!debugMode)
@@ -388,12 +401,17 @@ public abstract class BaseIntegrationTest {
         }
         playwright = Playwright.create();
         browser = playwright.chromium().launch(launchOptions);
+        // Register shutdown hook so the single shared instance is always cleaned up
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (browser != null) { try { browser.close(); } catch (Exception ignored) {} }
+            if (playwright != null) { try { playwright.close(); } catch (Exception ignored) {} }
+        }));
     }
 
     @AfterAll
     static void tearDownPlaywright() {
-        if (browser != null) browser.close();
-        if (playwright != null) playwright.close();
+        // Do NOT close here — the playwright/browser instances are reused across all subclasses.
+        // The JVM shutdown hook registered in setUpPlaywright() handles final cleanup.
     }
     @BeforeEach
     void setUp(TestInfo testInfo) {
@@ -440,42 +458,30 @@ public abstract class BaseIntegrationTest {
 
         // Close browser context (browser and playwright are closed in @AfterAll)
         if (context != null) context.close();
-        // Use @DirtiesContext instead of manual cleanup to avoid connection pool issues
+        // Spring context is reused across all subclasses — @DirtiesContext is intentionally absent
+        // to prevent Spring Boot 4 / Testcontainers @ServiceConnection incompatibility on context rebuild
         clearActivityTrail();
     }
 
     // ==================== AUTHENTICATION HELPERS ====================
 
-    /**
-     * Authenticates a user as a guest using Playwright's native API request.
-     * Each browser context maintains its own session cookies, allowing multiple
-     * simultaneous authenticated users.
-     */
     protected void authenticateAsGuest(Page page, String displayName) {
         recordActivity("authenticateAsGuest: " + displayName);
         try {
-            // Clear cookies for clean state
             page.context().clearCookies();
 
             page.navigate(baseUrl + "/login");
-            page.waitForSelector("input[name='_csrf']", 
-                new Page.WaitForSelectorOptions()
-                    .setState(WaitForSelectorState.ATTACHED)
-                    .setTimeout(DEFAULT_TIMEOUT_MS));
+            page.waitForSelector("input[name='displayName']",
+                new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
 
-            String csrfToken = page.locator("input[name='_csrf']").getAttribute("value");
-            if (csrfToken == null || csrfToken.isEmpty()) {
-                throw new RuntimeException("CSRF token not found on login page");
-            }
+            page.fill("input[name='displayName']", displayName);
+            page.click("button[type='submit']");
 
-            // Use Playwright's native API request (shares session with page)
-            page.request().post(baseUrl + "/auth/guest",
-                RequestOptions.create()
-                    .setForm(FormData.create()
-                        .set("displayName", displayName)
-                        .set("_csrf", csrfToken)));
+            page.waitForURL(
+                url -> url.equals(baseUrl + "/") || url.equals(baseUrl + "/home") || url.endsWith("/"),
+                new Page.WaitForURLOptions().setTimeout(DEFAULT_TIMEOUT_MS)
+            );
 
-            page.navigate(baseUrl + "/");
             page.waitForSelector("input[name='sessionName']",
                 new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
 
@@ -563,24 +569,14 @@ public abstract class BaseIntegrationTest {
         recordActivity("createRetroSession: " + sessionName);
         log.debug("Starting session creation for: {}", sessionName);
 
-        // Navigate to home page first (should be authenticated already)
         facilitatorPage.navigate(baseUrl + "/");
-        
-        // Wait for session creation form
         facilitatorPage.waitForSelector("input[name='sessionName']", new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
         log.debug("Session creation form found");
 
-        // CRITICAL: Wait for HTMX to fully initialize before interacting with forms
-        // Without this, clicking the button races with HTMX attaching event handlers
-        facilitatorPage.waitForFunction("() => typeof htmx !== 'undefined'");
-        log.debug("HTMX initialized and ready");
-
-        // Set up response monitoring to capture the HX-Redirect header
         final String[] redirectUrl = {null};
-        
         facilitatorPage.onResponse(response -> {
             if (response.url().contains("/api/retro/create")) {
-                log.debug("Session create response: status={}, headers={}", response.status(), response.headers());
+                log.debug("Session create response: status={}", response.status());
                 String hxRedirect = response.headers().get("hx-redirect");
                 if (hxRedirect == null) {
                     hxRedirect = response.headers().get("HX-Redirect");
@@ -593,27 +589,21 @@ public abstract class BaseIntegrationTest {
                 }
             }
         });
-        
-        // Create session (no template selection needed - API uses default template)
+
         facilitatorPage.fill("input[name='sessionName']", sessionName);
         facilitatorPage.click("button:has-text('Create Session')");
-        
-        // Wait for HTMX redirect to retro page (instead of network idle due to SSE)
-        facilitatorPage.waitForURL(url -> url.contains("/retro/"), new Page.WaitForURLOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-        
-        // Wait for essential page elements to load instead of fixed delay
+
+        facilitatorPage.waitForURL(url -> url.contains("/retro/"), new Page.WaitForURLOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
         facilitatorPage.waitForSelector("body", new Page.WaitForSelectorOptions().setTimeout(SHORT_TIMEOUT_MS));
 
         String sessionUrl = facilitatorPage.url();
         log.debug("Facilitator URL after session creation: {}", sessionUrl);
-        
-        // Use the redirect URL from the response to extract session ID
+
         if (redirectUrl[0] != null && !redirectUrl[0].isEmpty()) {
             String extractedId = redirectUrl[0].substring(redirectUrl[0].lastIndexOf("/") + 1);
             log.debug("Extracted session ID from HX-Redirect header: {}", extractedId);
             return extractedId;
         } else {
-            // Fallback to URL parsing
             String extractedId = sessionUrl.substring(sessionUrl.lastIndexOf("/") + 1);
             log.debug("Extracted session ID from current URL: {}", extractedId);
             return extractedId;
@@ -628,78 +618,37 @@ public abstract class BaseIntegrationTest {
         try {
             log.debug("Starting join session process - session ID: {}, current URL: {}", sessionId, participantPage.url());
 
-            // Navigate to home page first (should be authenticated already)
-            // SSE connections auto-disconnect on navigation
             participantPage.navigate(baseUrl + "/");
-            
-            // Wait for join session form
+
             log.info("Waiting for join session form input[name='retroId']...");
             try {
                 participantPage.waitForSelector("input[name='retroId']", new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
                 log.info("✅ Join session form found");
             } catch (Exception e) {
-                log.error("❌ Failed to find join session form after 3 seconds");
+                log.error("❌ Failed to find join session form");
                 log.error("Current URL: {}", participantPage.url());
                 log.error("Page title: {}", participantPage.title());
-                
-                // Debug: Check what's actually on the page
-                String bodyText = participantPage.textContent("body");
-                log.error("Page content (first 1000 chars): {}", 
-                    bodyText.length() > 1000 ? bodyText.substring(0, 1000) + "..." : bodyText);
-                
-                // Check if there are any forms on the page
-                int formCount = participantPage.locator("form").count();
-                log.error("Number of forms found: {}", formCount);
-                
-                // Check for specific elements that should be on home page
-                boolean hasSessionNameInput = participantPage.locator("input[name='sessionName']").count() > 0;
-                boolean hasRetroIdInput = participantPage.locator("input[name='retroId']").count() > 0;
-                log.error("Has sessionName input: {}, Has retroId input: {}", hasSessionNameInput, hasRetroIdInput);
-                
                 throw new RuntimeException("Join session form not found: " + e.getMessage(), e);
             }
-            
-            // Check if page has any existing error parameters
-            if (participantPage.url().contains("error=")) {
-                log.warn("⚠️ Page already has error parameter: {}", participantPage.url());
-            }
-            
-            // Only log page content before form fill if there are issues finding the form
-            // (removed to reduce noise)
-            
+
             log.info("Filling session ID into form: {}", sessionId);
             participantPage.fill("input[name='retroId']", sessionId);
-            
-            // Verify the form was filled
+
             String filledValue = participantPage.inputValue("input[name='retroId']");
             log.info("Form filled with value: {}", filledValue);
             if (!sessionId.equals(filledValue)) {
                 log.error("❌ Form fill failed! Expected: {}, Actual: {}", sessionId, filledValue);
             }
 
-            // CRITICAL: Wait for HTMX to fully initialize before interacting with forms
-            // Without this, clicking the button races with HTMX attaching event handlers
-            participantPage.waitForFunction("() => typeof htmx !== 'undefined'");
-            log.debug("HTMX initialized and ready for join");
-
-            // Set up response monitoring to track HTMX redirect headers
             final String[] redirectUrl = {null};
-            final boolean[] requestSent = {false};
-            final boolean[] responsReceived = {false};
-            
-            // Monitor JOIN requests - minimal logging
             participantPage.onRequest(request -> {
                 if (request.url().contains("/api/retro/join")) {
-                    requestSent[0] = true;
                     log.info("📤 JOIN REQUEST: {} {}", request.method(), request.url());
                 }
             });
-            
+
             participantPage.onResponse(response -> {
                 if (response.url().contains("/api/retro/join")) {
-                    responsReceived[0] = true;
-                    
-                    // Check for HX-Redirect header (case insensitive)
                     String hxRedirect = response.headers().get("hx-redirect");
                     if (hxRedirect == null) {
                         hxRedirect = response.headers().get("HX-Redirect");
@@ -710,65 +659,34 @@ public abstract class BaseIntegrationTest {
                     } else {
                         log.warn("📥 JOIN RESPONSE ({}): No redirect header", response.status());
                     }
-                    
-                    try {
-                        String responseText = response.text();
-                        if (response.status() == 200 && redirectUrl[0] == null && !responseText.contains("error")) {
-                            redirectUrl[0] = baseUrl + "/retro/" + sessionId;
-                        }
-                    } catch (Exception e) {
-                        // Ignore - expected for redirect responses
-                    }
                 }
             });
-            
+
             log.info("🖱️ Clicking 'Join Session' button...");
             participantPage.click("button:has-text('Join Session')");
-            
-            // Wait for HTMX to process and potentially redirect
-            // Instead of fixed 3s delay, wait for URL change or specific response elements
+
             try {
-                participantPage.waitForURL(url -> url.contains("/retro/") || url.contains("error="), 
+                participantPage.waitForURL(url -> url.contains("/retro/") || url.contains("error="),
                     new Page.WaitForURLOptions().setTimeout(DEFAULT_TIMEOUT_MS));
             } catch (Exception e) {
-                // If URL doesn't change quickly, allow time for HTMX response
                 participantPage.waitForTimeout(500);
             }
-            
-            String finalUrl = participantPage.url(); 
+
+            String finalUrl = participantPage.url();
             if (finalUrl.contains("/retro/")) {
                 log.info("✅ Join successful → {}", finalUrl);
             } else {
                 log.warn("❌ Join failed, URL: {}", finalUrl);
-                if (!requestSent[0] || !responsReceived[0]) {
-                    log.warn("📊 Request sent: {}, Response received: {}", requestSent[0], responsReceived[0]);
-                }
             }
-            
-            if (!requestSent[0]) {
-                log.error("❌ NO JOIN REQUEST WAS SENT! This suggests HTMX form submission failed");
-                // Debug: Check if HTMX is loaded
-                Object htmxLoaded = participantPage.evaluate("typeof htmx !== 'undefined'");
-                log.error("HTMX loaded: {}", htmxLoaded);
-                
-                // Check form attributes
-                String formHtml = participantPage.innerHTML("form");
-                log.error("Form HTML: {}", formHtml);
-            }
-            
-            if (!responsReceived[0] && requestSent[0]) {
-                log.error("❌ JOIN REQUEST SENT BUT NO RESPONSE RECEIVED");
-            }
-            
+
             if (redirectUrl[0] != null && !participantPage.url().contains("/retro/")) {
-                log.info("HTMX redirect didn't occur, navigating manually to: {}", redirectUrl[0]);
+                log.info("Redirect didn't occur, navigating manually to: {}", redirectUrl[0]);
                 participantPage.navigate(redirectUrl[0]);
                 participantPage.waitForSelector("h2:has-text('Session Lobby'), [data-step-index]",
                     new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
                 log.info("Manual navigation completed, URL is now: {}", participantPage.url());
             }
-            
-            // Check for error parameters in URL and throw exception if found
+
             if (participantPage.url().contains("error=")) {
                 String url = participantPage.url();
                 String errorParam = url.substring(url.indexOf("error=") + 6);
@@ -780,8 +698,7 @@ public abstract class BaseIntegrationTest {
                 debugScreenshot(participantPage, "session_join_error", "Error parameter: " + errorParam);
                 throw new RuntimeException("Failed to join session '" + sessionId + "': " + errorParam);
             }
-            
-            // Check for error indicators in page content
+
             boolean hasErrorContent = participantPage.locator(".bg-red-100").count() > 0 ||
                                     participantPage.locator("[class*='error']").count() > 0;
             if (hasErrorContent) {
@@ -791,16 +708,15 @@ public abstract class BaseIntegrationTest {
                 log.error("❌ Found error content on page: {}", errorText);
                 throw new RuntimeException("Failed to join session '" + sessionId + "': " + errorText);
             }
-            
-            // Only log page content if there was an error
+
             if (!participantPage.url().contains("/retro/")) {
                 String pageContentAfter = participantPage.textContent("body");
-                log.warn("❌ Join failed - page content (first 300 chars): {}", 
+                log.warn("❌ Join failed - page content (first 300 chars): {}",
                     pageContentAfter.substring(0, Math.min(300, pageContentAfter.length())));
             }
-                
+
             log.info("=== END JOIN SESSION PROCESS ===");
-            
+
         } catch (Exception e) {
             log.error("❌ Exception during session join: {}", e.getMessage());
             log.error("Page URL at time of error: {}", participantPage.url());
@@ -814,26 +730,24 @@ public abstract class BaseIntegrationTest {
 
         Response startResponse = facilitatorPage.waitForResponse(
             response -> response.url().contains("/start") && response.request().method().equals("POST"),
-            () -> facilitatorPage.click("button:has-text('Start Retrospective')")
+            () -> facilitatorPage.click("[data-testid='start-retro-button']")
         );
         log.debug("Start session request completed with status: {}", startResponse.status());
 
         facilitatorPage.waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
             null, new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-        log.debug("HTMX content swap completed - lobby text disappeared");
 
         facilitatorPage.waitForSelector("[data-step-index]",
             new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-        log.debug("Step content appeared with data-step-index attribute");
 
-        facilitatorPage.waitForSelector("button:has-text('Next')",
-            new Page.WaitForSelectorOptions().setTimeout(SHORT_TIMEOUT_MS));
+        facilitatorPage.waitForSelector("[data-testid='next-step-button']",
+            new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
         log.debug("Session started - Next button visible");
     }
 
     protected boolean clickNextAndWait(Page facilitatorPage, int timeoutMs, Page... participantPages) {
         try {
-            Locator nextButton = facilitatorPage.locator("button:has-text('Next')");
+            Locator nextButton = facilitatorPage.locator("[data-testid='next-step-button']");
             if (nextButton.count() == 0) {
                 log.debug("Next button not found, assuming end of flow");
                 return false;
@@ -855,16 +769,17 @@ public abstract class BaseIntegrationTest {
             allPages.add(facilitatorPage);
             Collections.addAll(allPages, participantPages);
 
-            Response contentResponse = facilitatorPage.waitForResponse(
-                response -> response.url().contains("/content") && response.request().method().equals("GET"),
+            Response nextResponse = facilitatorPage.waitForResponse(
+                response -> response.url().contains("/next") && response.request().method().equals("POST"),
+                new Page.WaitForResponseOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS),
                 () -> {
                     nextButton.click(new Locator.ClickOptions().setTimeout(timeoutMs));
-                    log.debug("Next button clicked, waiting for content refresh...");
+                    log.debug("Next button clicked, waiting for /next POST response...");
                 }
             );
-            log.debug("Content refresh response received with status: {}", contentResponse.status());
+            log.debug("/next POST response received with status: {}", nextResponse.status());
 
-            waitForStepChange(currentStepIndex, currentPhase, timeoutMs, allPages.toArray(new Page[0]));
+            waitForStepChange(currentStepIndex, currentPhase, SSE_PROPAGATION_TIMEOUT_MS, allPages.toArray(new Page[0]));
             
             Integer newStepIndex = getCurrentStepIndex(facilitatorPage);
             String newPhase = getCurrentPhase(facilitatorPage);
@@ -960,11 +875,11 @@ public abstract class BaseIntegrationTest {
             joinRetroSession(userPage.page(), sessionId);
         }
 
-        // Start the session
         log.debug("Starting retro session...");
+        waitForElement(facilitatorPage, "[data-testid='start-retro-button']", SSE_PROPAGATION_TIMEOUT_MS);
         Response startResponse = facilitatorPage.waitForResponse(
             response -> response.url().contains("/start") && response.request().method().equals("POST"),
-            () -> clickElement(facilitatorPage, "button:has-text('Start Retrospective')"));
+            () -> clickElement(facilitatorPage, "[data-testid='start-retro-button']"));
 
         log.debug("Start session request completed with status: {}", startResponse.status());
 
@@ -973,13 +888,12 @@ public abstract class BaseIntegrationTest {
         log.debug("Waiting for all pages to leave lobby...");
         for (UserPage userPage : participants) {
             userPage.page().waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
-                null, new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+                null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
             log.debug("✅ Participant {} left lobby", userPage.displayName());
         }
 
-        // Verify facilitator also left lobby
         facilitatorPage.waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
-            null, new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+            null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
         log.debug("✅ Facilitator left lobby");
 
         return sessionId;
@@ -1041,15 +955,21 @@ public abstract class BaseIntegrationTest {
                 return;
             }
 
-            if (facilitatorPage.locator("button:has-text('Next')").count() > 0) {
+            if (facilitatorPage.locator("[data-testid='next-step-button']").count() > 0) {
                 log.debug("Clicking 'Next' button (iteration {})", i);
                 Integer currentIndex = getCurrentStepIndex(facilitatorPage);
                 String currentPhase = getCurrentPhase(facilitatorPage);
-                clickElement(facilitatorPage, "button:has-text('Next')");
 
                 if (currentIndex != null && currentPhase != null) {
-                    waitForStepChange(currentIndex, currentPhase, DEFAULT_TIMEOUT_MS, facilitatorPage);
+                    Locator nextBtn = facilitatorPage.locator("[data-testid='next-step-button']");
+                    facilitatorPage.waitForResponse(
+                        response -> response.url().contains("/next") && response.request().method().equals("POST"),
+                        new Page.WaitForResponseOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS),
+                        () -> nextBtn.click(new Locator.ClickOptions().setTimeout(DEFAULT_TIMEOUT_MS))
+                    );
+                    waitForStepChange(currentIndex, currentPhase, SSE_PROPAGATION_TIMEOUT_MS, facilitatorPage);
                 } else {
+                    clickElement(facilitatorPage, "[data-testid='next-step-button']");
                     facilitatorPage.waitForLoadState(LoadState.DOMCONTENTLOADED,
                         new Page.WaitForLoadStateOptions().setTimeout(DEFAULT_TIMEOUT_MS));
                 }
@@ -1531,22 +1451,12 @@ public abstract class BaseIntegrationTest {
     protected void waitForSseConnection(Page page, UUID retroId) {
         recordActivity("waitForSseConnection: " + retroId);
         page.waitForSelector(
-            "[sse-connect*='/api/retro/" + retroId + "/events']",
+            "[data-testid='retro-content'][data-sse-connected='true']",
             new Page.WaitForSelectorOptions()
                 .setState(WaitForSelectorState.ATTACHED)
                 .setTimeout(DEFAULT_TIMEOUT_MS)
         );
-        log.debug("SSE element found, waiting for connection to open...");
-        
-        Object hasEventSource = page.evaluate("() => typeof window.eventSource");
-        Object eventSourceState = page.evaluate("() => window.eventSource ? window.eventSource.readyState : 'no eventSource'");
-        log.debug("Before wait: typeof window.eventSource={}, readyState={}", hasEventSource, eventSourceState);
-
-        page.waitForFunction(
-            "() => window.eventSource && window.eventSource.readyState === 1",
-            null, new Page.WaitForFunctionOptions().setTimeout(10000));
-
-        log.info("SSE connection established for retro: {}", retroId);
+        log.debug("SSE connection established for retro: {} (data-sse-connected='true')", retroId);
         recordActivity("SSE connection established: " + retroId);
     }
 

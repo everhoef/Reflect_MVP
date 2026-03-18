@@ -287,6 +287,18 @@ public class ResponseService {
         return saved;
     }
 
+    public Optional<ParticipantResponse> getMyRatingResponse(
+            UUID retroId,
+            Long stepId,
+            HttpServletRequest request) {
+
+        Participant participant = participantService.getParticipantForSession(request, retroId);
+        RetroSession session = participant.getSession();
+        RetroStep step = getRetroStepById(stepId);
+
+        return responseRepository.findBySessionAndRetroStepAndParticipant(session, step, participant);
+    }
+
     private RetroStep getRetroStepById(Long stepId) {
         return retroStepRepository.findById(stepId)
             .orElseThrow(() -> new IllegalArgumentException("RetroStep not found with ID: " + stepId));
