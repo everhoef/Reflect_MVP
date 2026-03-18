@@ -184,10 +184,7 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
 
             log.info("  ├─ ✅ Privacy mode validated - responses properly hidden");
 
-            // Advance from input step to reveal instruction
-            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS);
-
-            // Skip reveal instruction, advance to reveal+clustering step
+            // Advance from input step to reveal+clustering step (step 2,3: allowMerging=true)
             logTestProgress("PHASE_2", 10, 24, "Revealing all responses");
             clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS);
 
@@ -207,41 +204,35 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
 
             log.info("  ├─ ✅ Responses properly revealed");
 
-            // Test voting functionality (if implemented) - still at reveal+clustering step
-            log.info("  ├─ Testing voting functionality...");
-
-            // Find vote button within the specific card - use div[id^='card-'] to stay within card scope
-            String voteSelector = "[data-testid=\"column-glad\"] div[id^='card-']:has(p:has-text('Carol Glad: Great teamwork')) button:has-text('👍')";
-
-            if (bobPage.locator(voteSelector).count() > 0) {
-                clickElement(bobPage, voteSelector, DEFAULT_TIMEOUT_MS);
-                bobPage.waitForLoadState(LoadState.DOMCONTENTLOADED,
-                    new Page.WaitForLoadStateOptions().setTimeout(SHORT_TIMEOUT_MS));
-                log.info("  Voting functionality validated");
-            } else {
-                log.warn("  ├─ ⚠️ Vote button UI not implemented yet (expected - see todo.md)");
-            }
-
-            // Test clustering (if implemented)
+            // Test clustering/merging functionality - on the reveal+clustering step (allowMerging=true)
             log.info("  ├─ Testing clustering/merging functionality...");
             Locator bobMadCard1 = facilitatorPage.locator("[data-testid=\"column-mad\"] p:has-text('Bob Mad: Slow deployments')");
             Locator bobMadCard2 = facilitatorPage.locator("[data-testid=\"column-mad\"] p:has-text('Bob Mad: Long meetings')");
 
-            if (bobMadCard1.count() > 0 && bobMadCard2.count() > 0) {
-                try {
-                    bobMadCard2.dragTo(bobMadCard1);
-                    // Brief wait for clustering to propagate via SSE (no specific content change to verify)
-                    facilitatorPage.waitForTimeout(SHORT_TIMEOUT_MS);
-                    log.info("  ├─ ✅ Clustering/merging functionality validated");
-                } catch (Exception e) {
-                    log.warn("  ├─ ⚠️ Drag-and-drop UI not implemented yet (expected - see todo.md)");
-                }
-            } else {
-                log.warn("  ├─ ⚠️ Clustering UI not implemented yet (expected - see todo.md)");
-            }
+            assertTrue(bobMadCard1.isVisible(), "First mad card should be visible for clustering");
+            assertTrue(bobMadCard2.isVisible(), "Second mad card should be visible for clustering");
+            bobMadCard2.dragTo(bobMadCard1);
+            // Brief wait for clustering to propagate via SSE (no specific content change to verify)
+            facilitatorPage.waitForTimeout(SHORT_TIMEOUT_MS);
+            log.info("  ├─ ✅ Clustering/merging functionality validated");
 
-            // Advance through remaining Phase 2 steps (clustering/voting → discussion)
-            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // Advance from reveal+clustering to discussion
+            // Advance to voting step (allowVoting=true, allowMerging=false) - wait for SSE on all pages
+            logTestProgress("PHASE_2", 11, 24, "Advancing to voting step");
+            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS, bobPage, carolPage);
+            waitForAllPagesElement("[data-testid=\"column-glad\"] p:has-text('Carol Glad: Great teamwork')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage, facilitatorPage);
+
+            // Test voting functionality - on the dedicated voting step (allowVoting=true)
+            log.info("  ├─ Testing voting functionality...");
+            String voteSelector = "[data-testid=\"column-glad\"] button[aria-label*='Vote for this note']";
+            waitForElement(bobPage, voteSelector, DEFAULT_TIMEOUT_MS);
+            assertTrue(bobPage.locator(voteSelector).first().isVisible(), "Vote button should be visible on voting step");
+            clickElement(bobPage, voteSelector, DEFAULT_TIMEOUT_MS);
+            bobPage.waitForLoadState(LoadState.DOMCONTENTLOADED,
+                new Page.WaitForLoadStateOptions().setTimeout(SHORT_TIMEOUT_MS));
+            log.info("  ├─ ✅ Voting functionality validated");
+
+            // Advance through remaining Phase 2 steps (voting → discussion)
+            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // Advance from voting to discussion
             clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // Skip discussion
             log.info("  └─ ✓ Completed GATHER_DATA phase (5 steps)");
 
