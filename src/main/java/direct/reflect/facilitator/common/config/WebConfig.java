@@ -22,8 +22,10 @@ import java.util.List;
  * standard handler mappings. This ensures {@code @Controller} and {@code @RestController}
  * endpoints always win before the SPA catch-all is considered.
  *
- * <p>By declaring the {@link RouterFunctionMapping} bean explicitly here, Spring Boot's
- * auto-configuration backs off and does NOT create its own mapping at order {@code -1}.
+ * <p>The bean is named {@code spaRouterFunctionMapping} (not {@code routerFunctionMapping}) so it
+ * does NOT replace Spring Boot's auto-configured {@link RouterFunctionMapping} at order {@code -1}.
+ * Both mappings coexist: Spring Boot's at {@code -1} (empty — no routes are registered there),
+ * ours at {@code 2}.
  *
  * <p>Matching rules:
  * <ul>
@@ -32,15 +34,20 @@ import java.util.List;
  *   <li>Path: all paths EXCEPT the excluded prefixes below</li>
  * </ul>
  *
- * <p>Excluded path prefixes — the router does NOT match these; other handlers win:
+ * <p>Excluded paths — the router does NOT match these; other handlers win.
+ * Entries ending with {@code /} are matched as prefixes ({@code startsWith});
+ * all other entries are matched exactly.
  * <ul>
  *   <li>Group A — REST/SSE: {@code /api/}</li>
- *   <li>Group B — Auth/Security: {@code /auth/}, {@code /oauth2/}, {@code /login/oauth2/}, {@code /logout}</li>
- *   <li>Group C — Error: {@code /error}</li>
- *   <li>Group D — Monitoring/Docs: {@code /actuator/}, {@code /v3/api-docs/}, {@code /swagger-ui/}, {@code /swagger-ui.html}</li>
+ *   <li>Group B — Auth/Security: {@code /auth/}, {@code /oauth2/}, {@code /login/oauth2/},
+ *       {@code /logout} (exact)</li>
+ *   <li>Group C — Error: {@code /error} (exact)</li>
+ *   <li>Group D — Monitoring/Docs: {@code /actuator/}, {@code /v3/api-docs/}, {@code /swagger-ui/},
+ *       {@code /swagger-ui.html} (exact)</li>
  *   <li>Group E — Static assets: {@code /assets/}, {@code /css/}, {@code /js/}, {@code /images/},
- *       {@code /img/}, {@code /static/}, {@code /webjars/}, {@code /favicon.ico}, {@code /favicon.svg},
- *       {@code /vite.svg}, {@code /index.html}</li>
+ *       {@code /img/}, {@code /static/}, {@code /webjars/},
+ *       {@code /favicon.ico} (exact), {@code /favicon.svg} (exact),
+ *       {@code /vite.svg} (exact), {@code /index.html} (exact)</li>
  *   <li>Group F — Test helpers: {@code /test/} (prevents SPA from intercepting {@code TestAuthController})</li>
  * </ul>
  *
@@ -102,9 +109,9 @@ public class WebConfig {
      * intercepting {@code @Controller}/{@code @RestController} endpoints that browsers
      * navigate to with an {@code Accept: text/html} header.
      *
-     * <p>Named {@code spaRouterFunctionMapping} (not {@code routerFunctionMapping}) to avoid
-     * conflicting with Spring Boot's auto-configured {@code RouterFunctionMapping} bean at order -1.
-     * Both mappings coexist: Spring Boot's at -1 (empty, no routes registered there), ours at 2.
+     * <p>Named {@code spaRouterFunctionMapping} (not {@code routerFunctionMapping}) so it coexists
+     * with Spring Boot's auto-configured {@code RouterFunctionMapping} at order {@code -1} rather
+     * than replacing it. See class-level Javadoc for the full mapping-order explanation.
      */
     @Bean
     public RouterFunctionMapping spaRouterFunctionMapping(RouterFunction<ServerResponse> spaFallback) {
@@ -114,12 +121,17 @@ public class WebConfig {
     }
 
     private static boolean isNotExcluded(String path) {
-        for (String prefix : EXCLUDED_PREFIXES) {
-            if (path.equals(prefix) || path.startsWith(prefix)) {
-                return false;
-            }
-            if (prefix.endsWith("/") && path.equals(prefix.substring(0, prefix.length() - 1))) {
-                return false;
+        for (String entry : EXCLUDED_PREFIXES) {
+            if (entry.endsWith("/")) {
+                // Prefix match: /api/ excludes /api/foo but not /apiary
+                if (path.startsWith(entry) || path.equals(entry.substring(0, entry.length() - 1))) {
+                    return false;
+                }
+            } else {
+                // Exact match: /logout excludes /logout but not /logout-success
+                if (path.equals(entry)) {
+                    return false;
+                }
             }
         }
         return true;
