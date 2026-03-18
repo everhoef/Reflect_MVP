@@ -227,27 +227,22 @@ public class EventService {
         int failureCount = 0;
 
         for (Map.Entry<String, EmitterConnection> entry : matchingEmitters) {
+            String participantName = entry.getValue().participantName();
             try {
-                String eventData;
-                try {
-                    eventData = event.payload() != null ? objectMapper.writeValueAsString(event.payload()) : "null";
-                } catch (Exception jsonEx) {
-                    log.warn("[{}] Failed to serialize payload for event type {}: {}",
-                        event.correlationId(), event.type(), jsonEx.getMessage());
-                    throw new RuntimeException("Failed to serialize SSE event payload", jsonEx);
-                }
+                String eventData = event.payload() != null
+                        ? objectMapper.writeValueAsString(event.payload())
+                        : "null";
                 entry.getValue().emitter().send(SseEmitter.event()
-                    .id(event.correlationId())  // Include correlation ID in SSE message
+                    .id(event.correlationId())
                     .name(event.type().name().toLowerCase())
                     .data(eventData));
 
-                log.trace("[{}] Delivered to {}",
-                    event.correlationId(), entry.getValue().participantName());
+                log.trace("[{}] Delivered to {}", event.correlationId(), participantName);
                 successCount++;
 
-            } catch (IOException e) {
+            } catch (Exception e) {
                 log.warn("[{}] Failed to deliver to {}: {}",
-                    event.correlationId(), entry.getValue().participantName(), e.getMessage());
+                    event.correlationId(), participantName, e.getMessage());
                 failureCount++;
                 // Don't manually cleanup here - let the emitter's error handler deal with it
                 // This prevents double-cleanup and negative connection counts
