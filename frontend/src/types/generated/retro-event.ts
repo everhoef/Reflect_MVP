@@ -1,6 +1,6 @@
 /* tslint:disable */
 /* eslint-disable */
-// Generated using typescript-generator version 3.2.1263 on 2026-03-17 20:31:46.
+// Generated using typescript-generator version 3.2.1263 on 2026-03-18 15:34:16.
 
 export interface RetroEvent<T> {
     correlationId: string;

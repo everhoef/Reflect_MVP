@@ -9,10 +9,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.SimpleUrlLogoutSuccessHandler;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 
-import direct.reflect.facilitator.common.config.CsrfCookieFilter;
 import direct.reflect.facilitator.common.config.SecurityConfig;
 
 @TestConfiguration
@@ -21,29 +18,18 @@ import direct.reflect.facilitator.common.config.SecurityConfig;
 @Profile("test")
 public class TestSecurityOverride {
 
-    private final CsrfCookieFilter csrfCookieFilter;
-
-    public TestSecurityOverride(CsrfCookieFilter csrfCookieFilter) {
-        this.csrfCookieFilter = csrfCookieFilter;
-    }
-
     @Bean
     @Primary
     public SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
-        CookieCsrfTokenRepository tokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
-
         return http
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/login")
                 .successHandler(oidcSuccessHandler())
             )
             .csrf(csrf -> csrf
-                .csrfTokenRepository(tokenRepository)
-                .csrfTokenRequestHandler(requestHandler)
+                .spa()
                 .ignoringRequestMatchers("/test/**")
             )
-            .addFilterAfter(csrfCookieFilter, org.springframework.security.web.csrf.CsrfFilter.class)
             .authorizeHttpRequests(requests -> requests
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/img/**", "/static/**", "/webjars/**", "/assets/**").permitAll()
                 .requestMatchers("/favicon.ico", "/favicon.svg", "/vite.svg").permitAll()

@@ -16,8 +16,6 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.logout.SimpleUrlLogoutSuccessHandler;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.stereotype.Component;
 
 import jakarta.servlet.ServletException;
@@ -47,30 +45,15 @@ import java.util.Set;
 @ConditionalOnProperty(name = "spring.security.enabled", havingValue = "true", matchIfMissing = true)
 public class SecurityConfig {
 
-    private final CsrfCookieFilter csrfCookieFilter;
-
-    public SecurityConfig(CsrfCookieFilter csrfCookieFilter) {
-        this.csrfCookieFilter = csrfCookieFilter;
-    }
-
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        CookieCsrfTokenRepository tokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
-
         return http
             // OIDC authentication for registered users
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/login")
                 .successHandler(oidcSuccessHandler())
             )
-            // CSRF Configuration - use plain attribute handler (not XOR) for SPA fetch requests
-            .csrf(csrf -> csrf
-                .csrfTokenRepository(tokenRepository)
-                .csrfTokenRequestHandler(requestHandler)
-            )
-            // Filter that eagerly loads CSRF token so the cookie is always set on responses
-            .addFilterAfter(csrfCookieFilter, org.springframework.security.web.csrf.CsrfFilter.class)
+            .csrf(csrf -> csrf.spa())
             // Authorization rules - permissive approach with service-level enforcement
             .authorizeHttpRequests(requests -> requests
                 // Public static resources
