@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.UUID;
@@ -223,15 +224,21 @@ public class EventService {
         log.debug("[{}] Broadcasting {} to {} recipient(s): [{}]",
             event.correlationId(), event.type(), matchingEmitters.size(), recipients);
 
+        String eventData;
+        try {
+            eventData = event.payload() != null ? objectMapper.writeValueAsString(event.payload()) : "null";
+        } catch (JacksonException e) {
+            log.error("[{}] Failed to serialize payload for event type {}: {}",
+                event.correlationId(), event.type(), e.getMessage());
+            return;
+        }
+
         int successCount = 0;
         int failureCount = 0;
 
         for (Map.Entry<String, EmitterConnection> entry : matchingEmitters) {
             String participantName = entry.getValue().participantName();
             try {
-                String eventData = event.payload() != null
-                        ? objectMapper.writeValueAsString(event.payload())
-                        : "null";
                 entry.getValue().emitter().send(SseEmitter.event()
                     .id(event.correlationId())
                     .name(event.type().name().toLowerCase())

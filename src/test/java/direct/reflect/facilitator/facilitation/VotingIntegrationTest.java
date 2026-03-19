@@ -2,6 +2,8 @@ package direct.reflect.facilitator.facilitation;
 
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.auth.AuthService;
+import direct.reflect.facilitator.configurator.RetroStage;
+import direct.reflect.facilitator.configurator.RetroStageRepository;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.RetroStepRepository;
 import direct.reflect.facilitator.facilitation.Participant;
@@ -20,14 +22,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.containers.wait.strategy.Wait;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,25 +45,35 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Testcontainers
 @ActiveProfiles({"import", "test"})
 @org.springframework.context.annotation.Import(direct.reflect.facilitator.config.TestRedisConfig.class)
 @Slf4j
 class VotingIntegrationTest {
 
-    @Container
-    @ServiceConnection
     @SuppressWarnings("resource")
     static PostgreSQLContainer<?> postgresContainer = new PostgreSQLContainer<>("postgres:17-alpine")
             .withDatabaseName("postgres")
             .withUsername("postgres")
             .withPassword("postgres");
 
-    @Container
-    @ServiceConnection
     @SuppressWarnings("resource")
     static RedisContainer redisContainer = new RedisContainer("redis:alpine")
-            .withExposedPorts(6379);
+            .withExposedPorts(6379)
+            .waitingFor(Wait.forLogMessage(".*Ready to accept connections.*", 1));
+
+    static {
+        postgresContainer.start();
+        redisContainer.start();
+    }
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgresContainer::getJdbcUrl);
+        registry.add("spring.datasource.username", postgresContainer::getUsername);
+        registry.add("spring.datasource.password", postgresContainer::getPassword);
+        registry.add("spring.data.redis.host", redisContainer::getHost);
+        registry.add("spring.data.redis.port", () -> redisContainer.getMappedPort(6379));
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -77,6 +89,9 @@ class VotingIntegrationTest {
 
     @Autowired
     private RetroStepRepository stepRepository;
+
+    @Autowired
+    private RetroStageRepository stageRepository;
 
     @MockitoBean
     private AuthService authService;
@@ -103,7 +118,12 @@ class VotingIntegrationTest {
 
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(participantAUuid);
 
-        testStep = stepRepository.findAll().get(0);
+        RetroStage madSadGladStage = stageRepository.findByMastersheetID(28)
+                .orElseThrow(() -> new IllegalStateException("Mad/Sad/Glad stage (mastersheetID=28) not found - check CSV import"));
+        testStep = stepRepository.findByRetroStageOrderByOrderIndexAsc(madSadGladStage).stream()
+                .filter(s -> s.getOrderIndex() == 3)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Mad/Sad/Glad voting step (orderIndex=3) not found in stage 28"));
     }
 
     @AfterEach

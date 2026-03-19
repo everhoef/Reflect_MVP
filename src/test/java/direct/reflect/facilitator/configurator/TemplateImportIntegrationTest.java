@@ -50,46 +50,75 @@ class TemplateImportIntegrationTest {
 
     @Test
     @Transactional
-    void stage21_shouldHaveExactly40Steps() {
+    void stage21_shouldExistInStagesCsv() {
         RetroStage stage21 = retroStageRepository.findAll().stream()
                 .filter(s -> s.getMastersheetID() != null && s.getMastersheetID() == 21)
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Stage with mastersheetID=21 (Start Stop Keep) not found"));
 
-        log.info("Found stage: {} (id={})", stage21.getName(), stage21.getMastersheetID());
+        log.info("Found stage: {} (mastersheetID={})", stage21.getName(), stage21.getMastersheetID());
+        assertThat(stage21.getName()).as("Stage 21 should be named Start Stop Keep").isEqualTo("Start Stop Keep");
+    }
+
+    @Test
+    @Transactional
+    void stage21_shouldHaveNoSteps() {
+        RetroStage stage21 = retroStageRepository.findAll().stream()
+                .filter(s -> s.getMastersheetID() != null && s.getMastersheetID() == 21)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Stage with mastersheetID=21 (Start Stop Keep) not found"));
 
         List<RetroStep> steps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(stage21);
         log.info("Steps found for stage 21: {}", steps.size());
 
         assertThat(steps)
-                .as("Stage 21 (Start Stop Keep) should have exactly 40 steps")
-                .hasSize(40);
+                .as("Stage 21 (Start Stop Keep) should have no steps — step rows were intentionally removed " +
+                    "when the Default template was redesigned to use stage 29 (Start Stop Continue)")
+                .isEmpty();
     }
 
     @Test
     @Transactional
-    void stage21_allStepsShouldBeMultiColumnBoard() {
-        RetroStage stage21 = retroStageRepository.findAll().stream()
-                .filter(s -> s.getMastersheetID() != null && s.getMastersheetID() == 21)
+    void stage29_shouldHaveExactly7Steps() {
+        RetroStage stage29 = retroStageRepository.findAll().stream()
+                .filter(s -> s.getMastersheetID() != null && s.getMastersheetID() == 29)
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("Stage with mastersheetID=21 (Start Stop Keep) not found"));
+                .orElseThrow(() -> new AssertionError("Stage with mastersheetID=29 (Start Stop Continue) not found"));
 
-        List<RetroStep> steps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(stage21);
+        log.info("Found stage: {} (mastersheetID={})", stage29.getName(), stage29.getMastersheetID());
+
+        List<RetroStep> steps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(stage29);
+        log.info("Steps found for stage 29: {}", steps.size());
 
         assertThat(steps)
-                .as("All SSC steps should use MULTI_COLUMN_BOARD component type")
+                .as("Stage 29 (Start Stop Continue) should have exactly 7 steps")
+                .hasSize(7);
+    }
+
+    @Test
+    @Transactional
+    void stage29_allStepsShouldBeMultiColumnBoard() {
+        RetroStage stage29 = retroStageRepository.findAll().stream()
+                .filter(s -> s.getMastersheetID() != null && s.getMastersheetID() == 29)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Stage with mastersheetID=29 (Start Stop Continue) not found"));
+
+        List<RetroStep> steps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(stage29);
+
+        assertThat(steps)
+                .as("All Start Stop Continue steps should use MULTI_COLUMN_BOARD component type")
                 .allMatch(step -> step.getComponentType() == ComponentType.MULTI_COLUMN_BOARD);
     }
 
     @Test
     @Transactional
-    void stage21_firstStepShouldBeInstructionsMode() {
-        RetroStage stage21 = retroStageRepository.findAll().stream()
-                .filter(s -> s.getMastersheetID() != null && s.getMastersheetID() == 21)
+    void stage29_firstStepShouldBeInputMode() {
+        RetroStage stage29 = retroStageRepository.findAll().stream()
+                .filter(s -> s.getMastersheetID() != null && s.getMastersheetID() == 29)
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("Stage with mastersheetID=21 (Start Stop Keep) not found"));
+                .orElseThrow(() -> new AssertionError("Stage with mastersheetID=29 (Start Stop Continue) not found"));
 
-        List<RetroStep> steps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(stage21);
+        List<RetroStep> steps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(stage29);
         assertThat(steps).isNotEmpty();
 
         RetroStep firstStep = steps.get(0);
@@ -101,24 +130,24 @@ class TemplateImportIntegrationTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> capabilities = (Map<String, Object>) config.get("capabilities");
 
-        assertThat(capabilities.get("showContent"))
-                .as("First step (orderIndex=1) should have showContent=true (INSTRUCTIONS mode)")
+        assertThat(capabilities.get("allowInput"))
+                .as("First step (orderIndex=1) should have allowInput=true (input mode)")
                 .isEqualTo(true);
 
-        assertThat(capabilities.get("allowInput"))
-                .as("First step (orderIndex=1) should have allowInput=false (INSTRUCTIONS mode)")
+        assertThat(capabilities.get("showContent"))
+                .as("First step (orderIndex=1) should have showContent=false (private during input)")
                 .isEqualTo(false);
     }
 
     @Test
     @Transactional
-    void stage21_shouldHaveAtLeastOneVotingStep() {
-        RetroStage stage21 = retroStageRepository.findAll().stream()
-                .filter(s -> s.getMastersheetID() != null && s.getMastersheetID() == 21)
+    void stage29_shouldHaveAtLeastOneVotingStep() {
+        RetroStage stage29 = retroStageRepository.findAll().stream()
+                .filter(s -> s.getMastersheetID() != null && s.getMastersheetID() == 29)
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("Stage with mastersheetID=21 (Start Stop Keep) not found"));
+                .orElseThrow(() -> new AssertionError("Stage with mastersheetID=29 (Start Stop Continue) not found"));
 
-        List<RetroStep> steps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(stage21);
+        List<RetroStep> steps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(stage29);
 
         long votingSteps = steps.stream()
                 .filter(step -> {
@@ -133,19 +162,19 @@ class TemplateImportIntegrationTest {
         log.info("Steps with allowVoting=true: {}", votingSteps);
 
         assertThat(votingSteps)
-                .as("Stage 21 should have at least one step with allowVoting=true")
+                .as("Stage 29 should have at least one step with allowVoting=true")
                 .isGreaterThanOrEqualTo(1);
     }
 
     @Test
     @Transactional
-    void stage21_stepsShouldHaveAscendingOrderIndices() {
-        RetroStage stage21 = retroStageRepository.findAll().stream()
-                .filter(s -> s.getMastersheetID() != null && s.getMastersheetID() == 21)
+    void stage29_stepsShouldHaveAscendingOrderIndices() {
+        RetroStage stage29 = retroStageRepository.findAll().stream()
+                .filter(s -> s.getMastersheetID() != null && s.getMastersheetID() == 29)
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("Stage with mastersheetID=21 (Start Stop Keep) not found"));
+                .orElseThrow(() -> new AssertionError("Stage with mastersheetID=29 (Start Stop Continue) not found"));
 
-        List<RetroStep> steps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(stage21);
+        List<RetroStep> steps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(stage29);
 
         for (int i = 0; i < steps.size(); i++) {
             assertThat(steps.get(i).getOrderIndex())

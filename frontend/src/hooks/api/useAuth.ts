@@ -11,8 +11,11 @@ export interface MeResponse {
   };
 }
 
-async function fetchCurrentUser(): Promise<MeResponse> {
+async function fetchCurrentUser(): Promise<MeResponse | null> {
   const res = await fetch("/api/me");
+  if (res.status === 401) {
+    return null;
+  }
   if (!res.ok) {
     throw new Error(`Failed to fetch current user: ${res.status}`);
   }
@@ -20,7 +23,7 @@ async function fetchCurrentUser(): Promise<MeResponse> {
 }
 
 export function useCurrentUser() {
-  return useQuery<MeResponse>({
+  return useQuery<MeResponse | null>({
     queryKey: ["me"],
     queryFn: fetchCurrentUser,
     staleTime: Infinity,

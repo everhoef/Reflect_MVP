@@ -74,31 +74,31 @@ class CsvImporterServiceTest {
                 .findFirst().orElse(null);
         assertNotNull(defaultTemplate);
         assertEquals("Default", defaultTemplate.getName());
-        assertEquals("A classic retrospective format covering all five phases.", defaultTemplate.getDescription());
+        assertEquals("A concise 5-phase retrospective: ESVP check-in → Mad Sad Glad → Perfection Game → Start Stop Continue → +/- Delta.", defaultTemplate.getDescription());
         assertEquals(3, defaultTemplate.getMaturityLevel());
         assertEquals(true, defaultTemplate.isReleased());
 
         assertNotNull(defaultTemplate.getSetTheStage());
-        assertEquals("Happiness Histogram", defaultTemplate.getSetTheStage().getName());
+        assertEquals("ESVP Check-in", defaultTemplate.getSetTheStage().getName());
 
         assertNotNull(defaultTemplate.getGatherData());
         assertEquals("Mad Sad Glad", defaultTemplate.getGatherData().getName());
 
         assertNotNull(defaultTemplate.getGenerateInsights());
-        assertEquals("The Original Four", defaultTemplate.getGenerateInsights().getName());
+        assertEquals("Perfection Game", defaultTemplate.getGenerateInsights().getName());
 
         assertNotNull(defaultTemplate.getDecideActions());
-        assertEquals("Start Stop Keep", defaultTemplate.getDecideActions().getName());
+        assertEquals("Start Stop Continue", defaultTemplate.getDecideActions().getName());
 
         assertNotNull(defaultTemplate.getCloseRetro());
-        assertEquals("Feedback Door Smiley's", defaultTemplate.getCloseRetro().getName());
+        assertEquals("+/- Delta", defaultTemplate.getCloseRetro().getName());
     }
 
     @Test
     @Transactional
     void testImportRetroStages() {
         List<RetroStage> stages = retroStageRepository.findAll();
-        assertEquals(26, stages.size());
+        assertEquals(30, stages.size());
         
         // Verify some key stages are imported correctly
         RetroStage madSadGlad = stages.stream()
@@ -119,7 +119,7 @@ class CsvImporterServiceTest {
     @Transactional
     void testImportRetroStepsOrderedByStage() {
         List<RetroStage> stages = retroStageRepository.findAll();
-        assertEquals(26, stages.size());
+        assertEquals(30, stages.size());
 
         long totalSteps = retroStepRepository.count();
         log.info("Total steps found: {}", totalSteps);
@@ -137,8 +137,8 @@ class CsvImporterServiceTest {
 
         // For debugging, let's verify the expected total matches what we imported
         assertTrue(totalSteps > 0, "Should have imported some steps");
-        assertEquals(64, totalSteps, "Should have imported all 64 steps from CSV");
-        assertEquals(62, boardSteps, "Should have 62 MULTI_COLUMN_BOARD steps");
+        assertEquals(23, totalSteps, "Should have imported all 23 steps from CSV");
+        assertEquals(21, boardSteps, "Should have 21 MULTI_COLUMN_BOARD steps");
         assertEquals(1, ratingSteps, "Should have 1 RATING_SCALE step");
         assertEquals(1, histogramSteps, "Should have 1 HISTOGRAM_CHART step");
 

@@ -17,7 +17,7 @@
 16,Analyse Stories,20,,
 17,Five Why's,30,,
 18,Learning Matrix,15,,
-19,Perfection Game,20,,
+19,Perfection Game,25,"The Perfection Game helps the team identify what would make their work truly excellent. By rating the sprint and brainstorming improvements, we move from vague dissatisfaction to concrete, actionable ideas for getting closer to perfect.","You'll rate the sprint on a scale of 1-10, then brainstorm what specific changes would make it a 10. We'll cluster ideas, vote on the most impactful ones, and identify the top improvements to pursue next sprint."
 20,Remember the Future,25,,
 21,Start Stop Keep,15,,
 22,Three by Three,20,,
@@ -25,3 +25,7 @@
 24,ROTI,10,,
 25,Smiley's,4,,
 26,Take Aways,8,,
+27,ESVP Check-in,7,"Starting with an ESVP check-in helps the facilitator understand the team's engagement level and mindset before diving into the retrospective. Knowing whether people feel like Explorers, Shoppers, Vacationers, or Prisoners helps tailor the session.","Each participant anonymously selects one of four categories: Explorer, Shopper, Vacationer, or Prisoner. The team then reviews the overall distribution together."
+28,Mad Sad Glad,20,"Collecting emotional data about the sprint helps the team surface both positive experiences and frustrations in a structured way. Categorizing feelings into Mad, Sad, and Glad creates a shared emotional picture of the sprint.","You'll add sticky notes to three columns: Mad (things that frustrated you), Sad (things that disappointed you), and Glad (things that made you happy). Notes are private during input, then revealed for clustering, discussion, and voting."
+29,Start Stop Continue,25,"The Start Stop Continue format helps teams identify concrete behavioral changes. By separating what to start, stop, and continue doing, teams create clear, actionable commitments rather than vague improvement intentions.","You'll brainstorm across Start, Stop, and Continue. After revealing and clustering ideas, the team votes and commits to specific SMART actions."
+30,+/- Delta,5,"Closing with a meta-retrospective gives the team a chance to reflect on the retrospective process itself. This short feedback round helps continuously improve how the team runs retros.","You'll add notes to Plus (what worked well) and Delta (what to change next time). Participation is optional. The facilitator reviews the feedback and closes with appreciation."

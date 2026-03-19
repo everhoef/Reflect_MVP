@@ -145,29 +145,32 @@ public class SseBrowserTest extends BaseIntegrationTest {
                 waitForElement(participantPage, "[data-step-index]", DEFAULT_TIMEOUT_MS);
                 log.info("Participant page rendered at step index: {}", getCurrentStepIndex(participantPage));
 
-                log.info("Navigating to first multi-column input step (with textarea)...");
+                log.info("Navigating to first multi-column input step with text input (not single-char ESVP)...");
                 int maxSkips = 20;
                 boolean foundInputStep = false;
                 for (int i = 0; i < maxSkips; i++) {
-                    // Wait for any MultiColumnBoard loading spinner to clear before checking
-                    // for the textarea. Without this, the useClusters hook may still be
-                    // fetching data and the component renders a spinner (no [data-column] yet),
-                    // causing the loop to skip the correct step under load.
                     participantPage.waitForFunction(
                         "() => !document.querySelector('[class*=\"animate-spin\"]')",
                         null,
                         new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS)
                     );
-                    if (participantPage.locator("[data-column] textarea[name='content']").count() > 0) {
-                        log.info("Found multi-column input step (textarea present) at skip iteration {}", i);
-                        foundInputStep = true;
-                        break;
+                    int textareaCount = participantPage.locator("[data-column] textarea[name='content']").count();
+                    if (textareaCount > 0) {
+                        String maxLen = participantPage.locator("[data-column] textarea[name='content']").first()
+                            .getAttribute("maxlength");
+                        boolean isSingleCharStep = "1".equals(maxLen);
+                        if (!isSingleCharStep) {
+                            log.info("Found multi-column text input step at skip iteration {}", i);
+                            foundInputStep = true;
+                            break;
+                        }
+                        log.info("Skipping single-char step (maxlength=1, e.g. ESVP), iteration {}", i);
                     }
                     if (facilitatorPage.locator("[data-testid='next-step-button']").count() == 0) {
                         log.error("No Next button found while looking for input step (iteration {})", i);
                         break;
                     }
-                    log.info("No textarea yet, advancing to next step (iteration {})", i);
+                    log.info("Advancing to next step (iteration {})", i);
                     clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS, participantPage);
                 }
                 if (!foundInputStep) {

@@ -77,15 +77,15 @@ class StepAdvancementApiIntegrationTest {
     private RetroSession testSession;
     private UUID participantUuid;
 
-    private static final Long QUICK_CHECKIN_TEMPLATE_ID = 2L;
+    private static final Long DEFAULT_TEMPLATE_ID = 1L;
 
     @BeforeEach
     void setUp() {
         participantUuid = UUID.randomUUID();
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(participantUuid);
 
-        RetroTemplate template = templateRepository.findById(QUICK_CHECKIN_TEMPLATE_ID)
-                .orElseThrow(() -> new IllegalStateException("Template 2 (Quick Check-in) not found - is the 'import' profile active?"));
+        RetroTemplate template = templateRepository.findById(DEFAULT_TEMPLATE_ID)
+                .orElseThrow(() -> new IllegalStateException("Template 1 (Default) not found - is the 'import' profile active?"));
 
         RetroSession session = new RetroSession();
         session.setName("SSC Advancement Test Session");

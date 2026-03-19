@@ -43,8 +43,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("Retro Flow Browser Regression Tests")
 public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
 
-    private static final int SSC_GATHER_DATA_MASTERSHEET_ID = 21;
-    private static final int SSC_INPUT_STEP_INDEX = 2;
+    private static final int SSC_GATHER_DATA_MASTERSHEET_ID = 29;
+    private static final int SSC_INPUT_STEP_INDEX = 0;
 
     @Test
     @Timeout(300)
@@ -200,8 +200,8 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
             clickElement(facilitatorPage, "[data-column='Start'] button[type='submit']");
             waitForElement(facilitatorPage, "p:has-text('Clustering test note')");
 
-            // Now fast-forward to first clustering step (orderIndex=10 → 0-based index 9)
-            int clusteringStepIndex = 9;
+            // Now fast-forward to first clustering step (orderIndex=3 → 0-based index 2)
+            int clusteringStepIndex = 2;
             fastForwardToStep(sessionId, clusteringStepIndex);
             facilitatorPage.waitForResponse(
                     response -> response.url().contains("/" + sessionId) && response.status() == 200,
@@ -282,9 +282,9 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
             clickElement(participantPage, "[data-column='Start'] button[type='submit']");
             waitForElement(participantPage, "p:has-text('Start: Voting test note')");
 
-            // Fast-forward to voting step (orderIndex=22 → 0-based index 21)
+            // Fast-forward to voting step (orderIndex=4 → 0-based index 3)
             logTestProgress("VOTING", 5, 5, "Fast-forwarding to voting step");
-            int votingStepIndex = 21;
+            int votingStepIndex = 3;
             fastForwardToStep(sessionId, votingStepIndex);
 
             facilitatorPage.waitForResponse(
@@ -521,14 +521,14 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
 
     /**
      * Builds (and persists) a RetroTemplate whose GATHER_DATA stage is the
-     * "Start Stop Keep" SSC stage (mastersheetID=21).
+     * "Start Stop Continue" SSC stage (mastersheetID=29).
      * The other four phases reuse the first available template's stages so that
      * the session can navigate through all phases correctly.
      */
     private RetroTemplate buildSscTemplate() {
         RetroStage sscStage = stageRepository.findByMastersheetID(SSC_GATHER_DATA_MASTERSHEET_ID)
                 .orElseThrow(() -> new IllegalStateException(
-                        "Start Stop Keep stage (mastersheetID=" + SSC_GATHER_DATA_MASTERSHEET_ID +
+                        "Start Stop Continue stage (mastersheetID=" + SSC_GATHER_DATA_MASTERSHEET_ID +
                         ") not found. Is the 'import' profile active?"));
 
         // Use the default (first) template for the non-SSC phases
