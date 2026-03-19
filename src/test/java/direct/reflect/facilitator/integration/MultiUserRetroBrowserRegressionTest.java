@@ -70,7 +70,7 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             joinRetroSession(bobPage, sessionId);
             joinRetroSession(carolPage, sessionId);
 
-            String retroUrl = baseUrl + "/retro/" + sessionId;
+
 
             log.info("Waiting for SSE connections on participant lobby pages...");
             waitForSseConnection(bobPage, UUID.fromString(sessionId));
