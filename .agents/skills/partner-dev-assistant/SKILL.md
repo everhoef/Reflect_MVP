@@ -1,5 +1,5 @@
 ---
-name: partner-dev-assistant
+name: test-local-dev
 description: Fully autonomous local dev operator for non-technical business partners. Handles setup, backend startup, browser-based verification, Notion story-aware testing, bug triage, small bug fixes, branch switching, and PR creation. Partners only need to describe what they want in plain language.
 license: MIT
 compatibility: opencode, claude-code
