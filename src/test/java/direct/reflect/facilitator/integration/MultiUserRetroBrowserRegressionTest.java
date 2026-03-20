@@ -253,6 +253,31 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             waitForElement(facilitatorPage, "[data-column='Start']", DEFAULT_TIMEOUT_MS);
             waitForAllPagesElement("[data-column='Start']", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
 
+            // ── S8: Both facilitator and participants see guidance at the same active step ──────
+            // All three pages are on the SSC brainstorm step — assert guidance-sidebar + guidance-content
+            // are rendered for both facilitator and participant, and that the text is identical (S8).
+            logTestProgress("PHASE_4", 12, 23, "S8: Asserting guidance-sidebar visible on facilitator and participant pages");
+            waitForAllPagesElement("[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS, facilitatorPage, bobPage);
+            assertTrue(facilitatorPage.locator("[data-testid='guidance-sidebar']").isVisible(),
+                "S8: guidance-sidebar should be visible on facilitator page at SSC brainstorm step");
+            assertTrue(facilitatorPage.locator("[data-testid='guidance-content']").isVisible(),
+                "S8: guidance-content should be visible on facilitator page");
+            assertTrue(bobPage.locator("[data-testid='guidance-sidebar']").isVisible(),
+                "S8: guidance-sidebar should be visible on participant (Bob) page at SSC brainstorm step");
+            assertTrue(bobPage.locator("[data-testid='guidance-content']").isVisible(),
+                "S8: guidance-content should be visible on participant (Bob) page");
+
+            String facilitatorGuidanceAtBrainstorm = facilitatorPage.locator("[data-testid='guidance-content']").textContent();
+            String bobGuidanceAtBrainstorm = bobPage.locator("[data-testid='guidance-content']").textContent();
+            assertNotNull(facilitatorGuidanceAtBrainstorm, "S8: Facilitator guidance text must not be null");
+            assertFalse(facilitatorGuidanceAtBrainstorm.isBlank(), "S8: Facilitator guidance text must not be blank");
+            assertEquals(facilitatorGuidanceAtBrainstorm, bobGuidanceAtBrainstorm,
+                "S8: Facilitator and participant must see identical guidance text on the same step");
+            log.info("  ├─ ✅ S8: guidance-sidebar visible and identical on facilitator + participant pages");
+
+            // Capture brainstorm guidance text now so we can assert it CHANGES after step advance (S10)
+            String sscBrainstormGuidanceText = facilitatorGuidanceAtBrainstorm;
+
             fillElement(bobPage, "[data-column='Start'] textarea[name='content']", "Bob Start: Daily standups");
             clickElement(bobPage, "[data-column='Start'] button[type='submit']");
 
@@ -301,6 +326,24 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             assertTrue(bobPage.locator("[data-column='Stop'] p:has-text('Carol Stop: Long meetings')").isVisible(),
                 "Bob should see Carol's Stop card after reveal");
             log.info("  ├─ ✅ Cross-user visibility verified after reveal");
+
+            // S10: Guidance text must change when the step advances (brainstorm → reveal)
+            // S16: All participants must see the same updated guidance text after advance
+            logTestProgress("PHASE_4", 15, 23, "S10/S16: Asserting guidance changed and is identical across all pages");
+            waitForAllPagesElement("[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS,
+                facilitatorPage, bobPage, carolPage);
+            String facilitatorRevealGuidance = facilitatorPage.locator("[data-testid='guidance-content']").textContent();
+            String bobRevealGuidance = bobPage.locator("[data-testid='guidance-content']").textContent();
+            String carolRevealGuidance = carolPage.locator("[data-testid='guidance-content']").textContent();
+            assertNotNull(facilitatorRevealGuidance, "S10: Facilitator reveal guidance must not be null");
+            assertFalse(facilitatorRevealGuidance.isBlank(), "S10: Facilitator reveal guidance must not be blank");
+            assertNotEquals(sscBrainstormGuidanceText, facilitatorRevealGuidance,
+                "S10: Guidance text must change when advancing from SSC brainstorm to reveal step");
+            assertEquals(facilitatorRevealGuidance, bobRevealGuidance,
+                "S16: Facilitator and Bob must see identical guidance text at SSC reveal step");
+            assertEquals(facilitatorRevealGuidance, carolRevealGuidance,
+                "S16: Facilitator and Carol must see identical guidance text at SSC reveal step");
+            log.info("  ├─ ✅ S10/S16: Guidance changed on advance and is identical on all 3 pages");
 
             // Step 3 (orderIndex=3): cluster — allowMerging=true
             logTestProgress("PHASE_4", 16, 23, "Testing clustering on SSC cluster step");
