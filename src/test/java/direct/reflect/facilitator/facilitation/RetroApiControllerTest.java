@@ -23,14 +23,17 @@ import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.facilitation.RetroApiController;
 import direct.reflect.facilitator.facilitation.dto.CreateRetroRequest;
 import direct.reflect.facilitator.facilitation.dto.JoinRetroRequest;
+import direct.reflect.facilitator.facilitation.dto.AssistantStateDto;
 import direct.reflect.facilitator.facilitation.response.ResponseService;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponse;
 import direct.reflect.facilitator.configurator.RetroStep;
+import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.common.exception.InputLimitExceededException;
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.facilitation.dto.TimerStateDto;
 import direct.reflect.facilitator.auth.AuthService;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -861,5 +864,55 @@ public class RetroApiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.responseId").value(responseId.toString()))
                 .andExpect(jsonPath("$.content").value(updatedContent));
+    }
+
+    // ============================================================================
+    // Retro State API Tests
+    // ============================================================================
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void getRetroState_ValidParticipant_ShouldIncludeAssistantState() throws Exception {
+        UUID retroId = UUID.randomUUID();
+
+        RetroTemplate mockTemplate = org.mockito.Mockito.mock(RetroTemplate.class);
+        when(mockTemplate.getStageForPhase(any())).thenReturn(null);
+
+        RetroSession mockSession = new RetroSession();
+        mockSession.setId(retroId);
+        mockSession.setName("Test Session");
+        mockSession.setPhase(direct.reflect.facilitator.facilitation.RetroPhase.SET_THE_STAGE);
+        mockSession.setTemplate(mockTemplate);
+        mockSession.setCurrentStepIndex(0);
+
+        Participant mockParticipant = new Participant();
+        mockParticipant.setParticipantId(UUID.randomUUID());
+        mockParticipant.setDisplayName("Test User");
+        mockParticipant.setRole(ParticipantRole.FACILITATOR);
+        mockParticipant.setSession(mockSession);
+
+        AssistantStateDto assistantState = new AssistantStateDto(null, List.of(), null);
+
+        when(participantService.getParticipantForSession(any(HttpServletRequest.class), eq(retroId)))
+            .thenReturn(mockParticipant);
+        when(retroSessionService.getSessionById(retroId)).thenReturn(mockSession);
+        when(retroSessionService.getCurrentStep(retroId)).thenReturn(null);
+        when(participantService.getSessionParticipants(retroId)).thenReturn(List.of(mockParticipant));
+        when(retroSessionService.getAssistantHistory(retroId)).thenReturn(assistantState);
+
+        mockMvc.perform(get("/api/retro/{retroId}/state", retroId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.retroId").value(retroId.toString()))
+                .andExpect(jsonPath("$.assistantState").exists())
+                .andExpect(jsonPath("$.assistantState.history").isArray());
+    }
+
+    @Test
+    void getRetroState_Unauthenticated_ShouldReturnUnauthorized() throws Exception {
+        UUID retroId = UUID.randomUUID();
+
+        mockMvc.perform(get("/api/retro/{retroId}/state", retroId)
+                .with(anonymous()))
+                .andExpect(status().isUnauthorized());
     }
 }

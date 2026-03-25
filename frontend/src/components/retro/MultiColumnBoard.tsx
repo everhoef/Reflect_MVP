@@ -271,7 +271,7 @@ export function MultiColumnBoard({ retroId, stepId, componentConfig }: StepCompo
                 : "grid-cols-4",
         ].join(" ")}
       >
-        {columns.map((col) => {
+        {columns.map((col, colIndex) => {
           const colNotes = allNotes.filter((n) => n.columnId === col.id);
           const noteIds = colNotes.map((n) => n.id);
 
@@ -311,7 +311,12 @@ export function MultiColumnBoard({ retroId, stepId, componentConfig }: StepCompo
               </SortableContext>
 
               {allowInput && (
-                <div className="px-2">
+                <div
+                  className="px-2"
+                  {...(colIndex === 0
+                    ? { "data-coachmark": "note-input" }
+                    : {})}
+                >
                   <AddNoteForm
                     columnId={col.id}
                     placeholder={col.placeholder ?? cardConfig.placeholder}

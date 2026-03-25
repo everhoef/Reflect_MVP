@@ -27,6 +27,7 @@ import direct.reflect.facilitator.facilitation.dto.SubmitResponseResult;
 import direct.reflect.facilitator.facilitation.dto.VoteResult;
 import direct.reflect.facilitator.facilitation.dto.RevealResult;
 import direct.reflect.facilitator.facilitation.dto.UpdateResponseResult;
+import direct.reflect.facilitator.facilitation.dto.AssistantStateDto;
 import direct.reflect.facilitator.facilitation.dto.RetroStateDto;
 import direct.reflect.facilitator.facilitation.dto.StepSummaryDto;
 import direct.reflect.facilitator.facilitation.dto.ParticipantDto;
@@ -594,6 +595,8 @@ public class RetroApiController {
 
             boolean isFacilitator = currentParticipant.getRole() == ParticipantRole.FACILITATOR;
 
+            AssistantStateDto assistantState = retroService.getAssistantHistory(retroId);
+
             RetroStateDto dto = new RetroStateDto(
                 session.getId(),
                 session.getPhase().name(),
@@ -602,7 +605,8 @@ public class RetroApiController {
                 steps,
                 facilitatorId,
                 isFacilitator,
-                activeParticipants.size()
+                activeParticipants.size(),
+                assistantState
             );
 
             return ResponseEntity.ok(dto);

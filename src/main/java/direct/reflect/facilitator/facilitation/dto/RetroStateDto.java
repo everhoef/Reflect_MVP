@@ -11,5 +11,6 @@ public record RetroStateDto(
     List<StepSummaryDto> steps,
     UUID facilitatorId,
     boolean isFacilitator,
-    int participantCount
+    int participantCount,
+    AssistantStateDto assistantState
 ) {}

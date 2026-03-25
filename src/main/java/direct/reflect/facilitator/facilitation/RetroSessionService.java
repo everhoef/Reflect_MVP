@@ -10,13 +10,17 @@ import direct.reflect.facilitator.configurator.ComponentType;
 import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException;
 import direct.reflect.facilitator.configurator.RetroStepRepository;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponseRepository;
+import direct.reflect.facilitator.facilitation.dto.AssistantMessageDto;
 import direct.reflect.facilitator.facilitation.dto.TimerStateDto;
+import direct.reflect.facilitator.facilitation.dto.AssistantStateDto;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
 
 import java.time.LocalDateTime;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -266,6 +270,49 @@ public class RetroSessionService {
             sessionRepository.save(session);
             eventService.publish(RetroEvent.timerStarted(sessionId));
         }
+    }
+
+    public AssistantStateDto getAssistantHistory(UUID sessionId) {
+        RetroSession session = getSessionById(sessionId);
+        RetroStage currentStage = session.getCurrentStage();
+
+        if (currentStage == null || session.getCurrentStepIndex() < 0) {
+            return AssistantHistory.empty(sessionId).toPublicDto();
+        }
+
+        List<RetroStep> stepsInStage = stepRepository.findByRetroStageOrderByOrderIndexAsc(currentStage);
+        int currentIndex = session.getCurrentStepIndex();
+
+        // Build history by pushing messages for steps 0..currentIndex in order.
+        // After all pushes: current = step[currentIndex], history = steps[currentIndex-1..0] (newest-first, capped at 3).
+        AssistantHistory history = AssistantHistory.empty(sessionId);
+        for (int i = 0; i <= currentIndex && i < stepsInStage.size(); i++) {
+            RetroStep step = stepsInStage.get(i);
+            String instructions = step.getInstructions();
+            if (instructions != null && !instructions.isBlank()) {
+                String title = deriveTitleFromStep(step);
+                history.pushMessage(step.getId(), title, instructions);
+            }
+        }
+
+        return history.toPublicDto();
+    }
+
+    private String deriveTitleFromStep(RetroStep step) {
+        Map<String, Object> config = step.getComponentConfig();
+        if (config != null) {
+            Object columns = config.get("columns");
+            if (columns instanceof List<?> colList && !colList.isEmpty()) {
+                Object first = colList.get(0);
+                if (first instanceof Map<?, ?> colMap) {
+                    Object title = colMap.get("title");
+                    if (title instanceof String s && !s.isBlank()) {
+                        return s;
+                    }
+                }
+            }
+        }
+        return step.getComponentType().name().replace("_", " ");
     }
 
     /**
