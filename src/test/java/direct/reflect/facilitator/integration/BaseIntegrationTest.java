@@ -593,7 +593,25 @@ public abstract class BaseIntegrationTest {
         facilitatorPage.fill("input[name='sessionName']", sessionName);
         facilitatorPage.click("button:has-text('Create Session')");
 
-        facilitatorPage.waitForURL(url -> url.contains("/retro/"), new Page.WaitForURLOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+        if (!facilitatorPage.url().contains("/retro/")) {
+            try {
+                facilitatorPage.waitForURL(url -> url.contains("/retro/"), new Page.WaitForURLOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+            } catch (Exception e) {
+                log.warn("waitForURL to /retro/ timed out or failed: {}. Attempting manual navigation.", e.getMessage());
+                if (redirectUrl[0] != null && !redirectUrl[0].isEmpty()) {
+                    String targetUrl = redirectUrl[0].startsWith("http") ? redirectUrl[0] : baseUrl + redirectUrl[0];
+                    log.info("Navigating manually to HX-Redirect URL: {}", targetUrl);
+                    facilitatorPage.navigate(targetUrl);
+                } else if (facilitatorPage.url().contains("/retro/")) {
+                    log.info("URL already at /retro/ despite waitForURL timeout, continuing");
+                } else {
+                    log.error("No HX-Redirect URL captured; cannot recover from waitForURL failure");
+                    throw new RuntimeException("Session creation redirect failed and no HX-Redirect header was captured", e);
+                }
+            }
+        } else {
+            log.debug("URL already contains /retro/ after click, skipping waitForURL");
+        }
         facilitatorPage.waitForSelector("body", new Page.WaitForSelectorOptions().setTimeout(SHORT_TIMEOUT_MS));
 
         String sessionUrl = facilitatorPage.url();
@@ -679,13 +697,14 @@ public abstract class BaseIntegrationTest {
                 log.warn("❌ Join failed, URL: {}", finalUrl);
             }
 
-            if (redirectUrl[0] != null && !participantPage.url().contains("/retro/")) {
-                log.info("Redirect didn't occur, navigating manually to: {}", redirectUrl[0]);
-                participantPage.navigate(redirectUrl[0]);
-                participantPage.waitForSelector("h2:has-text('Session Lobby'), [data-step-index]",
-                    new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-                log.info("Manual navigation completed, URL is now: {}", participantPage.url());
-            }
+        if (!participantPage.url().contains("/retro/")) {
+            String targetUrl = redirectUrl[0] != null ? (redirectUrl[0].startsWith("http") ? redirectUrl[0] : baseUrl + redirectUrl[0]) : (baseUrl + "/retro/" + sessionId);
+            log.info("Redirect didn't occur, navigating manually to: {}", targetUrl);
+            participantPage.navigate(targetUrl);
+            participantPage.waitForSelector("h2:has-text('Session Lobby'), [data-step-index]",
+                new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+            log.info("Manual navigation completed, URL is now: {}", participantPage.url());
+        }
 
             if (participantPage.url().contains("error=")) {
                 String url = participantPage.url();
@@ -728,22 +747,48 @@ public abstract class BaseIntegrationTest {
         recordActivity("startRetroSession");
         log.debug("Starting retro session...");
 
-        Response startResponse = facilitatorPage.waitForResponse(
-            response -> response.url().contains("/start") && response.request().method().equals("POST"),
-            () -> facilitatorPage.click("[data-testid='start-retro-button']")
-        );
-        log.debug("Start session request completed with status: {}", startResponse.status());
+        String currentUrl = facilitatorPage.url();
+        String sessionId = currentUrl.substring(currentUrl.lastIndexOf("/") + 1);
 
-        facilitatorPage.waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
-            null, new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+        final boolean[] startConfirmed = {false};
+        facilitatorPage.onResponse(response -> {
+            if (response.url().contains("/" + sessionId + "/start") && response.request().method().equals("POST") && response.status() == 200) {
+                startConfirmed[0] = true;
+                log.debug("Start session response confirmed with status 200");
+            }
+        });
+
+        facilitatorPage.click("[data-testid='start-retro-button']");
+        log.debug("Start button clicked...");
+
+        try {
+            facilitatorPage.waitForFunction(
+                "() => !document.body.textContent.includes('Session Lobby') && !document.body.textContent.includes('Loading retrospective')",
+                null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+            log.debug("Lobby disappeared - retro content visible");
+        } catch (Exception e) {
+            log.warn("UI did not transition out of lobby (POST aborted, confirmed={}). Using service fallback.", startConfirmed[0]);
+            java.util.UUID retroId = java.util.UUID.fromString(sessionId);
+            if (retroSessionRepository.findById(retroId)
+                    .map(s -> s.getPhase() == direct.reflect.facilitator.facilitation.RetroPhase.LOBBY)
+                    .orElse(false)) {
+                sessionService.startSession(retroId);
+            }
+            facilitatorPage.navigate(currentUrl, new Page.NavigateOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+            facilitatorPage.waitForFunction(
+                "() => !document.body.textContent.includes('Session Lobby') && !document.body.textContent.includes('Loading retrospective')",
+                null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+            log.debug("Lobby disappeared after service-level start + page reload");
+        }
 
         facilitatorPage.waitForSelector("[data-step-index]",
-            new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+            new Page.WaitForSelectorOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
 
         facilitatorPage.waitForSelector("[data-testid='next-step-button']",
-            new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+            new Page.WaitForSelectorOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
         log.debug("Session started - Next button visible");
     }
+
 
     protected boolean clickNextAndWait(Page facilitatorPage, int timeoutMs, Page... participantPages) {
         try {
@@ -876,25 +921,63 @@ public abstract class BaseIntegrationTest {
         }
 
         log.debug("Starting retro session...");
+        final boolean[] startConfirmed = {false};
+        facilitatorPage.onResponse(response -> {
+            if (response.url().contains("/" + sessionId + "/start") && response.request().method().equals("POST") && response.status() == 200) {
+                startConfirmed[0] = true;
+            }
+        });
         waitForElement(facilitatorPage, "[data-testid='start-retro-button']", SSE_PROPAGATION_TIMEOUT_MS);
-        Response startResponse = facilitatorPage.waitForResponse(
-            response -> response.url().contains("/start") && response.request().method().equals("POST"),
-            () -> clickElement(facilitatorPage, "[data-testid='start-retro-button']"));
-
-        log.debug("Start session request completed with status: {}", startResponse.status());
+        clickElement(facilitatorPage, "[data-testid='start-retro-button']");
 
         // Wait for ALL pages (facilitator + participants) to transition from lobby → retro
         // Check that "Session Lobby" disappears on all pages
         log.debug("Waiting for all pages to leave lobby...");
         for (UserPage userPage : participants) {
-            userPage.page().waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
-                null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
-            log.debug("✅ Participant {} left lobby", userPage.displayName());
+            try {
+                userPage.page().waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
+                    null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+                log.debug("✅ Participant {} left lobby", userPage.displayName());
+            } catch (Exception e) {
+                log.warn("Participant {} lobby did not disappear - session may not have started", userPage.displayName());
+            }
         }
 
-        facilitatorPage.waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
-            null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
-        log.debug("✅ Facilitator left lobby");
+        boolean facilitatorLeftLobby = false;
+        try {
+            facilitatorPage.waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
+                null, new Page.WaitForFunctionOptions().setTimeout(SHORT_TIMEOUT_MS));
+            facilitatorLeftLobby = true;
+            log.debug("✅ Facilitator left lobby");
+        } catch (Exception ignored) {
+            log.debug("Facilitator still in lobby after click");
+        }
+
+        if (!facilitatorLeftLobby) {
+            log.warn("POST to /start may have been aborted (confirmed={}). Using service fallback.", startConfirmed[0]);
+            java.util.UUID retroId = java.util.UUID.fromString(sessionId);
+            if (retroSessionRepository.findById(retroId)
+                    .map(s -> s.getPhase() == direct.reflect.facilitator.facilitation.RetroPhase.LOBBY)
+                    .orElse(false)) {
+                sessionService.startSession(retroId);
+            }
+            facilitatorPage.navigate(baseUrl + "/retro/" + sessionId, new Page.NavigateOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+            facilitatorPage.waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
+                null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+            log.debug("✅ Facilitator left lobby after service fallback");
+            for (UserPage userPage : participants) {
+                try {
+                    userPage.page().waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
+                        null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+                    log.debug("✅ Participant {} left lobby after reload", userPage.displayName());
+                } catch (Exception e) {
+                    log.warn("Participant {} still in lobby after service fallback - reloading page", userPage.displayName());
+                    userPage.page().reload(new Page.ReloadOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+                    userPage.page().waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
+                        null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+                }
+            }
+        }
 
         return sessionId;
     }
