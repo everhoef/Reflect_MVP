@@ -73,12 +73,11 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
 
             logTestProgress("SETUP", 2, 23, "Creating session and joining participants");
             String sessionId = createRetroSession(facilitatorPage, "Complete Flow Test");
-            String retroUrl = baseUrl + "/retro/" + sessionId;
             joinRetroSession(bobPage, sessionId);
             joinRetroSession(carolPage, sessionId);
 
             waitForElement(facilitatorPage, "[data-testid='start-retro-button']", SSE_PROPAGATION_TIMEOUT_MS);
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             waitForAllPagesElement("[data-testid='retro-content']", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
 
@@ -459,7 +458,7 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             joinRetroSession(participantLobbyPage, sessionId);
             waitForSseConnection(participantLobbyPage, UUID.fromString(sessionId));
             participantLobbyPage.close();
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             logTestProgress("ADVANCE", 3, 4, "Fast-forwarding to GATHER_DATA step 1 and loading retro URL");
             String retroUrl = baseUrl + "/retro/" + sessionId;
@@ -509,7 +508,7 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             authenticateAsGuest(facilitatorPage, "Facilitator");
             String sessionId = createRetroSession(facilitatorPage, "History Shift Test");
             waitForElement(facilitatorPage, "[data-testid='start-retro-button']", SSE_PROPAGATION_TIMEOUT_MS);
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             logTestProgress("ADVANCE_1", 2, 6, "Fast-forwarding to GATHER_DATA step 1 (facilitator only)");
             String retroUrl = baseUrl + "/retro/" + sessionId;
@@ -593,7 +592,7 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             joinRetroSession(participantPage, sessionId);
             waitForSseConnection(participantPage, UUID.fromString(sessionId));
             waitForElement(facilitatorPage, "[data-testid='start-retro-button']", SSE_PROPAGATION_TIMEOUT_MS);
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             waitForElement(participantPage, "h2:has-text('Step')", SSE_PROPAGATION_TIMEOUT_MS);
 
@@ -655,7 +654,7 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             authenticateAsGuest(facilitatorPage, "Facilitator");
             String sessionId = createRetroSession(facilitatorPage, "Late Join Consistency Test");
             waitForElement(facilitatorPage, "[data-testid='start-retro-button']", SSE_PROPAGATION_TIMEOUT_MS);
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             logTestProgress("ADVANCE", 2, 8, "Fast-forwarding to GATHER_DATA step 2 to build history");
             fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 2);
@@ -751,7 +750,7 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             logTestProgress("SETUP", 2, 4, "Creating and starting retro session");
             String sessionId = createRetroSession(facilitatorPage, "Next-Step Coachmark Test");
             joinRetroSession(participantPage, sessionId);
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             waitForAllPagesElement("[data-testid='retro-content']", facilitatorPage, participantPage);
             waitForElement(facilitatorPage, "[data-coachmark='next-step']");
@@ -812,7 +811,7 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             logTestProgress("SETUP", 2, 5, "Creating and starting retro session");
             String sessionId = createRetroSession(facilitatorPage, "Note-Input Coachmark Test");
             joinRetroSession(participantPage, sessionId);
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             logTestProgress("SETUP", 3, 5, "Fast-forwarding to GATHER_DATA step 0 (guaranteed board step)");
             fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 0);

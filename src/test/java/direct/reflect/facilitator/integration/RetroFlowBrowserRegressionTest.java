@@ -92,7 +92,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
             // ── 4. Participant joins, facilitator starts session ────────────────────
             logTestProgress("SETUP", 4, 6, "Participant joining and starting session");
             joinRetroSession(participantPage, sessionId);
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             // ── 5. Fast-forward session DB state to SSC input step ─────────────────
             //    After startRetroSession() the server is at SET_THE_STAGE, step 0.
@@ -188,7 +188,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
             retroSessionRepository.save(session);
 
             logTestProgress("SETUP", 3, 4, "Starting session, submitting note, then fast-forwarding to clustering step");
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             // First submit a sticky note at the input step so responses.empty is false at clustering step
             // (The .sortable div only renders when responses exist AND allowMerging=true)
@@ -270,7 +270,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
 
             logTestProgress("SETUP", 3, 5, "Participant joining and starting session");
             joinRetroSession(participantPage, sessionId);
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             // First submit a sticky note at the input step so there is something to vote on
             logTestProgress("SETUP", 4, 5, "Submitting sticky note for voting");
@@ -359,7 +359,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
 
             logTestProgress("SETUP", 3, 4, "Participant joining and starting session");
             joinRetroSession(participantPage, sessionId);
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             // Fast-forward to SSC input step (TIMER_EXPIRES, durationSeconds=480)
             // AND set stepStartedAt so the timer is active
@@ -432,7 +432,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
 
             logTestProgress("SETUP", 2, 3, "Creating and starting retro session");
             String sessionId = createRetroSession(facilitatorPage, "Phase Progress Sanity Test");
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             // Wait for the retro content to be fully rendered
             waitForElement(facilitatorPage, "[data-testid='retro-content']");
@@ -485,7 +485,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
                     .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
             session.setTemplate(sscTemplate);
             retroSessionRepository.save(session);
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             // Fast-forward to SSC input step with active timer (stepStartedAt set now)
             logTestProgress("TIMER", 3, 3, "Fast-forwarding to SSC timed step and verifying countdown");
@@ -544,7 +544,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
             logTestProgress("SETUP", 1, 6, "Authenticate facilitator and create session");
             authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
             String sessionId = createRetroSession(facilitatorPage, "Reload Consistency Test");
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             // Fast-forward to GATHER_DATA step 2 so there are 2 history items
             logTestProgress("ADVANCE", 2, 6, "Fast-forwarding to GATHER_DATA step 2 to build history");
@@ -621,8 +621,8 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
             authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
 
             logTestProgress("SETUP", 2, 3, "Creating and starting retro session");
-            createRetroSession(facilitatorPage, "Guidance Coachmark Test");
-            startRetroSession(facilitatorPage);
+            String sessionId = createRetroSession(facilitatorPage, "Guidance Coachmark Test");
+            startRetroSession(facilitatorPage, sessionId);
 
             waitForElement(facilitatorPage, "[data-testid='retro-content']");
             waitForElement(facilitatorPage, "[data-coachmark='guidance-sidebar']");

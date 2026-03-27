@@ -55,8 +55,30 @@ function normalizeStep(s: components["schemas"]["StepSummaryDto"]): StepSummaryD
   };
 }
 
+function normalizeAssistantState(
+  raw: components["schemas"]["AssistantStateDto"] | null | undefined
+): AssistantState | null {
+  if (raw == null) return null;
+  return {
+    current: raw.current
+      ? {
+          retroId: raw.current.retroId ?? "",
+          stepId: raw.current.stepId ?? 0,
+          stepTitle: raw.current.stepTitle ?? "",
+          publicText: raw.current.publicText ?? "",
+        }
+      : null,
+    history: (raw.history ?? []).map((m) => ({
+      retroId: m.retroId ?? "",
+      stepId: m.stepId ?? 0,
+      stepTitle: m.stepTitle ?? "",
+      publicText: m.publicText ?? "",
+    })),
+    facilitatorCoachingNote: raw.facilitatorCoachingNote ?? null,
+  };
+}
+
 function normalizeState(raw: components["schemas"]["RetroStateDto"]): RetroState {
-  const rawWithAssistant = raw as unknown as { assistantState?: AssistantState | null };
   return {
     retroId: raw.retroId ?? "",
     phase: raw.phase ?? "LOBBY",
@@ -66,7 +88,7 @@ function normalizeState(raw: components["schemas"]["RetroStateDto"]): RetroState
     facilitatorId: raw.facilitatorId ?? "",
     isFacilitator: raw.isFacilitator ?? false,
     participantCount: raw.participantCount ?? 0,
-    assistantState: rawWithAssistant.assistantState ?? null,
+    assistantState: normalizeAssistantState(raw.assistantState),
   };
 }
 

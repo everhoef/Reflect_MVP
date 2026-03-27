@@ -743,12 +743,11 @@ public abstract class BaseIntegrationTest {
         }
     }
 
-    protected void startRetroSession(Page facilitatorPage) {
+    protected void startRetroSession(Page facilitatorPage, String sessionId) {
         recordActivity("startRetroSession");
         log.debug("Starting retro session...");
 
         String currentUrl = facilitatorPage.url();
-        String sessionId = currentUrl.substring(currentUrl.lastIndexOf("/") + 1);
 
         final boolean[] startConfirmed = {false};
         facilitatorPage.onResponse(response -> {

@@ -498,6 +498,19 @@ export interface components {
             };
             unclustered?: components["schemas"]["ColumnResponseDto"][];
         };
+        AssistantMessageDto: {
+            /** Format: uuid */
+            retroId?: string;
+            /** Format: int64 */
+            stepId?: number;
+            stepTitle?: string;
+            publicText?: string;
+        };
+        AssistantStateDto: {
+            current?: components["schemas"]["AssistantMessageDto"] | null;
+            history?: components["schemas"]["AssistantMessageDto"][];
+            facilitatorCoachingNote?: string | null;
+        };
         RetroStateDto: {
             /** Format: uuid */
             retroId?: string;
@@ -512,6 +525,7 @@ export interface components {
             isFacilitator?: boolean;
             /** Format: int32 */
             participantCount?: number;
+            assistantState?: components["schemas"]["AssistantStateDto"] | null;
         };
         StepSummaryDto: {
             /** Format: int64 */
