@@ -693,3 +693,105 @@ ps aux | grep -i "[m]vn spring-boot:run"
 - ALWAYS prefer editing existing files to creating new ones
 - NEVER proactively create documentation files unless explicitly requested
 - Make sure that MCP is used for browser tests to test the facilitation flow if it works in an 'agent' / automated way so that I dont need to do this myself
+
+---
+
+## Partner PR Reviewer Checklist
+
+Use this checklist when reviewing PRs created via the `fix-bug` or `va-explain` partner skills. The goal is to catch ambient noise before merging — not to re-verify partner intent.
+
+### Step 1: Diff Cleanliness
+
+Run these two commands against the PR branch:
+
+```bash
+# All files in the PR diff
+git diff origin/main...<branch-name> --name-only
+
+# Full content diff
+git diff origin/main...<branch-name>
+```
+
+The diff must contain **only the files the partner intended to change**. Reject anything else.
+
+**Forbidden file classes — any of these in the diff = reject:**
+
+| Pattern | Why it must not be here |
+|---|---|
+| `src/main/resources/static/` | Generated Vite build output; regenerated on every Maven build |
+| `bdd-reports/` | Generated BDD analysis artifacts; transient review output only |
+| `CLAUDE.md`, `.claude/`, `.agents/skills/` | Repo-owner tooling files; incidental AI side-effects belong in separate commits |
+| `.sisyphus/` | Agent planning files; gitignored by design |
+| `frontend/src/types/generated/` | Generated TypeScript types; changes without actual type changes are noise |
+| `.env*`, `secrets/`, credential files | Never commit secrets |
+| `frontend/node_modules/` | Package install output; should never be tracked |
+| `.opencode/oh-my-opencode.json` | Runtime tooling config; ambient drift from OpenCode sessions |
+
+If forbidden files are present, ask the partner to re-run the skill (or fix the branch yourself per the branch-rewrite pattern in `.sisyphus/notepads/pr-skill-and-pr-hygiene/learnings.md`).
+
+### Step 2: Test Gate
+
+Checkout the branch and run:
+
+```bash
+git checkout <branch-name>
+./mvnw clean test
+```
+
+Expected: `Tests run: N, Failures: 0, Errors: 0, Skipped: 0` — BUILD SUCCESS.
+
+Zero tolerance. If any test fails, the PR is not ready.
+
+After running tests, restore any drift the Maven build produces. Maven regenerates static assets (new hashed JS/CSS bundles as untracked files) and generated TypeScript types — `git restore` alone is insufficient because new untracked files won't be removed by it:
+
+```bash
+git restore src/main/resources/static/ frontend/src/types/generated/
+git clean -f src/main/resources/static/
+git status  # should be clean
+```
+
+### Step 3: Functional Readiness
+
+For each intended change in the diff, ask: does this change do what the partner described?
+
+- CSV config changes: verify the changed rows look correct and plausible
+- Frontend changes: check for a Playwright screenshot or a brief browser verification note in the PR description
+- Security-relevant changes (auth, redirect handling, session config): look for corresponding tests
+
+A clean diff is necessary but not sufficient. The change still needs to be correct.
+
+### Merge vs Reject Decision
+
+**Merge when all of the following are true:**
+- Diff scope contains only the intended files (no forbidden classes above)
+- `./mvnw clean test` passes with zero failures
+- The content of the change matches the partner's stated intent
+- `gh pr view <N> --json mergeStateStatus` returns `"CLEAN"`
+
+**Request changes (do not merge) when any of the following is true:**
+- Any forbidden file class appears in the diff
+- Tests fail on the branch
+- The diff contains unrelated changes with no explanation
+- The change content appears incorrect or incomplete
+
+**Reject outright and ask for rework when:**
+- Secrets or credentials appear in the diff
+- A PR contains changes to both business logic AND tooling/build files (they must be separate PRs)
+- The branch is based on a stale `main` with unresolved merge conflicts
+
+### Quick Reference Commands
+
+```bash
+# Check diff scope
+git diff origin/main...<branch> --name-only
+
+# Check review state before force-push
+gh pr view <N> --json number,title,state,headRefName,reviews,reviewDecision
+gh api repos/<owner>/<repo>/pulls/<N>/comments
+
+# Run full test suite
+./mvnw clean test
+
+# Check merge eligibility
+gh pr view <N> --json mergeStateStatus
+```

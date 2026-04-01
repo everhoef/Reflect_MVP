@@ -79,3 +79,9 @@ logs/
 ### Frontend ###
 frontend/node_modules/
 frontend/dist/
+
+### Generated static build output (Maven/Vite regenerates on every build) ###
+src/main/resources/static/
+
+### BDD analysis reports (transient review output only) ###
+bdd-reports/
