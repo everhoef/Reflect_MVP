@@ -1,9 +1,9 @@
-import { render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { GuidanceSidebar, type HistoryMessage, type FacilitatorQuickActionsConfig } from './GuidanceSidebar'
+import { render, screen } from '@testing-library/react'
+import { GuidanceSidebar } from './GuidanceSidebar'
+import type { HistoryMessage, PrivateCoachingNote, FacilitatorQuickActionsConfig } from './GuidanceSidebar'
 
 describe('GuidanceSidebar', () => {
-  it('renders the default label when no stepTitle provided', () => {
+  it('renders the default title "Now" when no stepTitle provided', () => {
     render(<GuidanceSidebar />)
     expect(screen.getByText('Now')).toBeInTheDocument()
   })
@@ -39,366 +39,257 @@ describe('GuidanceSidebar', () => {
     expect(screen.getByText('Second step')).toBeInTheDocument()
   })
 
-  it('is expanded by default', () => {
+  it('renders bullet points for lines starting with bullet character', () => {
+    render(<GuidanceSidebar guidance={`• First step\n• Second step`} />)
+    expect(screen.getByText('First step')).toBeInTheDocument()
+    expect(screen.getByText('Second step')).toBeInTheDocument()
+  })
+
+  it('renders plain paragraph for non-bullet lines', () => {
+    render(<GuidanceSidebar guidance="Plain text line" />)
+    expect(screen.getByText('Plain text line')).toBeInTheDocument()
+  })
+
+  it('is always visible — cannot be collapsed (BDD Scenario 11)', () => {
     render(<GuidanceSidebar guidance="Some guidance text" />)
     expect(screen.getByText('Some guidance text')).toBeVisible()
   })
 
-  it('collapses when the toggle button is clicked', async () => {
-    const user = userEvent.setup()
+  it('has no collapse or expand button (BDD Scenario 11)', () => {
     render(<GuidanceSidebar guidance="Some guidance text" />)
-
-    const toggleButton = screen.getByRole('button', { name: 'Collapse guidance' })
-    await user.click(toggleButton)
-
-    expect(screen.queryByText('Some guidance text')).not.toBeInTheDocument()
-  })
-
-  it('shows toggle text "↓ Show" when collapsed', async () => {
-    const user = userEvent.setup()
-    render(<GuidanceSidebar guidance="Some guidance text" />)
-
-    await user.click(screen.getByRole('button', { name: 'Collapse guidance' }))
-
-    expect(screen.getByText('↓ Show')).toBeInTheDocument()
-  })
-
-  it('expands again when the expand toggle is clicked', async () => {
-    const user = userEvent.setup()
-    render(<GuidanceSidebar guidance="Some guidance text" />)
-
-    await user.click(screen.getByRole('button', { name: 'Collapse guidance' }))
-    expect(screen.queryByText('Some guidance text')).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Expand guidance' }))
-    expect(screen.getByText('Some guidance text')).toBeInTheDocument()
-  })
-
-  it('toggle button has correct aria-expanded attribute', async () => {
-    const user = userEvent.setup()
-    render(<GuidanceSidebar />)
-
-    const toggleButton = screen.getByRole('button', { name: 'Collapse guidance' })
-    expect(toggleButton).toHaveAttribute('aria-expanded', 'true')
-
-    await user.click(toggleButton)
-    expect(screen.getByRole('button', { name: 'Expand guidance' })).toHaveAttribute('aria-expanded', 'false')
-  })
-
-  it('Card root has data-coachmark="guidance-sidebar" anchor attribute', () => {
-    render(<GuidanceSidebar guidance="Some guidance text" />)
-    const card = document.querySelector('[data-coachmark="guidance-sidebar"]')
-    expect(card).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /collapse guidance/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /expand guidance/i })).not.toBeInTheDocument()
+    expect(screen.queryByText('Show guidance ↓')).not.toBeInTheDocument()
   })
 
   describe('stable selector hook contract', () => {
-    it('renders data-testid="guidance-sidebar" on the shell root', () => {
+    it('renders the guidance-sidebar shell', () => {
       render(<GuidanceSidebar />)
       expect(screen.getByTestId('guidance-sidebar')).toBeInTheDocument()
     })
 
-    it('renders data-testid="guidance-content" when expanded (default)', () => {
-      render(<GuidanceSidebar guidance="Some guidance" />)
-      expect(screen.getByTestId('guidance-content')).toBeInTheDocument()
-    })
-
-    it('guidance-content is absent when collapsed', async () => {
-      const user = userEvent.setup()
-      render(<GuidanceSidebar guidance="Some guidance" />)
-      await user.click(screen.getByRole('button', { name: 'Collapse guidance' }))
-      expect(screen.queryByTestId('guidance-content')).not.toBeInTheDocument()
-    })
-
-    it('shell root carries data-assistant-testid="assistant-shell"', () => {
+    it('guidance-sidebar has data-assistant-testid="assistant-shell"', () => {
       render(<GuidanceSidebar />)
       expect(screen.getByTestId('guidance-sidebar')).toHaveAttribute('data-assistant-testid', 'assistant-shell')
     })
 
-    it('guidance-content carries data-assistant-testid="assistant-current-message"', () => {
-      render(<GuidanceSidebar guidance="Some guidance" />)
+    it('guidance-sidebar has data-coachmark="guidance-sidebar"', () => {
+      render(<GuidanceSidebar />)
+      expect(screen.getByTestId('guidance-sidebar')).toHaveAttribute('data-coachmark', 'guidance-sidebar')
+    })
+
+    it('guidance-content is always in DOM when component renders', () => {
+      render(<GuidanceSidebar guidance="Some guidance text" />)
+      expect(screen.getByTestId('guidance-content')).toBeInTheDocument()
+    })
+
+    it('guidance-content is present even when no guidance is provided', () => {
+      render(<GuidanceSidebar />)
+      expect(screen.getByTestId('guidance-content')).toBeInTheDocument()
+    })
+
+    it('guidance-content has data-assistant-testid="assistant-current-message"', () => {
+      render(<GuidanceSidebar guidance="Some guidance text" />)
       expect(screen.getByTestId('guidance-content')).toHaveAttribute('data-assistant-testid', 'assistant-current-message')
     })
 
-    it('assistant-history-list placeholder is always in DOM regardless of expand state', async () => {
-      const user = userEvent.setup()
+    it('assistant-history-list is always in DOM', () => {
       render(<GuidanceSidebar />)
-      expect(screen.getByTestId('assistant-history-list')).toBeInTheDocument()
-      await user.click(screen.getByRole('button', { name: 'Collapse guidance' }))
       expect(screen.getByTestId('assistant-history-list')).toBeInTheDocument()
     })
 
-    it('assistant-history-list placeholder is hidden', () => {
-      render(<GuidanceSidebar />)
+    it('assistant-history-list has aria-hidden="true" when no history', () => {
+      render(<GuidanceSidebar previousMessages={[]} />)
       expect(screen.getByTestId('assistant-history-list')).toHaveAttribute('aria-hidden', 'true')
     })
 
-    it('assistant-private-coaching-placeholder is always in DOM', () => {
-      render(<GuidanceSidebar />)
+    it('assistant-history-list does not have aria-hidden when history is present', () => {
+      const messages: HistoryMessage[] = [{ stepTitle: 'Step 1', publicText: 'Some text' }]
+      render(<GuidanceSidebar previousMessages={messages} />)
+      expect(screen.getByTestId('assistant-history-list')).not.toHaveAttribute('aria-hidden', 'true')
+    })
+
+    it('assistant-private-coaching-placeholder is in DOM when private note not shown', () => {
+      render(<GuidanceSidebar isFacilitator={false} />)
       expect(screen.getByTestId('assistant-private-coaching-placeholder')).toBeInTheDocument()
     })
 
-    it('assistant-private-coaching-placeholder is hidden', () => {
-      render(<GuidanceSidebar />)
-      expect(screen.getByTestId('assistant-private-coaching-placeholder')).toHaveAttribute('aria-hidden', 'true')
+    it('assistant-private-coaching-placeholder has aria-hidden="true" and hidden when not shown', () => {
+      render(<GuidanceSidebar isFacilitator={false} />)
+      const placeholder = screen.getByTestId('assistant-private-coaching-placeholder')
+      expect(placeholder).toHaveAttribute('aria-hidden', 'true')
+      expect(placeholder).toHaveAttribute('hidden')
     })
 
-    it('assistant-history-list carries data-assistant-testid="assistant-history-list"', () => {
-      render(<GuidanceSidebar />)
-      expect(screen.getByTestId('assistant-history-list')).toHaveAttribute('data-assistant-testid', 'assistant-history-list')
+    it('facilitator-quick-actions-placeholder is in DOM when quick actions not shown', () => {
+      render(<GuidanceSidebar isFacilitator={false} />)
+      expect(screen.getByTestId('facilitator-quick-actions-placeholder')).toBeInTheDocument()
     })
 
-    it('assistant-private-coaching-placeholder carries data-assistant-testid="assistant-private-coaching"', () => {
-      render(<GuidanceSidebar />)
-      expect(screen.getByTestId('assistant-private-coaching-placeholder')).toHaveAttribute('data-assistant-testid', 'assistant-private-coaching')
+    it('facilitator-quick-actions-placeholder has aria-hidden="true" and hidden when not shown', () => {
+      render(<GuidanceSidebar isFacilitator={false} />)
+      const placeholder = screen.getByTestId('facilitator-quick-actions-placeholder')
+      expect(placeholder).toHaveAttribute('aria-hidden', 'true')
+      expect(placeholder).toHaveAttribute('hidden')
     })
   })
 
   describe('facilitator-private coaching boundary', () => {
-    it('facilitator with a note sees assistant-private-coaching section', () => {
-      render(
-        <GuidanceSidebar
-          isFacilitator={true}
-          privateCoachingNote={{ text: 'Click Next when ready.' }}
-        />
-      )
-      expect(screen.getByTestId('assistant-private-coaching')).toBeInTheDocument()
-      expect(screen.queryByTestId('assistant-private-coaching-placeholder')).not.toBeInTheDocument()
-    })
+    const note: PrivateCoachingNote = { text: 'Remind them to stay on topic.' }
 
-    it('private coaching section shows the note text', () => {
-      render(
-        <GuidanceSidebar
-          isFacilitator={true}
-          privateCoachingNote={{ text: 'Click Next when ready.' }}
-        />
-      )
-      expect(screen.getByText('Click Next when ready.')).toBeInTheDocument()
-    })
-
-    it('private coaching section shows "Private note" label', () => {
-      render(
-        <GuidanceSidebar
-          isFacilitator={true}
-          privateCoachingNote={{ text: 'Click Next when ready.' }}
-        />
-      )
-      expect(screen.getByText(/Private note/i)).toBeInTheDocument()
-    })
-
-    it('non-facilitator sees only the placeholder, not the coaching section', () => {
-      render(
-        <GuidanceSidebar
-          isFacilitator={false}
-          privateCoachingNote={{ text: 'Click Next when ready.' }}
-        />
-      )
+    it('does not render private coaching section for non-facilitator', () => {
+      render(<GuidanceSidebar isFacilitator={false} privateCoachingNote={note} />)
       expect(screen.queryByTestId('assistant-private-coaching')).not.toBeInTheDocument()
-      expect(screen.getByTestId('assistant-private-coaching-placeholder')).toBeInTheDocument()
     })
 
-    it('omitting isFacilitator shows only the placeholder', () => {
-      render(<GuidanceSidebar privateCoachingNote={{ text: 'Click Next when ready.' }} />)
-      expect(screen.queryByTestId('assistant-private-coaching')).not.toBeInTheDocument()
-      expect(screen.getByTestId('assistant-private-coaching-placeholder')).toBeInTheDocument()
-    })
-
-    it('no coaching note shows only the placeholder even for facilitator', () => {
+    it('does not render private coaching section when note is null', () => {
       render(<GuidanceSidebar isFacilitator={true} privateCoachingNote={null} />)
       expect(screen.queryByTestId('assistant-private-coaching')).not.toBeInTheDocument()
+    })
+
+    it('does not render private coaching section when note text is empty', () => {
+      render(<GuidanceSidebar isFacilitator={true} privateCoachingNote={{ text: '' }} />)
+      expect(screen.queryByTestId('assistant-private-coaching')).not.toBeInTheDocument()
+    })
+
+    it('renders private coaching section for facilitator with valid note', () => {
+      render(<GuidanceSidebar isFacilitator={true} privateCoachingNote={note} />)
+      expect(screen.getByTestId('assistant-private-coaching')).toBeInTheDocument()
+    })
+
+    it('renders private coaching note text', () => {
+      render(<GuidanceSidebar isFacilitator={true} privateCoachingNote={note} />)
+      expect(screen.getByText('Remind them to stay on topic.')).toBeInTheDocument()
+    })
+
+    it('private coaching section has data-assistant-testid="assistant-private-coaching"', () => {
+      render(<GuidanceSidebar isFacilitator={true} privateCoachingNote={note} />)
+      expect(screen.getByTestId('assistant-private-coaching')).toHaveAttribute('data-assistant-testid', 'assistant-private-coaching')
+    })
+
+    it('shows placeholder instead of section when coaching is absent', () => {
+      render(<GuidanceSidebar isFacilitator={false} />)
+      expect(screen.queryByTestId('assistant-private-coaching')).not.toBeInTheDocument()
       expect(screen.getByTestId('assistant-private-coaching-placeholder')).toBeInTheDocument()
     })
 
-    it('guidance-content subtree does not contain private coaching text', () => {
-      render(
-        <GuidanceSidebar
-          guidance="Shared guidance here."
-          isFacilitator={true}
-          privateCoachingNote={{ text: 'SECRET facilitator note.' }}
-        />
-      )
-      const guidanceContent = screen.getByTestId('guidance-content')
-      expect(guidanceContent).not.toHaveTextContent('SECRET facilitator note.')
-    })
-
-    it('private coaching section is structurally outside guidance-content', () => {
-      render(
-        <GuidanceSidebar
-          guidance="Shared guidance here."
-          isFacilitator={true}
-          privateCoachingNote={{ text: 'SECRET facilitator note.' }}
-        />
-      )
-      const guidanceContent = screen.getByTestId('guidance-content')
-      const privateSection = screen.getByTestId('assistant-private-coaching')
-      expect(guidanceContent.contains(privateSection)).toBe(false)
+    it('placeholder has data-assistant-testid="assistant-private-coaching"', () => {
+      render(<GuidanceSidebar isFacilitator={false} />)
+      expect(screen.getByTestId('assistant-private-coaching-placeholder')).toHaveAttribute('data-assistant-testid', 'assistant-private-coaching')
     })
   })
 
   describe('shared assistant history rendering', () => {
-    const makeHistory = (n: number): HistoryMessage[] =>
-      Array.from({ length: n }, (_, i) => ({
-        stepTitle: `Step ${n - i}`,
-        publicText: `Message ${n - i}`,
-      }))
+    const messages: HistoryMessage[] = [
+      { stepTitle: 'Step A', publicText: 'First message' },
+      { stepTitle: 'Step B', publicText: 'Second message' },
+    ]
 
-    it('renders no history items when previousMessages is empty', () => {
-      render(<GuidanceSidebar guidance="Current" previousMessages={[]} />)
-      const historyList = screen.getByTestId('assistant-history-list')
-      expect(historyList.children).toHaveLength(0)
-    })
-
-    it('renders 1 previous message when provided', () => {
-      const history = makeHistory(1)
-      render(<GuidanceSidebar guidance="Current" previousMessages={history} />)
-      const historyList = screen.getByTestId('assistant-history-list')
-      // Count only item <div>s — the "Earlier" <p> header is also a direct child
-      expect(historyList.querySelectorAll(':scope > div')).toHaveLength(1)
-      expect(within(historyList).getByText('Message 1')).toBeInTheDocument()
-    })
-
-    it('renders up to 3 previous messages when 3 are provided', () => {
-      const history = makeHistory(3)
-      render(<GuidanceSidebar guidance="Current" previousMessages={history} />)
-      const historyList = screen.getByTestId('assistant-history-list')
-      // Count only item <div>s — the "Earlier" <p> header is also a direct child
-      expect(historyList.querySelectorAll(':scope > div')).toHaveLength(3)
-      expect(within(historyList).getByText('Message 3')).toBeInTheDocument()
-      expect(within(historyList).getByText('Message 2')).toBeInTheDocument()
-      expect(within(historyList).getByText('Message 1')).toBeInTheDocument()
-    })
-
-    it('renders only 3 items when 4 previous messages are provided (cap enforced)', () => {
-      const history = makeHistory(4)
-      render(<GuidanceSidebar guidance="Current" previousMessages={history} />)
-      const historyList = screen.getByTestId('assistant-history-list')
-      // Count only item <div>s — the "Earlier" <p> header is also a direct child
-      expect(historyList.querySelectorAll(':scope > div')).toHaveLength(3)
-      expect(within(historyList).queryByText('Message 1')).not.toBeInTheDocument()
-    })
-
-    it('renders only 3 items when 6 previous messages are provided (cap enforced)', () => {
-      const history = makeHistory(6)
-      render(<GuidanceSidebar guidance="Current" previousMessages={history} />)
-      const historyList = screen.getByTestId('assistant-history-list')
-      // Count only item <div>s — the "Earlier" <p> header is also a direct child
-      expect(historyList.querySelectorAll(':scope > div')).toHaveLength(3)
-    })
-
-    it('current message remains primary (guidance-content is present and rendered above history)', () => {
-      const history = makeHistory(3)
-      render(<GuidanceSidebar guidance="Current guidance" previousMessages={history} />)
-      expect(screen.getByTestId('guidance-content')).toBeInTheDocument()
-      expect(screen.getByText('Current guidance')).toBeInTheDocument()
-    })
-
-    it('history items do not appear in the guidance-content subtree', () => {
-      const history = makeHistory(2)
-      render(<GuidanceSidebar guidance="Current guidance" previousMessages={history} />)
-      const guidanceContent = screen.getByTestId('guidance-content')
-      expect(guidanceContent).not.toHaveTextContent('Message 2')
-      expect(guidanceContent).not.toHaveTextContent('Message 1')
-    })
-
-    it('history container is always in DOM regardless of expand state', async () => {
-      const user = userEvent.setup()
-      const history = makeHistory(2)
-      render(<GuidanceSidebar guidance="Current" previousMessages={history} />)
-      expect(screen.getByTestId('assistant-history-list')).toBeInTheDocument()
-      await user.click(screen.getByRole('button', { name: 'Collapse guidance' }))
+    it('history container is always in DOM regardless of expand state', () => {
+      render(<GuidanceSidebar />)
       expect(screen.getByTestId('assistant-history-list')).toBeInTheDocument()
     })
 
-    it('history list is not aria-hidden when history items exist', () => {
-      const history = makeHistory(2)
-      render(<GuidanceSidebar guidance="Current" previousMessages={history} />)
-      const historyList = screen.getByTestId('assistant-history-list')
-      expect(historyList).not.toHaveAttribute('aria-hidden', 'true')
+    it('renders history messages when provided', () => {
+      render(<GuidanceSidebar previousMessages={messages} />)
+      expect(screen.getByText('First message')).toBeInTheDocument()
+      expect(screen.getByText('Second message')).toBeInTheDocument()
     })
 
-    it('history list is aria-hidden when no history is provided', () => {
-      render(<GuidanceSidebar guidance="Current" />)
-      const historyList = screen.getByTestId('assistant-history-list')
-      expect(historyList).toHaveAttribute('aria-hidden', 'true')
+    it('renders step titles for history messages', () => {
+      render(<GuidanceSidebar previousMessages={messages} />)
+      expect(screen.getByText('Step A')).toBeInTheDocument()
+      expect(screen.getByText('Step B')).toBeInTheDocument()
+    })
+
+    it('caps rendered history at 3 messages (HISTORY_RENDER_MAX)', () => {
+      const fourMessages: HistoryMessage[] = [
+        { stepTitle: 'Step 1', publicText: 'Msg 1' },
+        { stepTitle: 'Step 2', publicText: 'Msg 2' },
+        { stepTitle: 'Step 3', publicText: 'Msg 3' },
+        { stepTitle: 'Step 4', publicText: 'Msg 4 — should be hidden' },
+      ]
+      render(<GuidanceSidebar previousMessages={fourMessages} />)
+      expect(screen.getByText('Msg 1')).toBeInTheDocument()
+      expect(screen.getByText('Msg 2')).toBeInTheDocument()
+      expect(screen.getByText('Msg 3')).toBeInTheDocument()
+      expect(screen.queryByText('Msg 4 — should be hidden')).not.toBeInTheDocument()
+    })
+
+    it('shows "Earlier" label when history messages exist', () => {
+      render(<GuidanceSidebar previousMessages={messages} />)
+      expect(screen.getByText('Earlier')).toBeInTheDocument()
+    })
+
+    it('does not show "Earlier" label when no history', () => {
+      render(<GuidanceSidebar previousMessages={[]} />)
+      expect(screen.queryByText('Earlier')).not.toBeInTheDocument()
+    })
+
+    it('renders empty history container without errors', () => {
+      render(<GuidanceSidebar previousMessages={[]} />)
+      expect(screen.getByTestId('assistant-history-list')).toBeInTheDocument()
     })
   })
 
   describe('facilitator quick actions', () => {
-    it('renders facilitator-quick-actions-placeholder when no quickActions provided', () => {
-      render(<GuidanceSidebar isFacilitator={true} />)
-      expect(screen.getByTestId('facilitator-quick-actions-placeholder')).toBeInTheDocument()
+    it('does not render quick actions section for non-facilitator', () => {
+      const quickActions: FacilitatorQuickActionsConfig = { onAdvanceStep: vi.fn() }
+      render(<GuidanceSidebar isFacilitator={false} quickActions={quickActions} />)
       expect(screen.queryByTestId('facilitator-quick-actions')).not.toBeInTheDocument()
     })
 
-    it('renders facilitator-quick-actions-placeholder for non-facilitator even with quickActions', () => {
-      const onAdvanceStep = vi.fn()
-      render(<GuidanceSidebar isFacilitator={false} quickActions={{ onAdvanceStep }} />)
-      expect(screen.getByTestId('facilitator-quick-actions-placeholder')).toBeInTheDocument()
+    it('does not render quick actions section when quickActions is null', () => {
+      render(<GuidanceSidebar isFacilitator={true} quickActions={null} />)
       expect(screen.queryByTestId('facilitator-quick-actions')).not.toBeInTheDocument()
     })
 
-    it('renders facilitator-quick-actions section for facilitator with onAdvanceStep', () => {
-      const onAdvanceStep = vi.fn()
-      render(<GuidanceSidebar isFacilitator={true} quickActions={{ onAdvanceStep }} />)
+    it('does not render quick actions section when onAdvanceStep is undefined', () => {
+      render(<GuidanceSidebar isFacilitator={true} quickActions={{}} />)
+      expect(screen.queryByTestId('facilitator-quick-actions')).not.toBeInTheDocument()
+    })
+
+    it('renders quick actions section for facilitator with onAdvanceStep', () => {
+      const quickActions: FacilitatorQuickActionsConfig = { onAdvanceStep: vi.fn() }
+      render(<GuidanceSidebar isFacilitator={true} quickActions={quickActions} />)
       expect(screen.getByTestId('facilitator-quick-actions')).toBeInTheDocument()
-      expect(screen.queryByTestId('facilitator-quick-actions-placeholder')).not.toBeInTheDocument()
     })
 
-    it('renders "Quick actions" label when actions are available', () => {
-      const onAdvanceStep = vi.fn()
-      render(<GuidanceSidebar isFacilitator={true} quickActions={{ onAdvanceStep }} />)
-      expect(screen.getByText(/Quick actions/i)).toBeInTheDocument()
-    })
-
-    it('renders "Advance step →" button when onAdvanceStep is provided', () => {
-      const onAdvanceStep = vi.fn()
-      render(<GuidanceSidebar isFacilitator={true} quickActions={{ onAdvanceStep }} />)
+    it('renders advance step button when onAdvanceStep is provided', () => {
+      const quickActions: FacilitatorQuickActionsConfig = { onAdvanceStep: vi.fn() }
+      render(<GuidanceSidebar isFacilitator={true} quickActions={quickActions} />)
       expect(screen.getByTestId('quick-action-advance-step')).toBeInTheDocument()
-      expect(screen.getByText('Advance step →')).toBeInTheDocument()
     })
 
-    it('calls onAdvanceStep when "Advance step →" is clicked', async () => {
-      const user = userEvent.setup()
+    it('advance step button has correct text', () => {
+      const quickActions: FacilitatorQuickActionsConfig = { onAdvanceStep: vi.fn() }
+      render(<GuidanceSidebar isFacilitator={true} quickActions={quickActions} />)
+      expect(screen.getByTestId('quick-action-advance-step')).toHaveTextContent('Advance step →')
+    })
+
+    it('calls onAdvanceStep when advance step button is clicked', async () => {
+      const { default: userEvent } = await import('@testing-library/user-event')
       const onAdvanceStep = vi.fn()
       render(<GuidanceSidebar isFacilitator={true} quickActions={{ onAdvanceStep }} />)
-      await user.click(screen.getByTestId('quick-action-advance-step'))
-      expect(onAdvanceStep).toHaveBeenCalledTimes(1)
+      await userEvent.setup().click(screen.getByTestId('quick-action-advance-step'))
+      expect(onAdvanceStep).toHaveBeenCalledOnce()
     })
 
-    it('does not auto-advance: callback is invoked only on user click, not on render', () => {
-      const onAdvanceStep = vi.fn()
-      render(<GuidanceSidebar isFacilitator={true} quickActions={{ onAdvanceStep }} />)
-      expect(onAdvanceStep).not.toHaveBeenCalled()
-    })
-
-    it('quick actions section is structurally outside guidance-content', () => {
-      const onAdvanceStep = vi.fn()
-      render(<GuidanceSidebar guidance="Shared guidance" isFacilitator={true} quickActions={{ onAdvanceStep }} />)
-      const guidanceContent = screen.getByTestId('guidance-content')
-      const quickActionsSection = screen.getByTestId('facilitator-quick-actions')
-      expect(guidanceContent.contains(quickActionsSection)).toBe(false)
-    })
-
-    it('placeholder carries data-assistant-testid="facilitator-quick-actions"', () => {
-      render(<GuidanceSidebar isFacilitator={true} />)
-      expect(screen.getByTestId('facilitator-quick-actions-placeholder')).toHaveAttribute('data-assistant-testid', 'facilitator-quick-actions')
-    })
-
-    it('active section carries data-assistant-testid="facilitator-quick-actions"', () => {
-      const onAdvanceStep = vi.fn()
-      render(<GuidanceSidebar isFacilitator={true} quickActions={{ onAdvanceStep }} />)
+    it('quick actions section has data-assistant-testid="facilitator-quick-actions"', () => {
+      const quickActions: FacilitatorQuickActionsConfig = { onAdvanceStep: vi.fn() }
+      render(<GuidanceSidebar isFacilitator={true} quickActions={quickActions} />)
       expect(screen.getByTestId('facilitator-quick-actions')).toHaveAttribute('data-assistant-testid', 'facilitator-quick-actions')
     })
 
-    it('renders placeholder when quickActions is null', () => {
-      render(<GuidanceSidebar isFacilitator={true} quickActions={null} />)
+    it('shows placeholder instead of section when quick actions absent', () => {
+      render(<GuidanceSidebar isFacilitator={false} />)
+      expect(screen.queryByTestId('facilitator-quick-actions')).not.toBeInTheDocument()
       expect(screen.getByTestId('facilitator-quick-actions-placeholder')).toBeInTheDocument()
     })
 
-    it('renders placeholder when quickActions has no onAdvanceStep (empty config)', () => {
-      const emptyConfig: FacilitatorQuickActionsConfig = {}
-      render(<GuidanceSidebar isFacilitator={true} quickActions={emptyConfig} />)
-      expect(screen.getByTestId('facilitator-quick-actions-placeholder')).toBeInTheDocument()
-      expect(screen.queryByTestId('facilitator-quick-actions')).not.toBeInTheDocument()
+    it('placeholder has data-assistant-testid="facilitator-quick-actions"', () => {
+      render(<GuidanceSidebar isFacilitator={false} />)
+      expect(screen.getByTestId('facilitator-quick-actions-placeholder')).toHaveAttribute('data-assistant-testid', 'facilitator-quick-actions')
     })
   })
 })

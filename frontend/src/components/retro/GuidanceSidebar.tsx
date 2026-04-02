@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 export interface PrivateCoachingNote {
   text: string;
 }
@@ -65,8 +63,6 @@ export function GuidanceSidebar({
   previousMessages = [],
   quickActions,
 }: GuidanceSidebarProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
-
   const hasGuidance = guidance != null && guidance.trim().length > 0;
   const hasPrivateNote =
     isFacilitator &&
@@ -90,32 +86,21 @@ export function GuidanceSidebar({
           <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-600/70 truncate">
             {stepTitle ?? "Now"}
           </span>
-          <button
-            type="button"
-            onClick={() => setIsExpanded((prev) => !prev)}
-            className="shrink-0 ml-2 text-gray-600 hover:text-gray-300 transition-colors text-[10px] leading-none py-0.5"
-            aria-expanded={isExpanded}
-            aria-label={isExpanded ? "Collapse guidance" : "Expand guidance"}
-          >
-            {isExpanded ? "↑ Hide" : "↓ Show"}
-          </button>
         </div>
 
-        {isExpanded ? (
-          <div
-            data-testid="guidance-content"
-            data-assistant-testid="assistant-current-message"
-            className="rounded-lg bg-gray-800/70 border-l-[3px] border-amber-500/80 px-4 py-3 shadow-sm"
-          >
-            {hasGuidance ? (
-              <MessageBody text={guidance} />
-            ) : (
-              <p className="text-gray-500 text-[12px] italic leading-relaxed">
-                No guidance available for this step.
-              </p>
-            )}
-          </div>
-        ) : null}
+        <div
+          data-testid="guidance-content"
+          data-assistant-testid="assistant-current-message"
+          className="rounded-lg bg-gray-800/70 border-l-[3px] border-amber-500/80 px-4 py-3 shadow-sm"
+        >
+          {hasGuidance ? (
+            <MessageBody text={guidance} />
+          ) : (
+            <p className="text-gray-500 text-[12px] italic leading-relaxed">
+              No guidance available for this step.
+            </p>
+          )}
+        </div>
 
         <div
           data-testid="assistant-history-list"
