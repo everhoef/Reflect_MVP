@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -91,7 +92,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
             // ── 4. Participant joins, facilitator starts session ────────────────────
             logTestProgress("SETUP", 4, 6, "Participant joining and starting session");
             joinRetroSession(participantPage, sessionId);
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             // ── 5. Fast-forward session DB state to SSC input step ─────────────────
             //    After startRetroSession() the server is at SET_THE_STAGE, step 0.
@@ -187,7 +188,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
             retroSessionRepository.save(session);
 
             logTestProgress("SETUP", 3, 4, "Starting session, submitting note, then fast-forwarding to clustering step");
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             // First submit a sticky note at the input step so responses.empty is false at clustering step
             // (The .sortable div only renders when responses exist AND allowMerging=true)
@@ -269,7 +270,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
 
             logTestProgress("SETUP", 3, 5, "Participant joining and starting session");
             joinRetroSession(participantPage, sessionId);
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             // First submit a sticky note at the input step so there is something to vote on
             logTestProgress("SETUP", 4, 5, "Submitting sticky note for voting");
@@ -358,7 +359,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
 
             logTestProgress("SETUP", 3, 4, "Participant joining and starting session");
             joinRetroSession(participantPage, sessionId);
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             // Fast-forward to SSC input step (TIMER_EXPIRES, durationSeconds=480)
             // AND set stepStartedAt so the timer is active
@@ -431,7 +432,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
 
             logTestProgress("SETUP", 2, 3, "Creating and starting retro session");
             String sessionId = createRetroSession(facilitatorPage, "Phase Progress Sanity Test");
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             // Wait for the retro content to be fully rendered
             waitForElement(facilitatorPage, "[data-testid='retro-content']");
@@ -484,7 +485,7 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
                     .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
             session.setTemplate(sscTemplate);
             retroSessionRepository.save(session);
-            startRetroSession(facilitatorPage);
+            startRetroSession(facilitatorPage, sessionId);
 
             // Fast-forward to SSC input step with active timer (stepStartedAt set now)
             logTestProgress("TIMER", 3, 3, "Fast-forwarding to SSC timed step and verifying countdown");
@@ -516,6 +517,146 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
         }
     }
 
+
+    @Test
+    @Timeout(300)
+    @DisplayName("Should preserve assistant history exactly after page reload")
+    void shouldPreserveAssistantHistoryOnReload() {
+        BrowserContext facilitatorContext = createMonitoredContext();
+        Page facilitatorPage = facilitatorContext.newPage();
+
+        try {
+            // Wait for server to be ready (handles cold-start when run in isolation)
+            long deadline = System.currentTimeMillis() + 30_000;
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
+                        new java.net.URL(baseUrl + "/login").openConnection();
+                    conn.setConnectTimeout(1000);
+                    conn.setReadTimeout(3000);
+                    int status = conn.getResponseCode();
+                    conn.disconnect();
+                    if (status < 500) break;
+                } catch (Exception ignored) { /* server not ready yet, retry */ }
+                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+            }
+
+            logTestProgress("SETUP", 1, 6, "Authenticate facilitator and create session");
+            authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
+            String sessionId = createRetroSession(facilitatorPage, "Reload Consistency Test");
+            startRetroSession(facilitatorPage, sessionId);
+
+            // Fast-forward to GATHER_DATA step 2 so there are 2 history items
+            logTestProgress("ADVANCE", 2, 6, "Fast-forwarding to GATHER_DATA step 2 to build history");
+            fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 2);
+            facilitatorPage.reload();
+
+            waitForElement(facilitatorPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForElement(facilitatorPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
+
+            logTestProgress("WAIT", 3, 6, "Waiting for history items to appear");
+            waitForHistoryItemCount(facilitatorPage, 2);
+
+            logTestProgress("CAPTURE", 4, 6, "Capturing guidance text and history before reload");
+            String guidanceBefore = facilitatorPage.locator("[data-testid='guidance-content']").textContent();
+            int historyCountBefore = getHistoryItemCount(facilitatorPage);
+            List<String> historyTextsBefore = getHistoryItemTexts(facilitatorPage);
+
+            assertNotNull(guidanceBefore, "Guidance content must not be null before reload");
+            assertFalse(guidanceBefore.isBlank(), "Guidance content must not be blank before reload");
+            assertTrue(historyCountBefore > 0,
+                "Must have at least 1 history item before reload (count: " + historyCountBefore + ")");
+
+            logTestProgress("RELOAD", 5, 6, "Reloading page");
+            facilitatorPage.reload();
+
+            waitForElement(facilitatorPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForElement(facilitatorPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForHistoryItemCount(facilitatorPage, historyCountBefore);
+
+            logTestProgress("ASSERT", 6, 6, "Asserting guidance and history are identical after reload");
+            String guidanceAfter = facilitatorPage.locator("[data-testid='guidance-content']").textContent();
+            int historyCountAfter = getHistoryItemCount(facilitatorPage);
+            List<String> historyTextsAfter = getHistoryItemTexts(facilitatorPage);
+
+            assertEquals(guidanceBefore, guidanceAfter,
+                "Guidance content must be identical after reload");
+            assertEquals(historyCountBefore, historyCountAfter,
+                "History item count must be identical after reload");
+            assertEquals(historyTextsBefore, historyTextsAfter,
+                "History item texts must be identical after reload");
+
+        } catch (Exception e) {
+            reportTestFailure(facilitatorPage, "Assistant History Reload", e);
+            throw e;
+        } finally {
+            facilitatorContext.close();
+        }
+    }
+
+    @Test
+    @Timeout(300)
+    @DisplayName("guidance-sidebar coachmark is visible on active step and dismissible")
+    void shouldShowAndDismissGuidanceSidebarCoachmark() {
+        BrowserContext facilitatorContext = createMonitoredContext();
+        Page facilitatorPage = facilitatorContext.newPage();
+
+        try {
+            // Wait for server to be ready (handles cold-start when run in isolation)
+            long deadline = System.currentTimeMillis() + 30_000;
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
+                        new java.net.URL(baseUrl + "/login").openConnection();
+                    conn.setConnectTimeout(1000);
+                    conn.setReadTimeout(3000);
+                    int status = conn.getResponseCode();
+                    conn.disconnect();
+                    if (status < 500) break;
+                } catch (Exception ignored) { /* server not ready yet, retry */ }
+                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+            }
+
+            logTestProgress("SETUP", 1, 3, "Authenticating facilitator");
+            authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
+
+            logTestProgress("SETUP", 2, 3, "Creating and starting retro session");
+            String sessionId = createRetroSession(facilitatorPage, "Guidance Coachmark Test");
+            startRetroSession(facilitatorPage, sessionId);
+
+            waitForElement(facilitatorPage, "[data-testid='retro-content']");
+            waitForElement(facilitatorPage, "[data-coachmark='guidance-sidebar']");
+
+            logTestProgress("COACHMARK", 3, 3, "Verifying guidance-sidebar coachmark visible and dismissible");
+            waitForElement(facilitatorPage, "[data-testid='guidance-sidebar-coachmark']");
+            assertTrue(
+                facilitatorPage.locator("[data-testid='guidance-sidebar-coachmark']").isVisible(),
+                "guidance-sidebar coachmark should be visible on an active step"
+            );
+            assertTrue(
+                facilitatorPage.locator("[data-testid='guidance-sidebar-coachmark-content']").isVisible(),
+                "guidance-sidebar coachmark content panel should be visible"
+            );
+
+            clickElement(facilitatorPage, "[data-testid='guidance-sidebar-coachmark-close']");
+            facilitatorPage.waitForFunction(
+                "() => document.querySelector('[data-testid=\"guidance-sidebar-coachmark\"]') === null",
+                null,
+                new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS)
+            );
+            assertEquals(
+                0,
+                facilitatorPage.locator("[data-testid='guidance-sidebar-coachmark']").count(),
+                "guidance-sidebar coachmark should be removed from DOM after dismiss"
+            );
+
+        } catch (Exception e) {
+            reportTestFailure(facilitatorPage, "Guidance Sidebar Coachmark", e);
+            throw e;
+        } finally {
+            facilitatorContext.close();
+        }
+    }
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -576,6 +717,49 @@ public class RetroFlowBrowserRegressionTest extends BaseIntegrationTest {
         session.setTimerPausedAt(null);
         session.setAccumulatedPauseSeconds(0L);
         retroSessionRepository.save(session);
+    }
+
+    private void fastForwardSession(String sessionId, RetroPhase phase, int stepIndex) {
+        RetroSession session = retroSessionRepository.findById(UUID.fromString(sessionId))
+                .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
+        session.setPhase(phase);
+        session.setCurrentStepIndex(stepIndex);
+        retroSessionRepository.save(session);
+    }
+
+    private void waitForHistoryItemCount(Page page, int expectedCount) {
+        recordActivity("waitForHistoryItemCount: expected=" + expectedCount);
+        try {
+            page.waitForFunction(
+                String.format(
+                    "() => document.querySelectorAll('[data-testid=\"assistant-history-list\"] > div').length >= %d",
+                    expectedCount
+                ),
+                null,
+                new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS)
+            );
+        } catch (Exception e) {
+            int actual = getHistoryItemCount(page);
+            throw new AssertionError(String.format(
+                "History item count did not reach %d within %dms. Actual: %d. URL: %s",
+                expectedCount, (long) SSE_PROPAGATION_TIMEOUT_MS, actual, page.url()), e);
+        }
+    }
+
+    private int getHistoryItemCount(Page page) {
+        return page.locator("[data-testid='assistant-history-list'] > div").count();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> getHistoryItemTexts(Page page) {
+        Object result = page.evaluate(
+            "() => Array.from(document.querySelectorAll('[data-testid=\"assistant-history-list\"] > div p:last-child'))" +
+            ".map(p => p.textContent ? p.textContent.replace(/\\s+/g, ' ').trim() : '')"
+        );
+        if (result instanceof List) {
+            return (List<String>) result;
+        }
+        return List.of();
     }
 
 }

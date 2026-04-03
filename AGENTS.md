@@ -214,6 +214,26 @@ Custom cookie-based authentication supporting two modes:
 
 ---
 
+## Frontend Architecture & Patterns
+
+The frontend treats the React component tree similarly to how a DevOps engineer treats a cluster: state is managed centrally, and components are decoupled micro-units that discover each other dynamically.
+
+### State Management (Zustand)
+We use **Zustand** as our global state manager (e.g., `assistantStore.ts`). 
+- **DevOps Analogy**: Think of Zustand as an in-memory Redis cache or `etcd` for the browser. Instead of passing data down through a deep tree of components (which is like passing configuration through 10 layers of bash scripts), components can simply subscribe directly to the "cache".
+- **Usage**: Use Zustand for state that needs to be accessed by wildly different parts of the application (like the Assistant/Guidance state, which affects the sidebar, coachmarks, and main content simultaneously).
+- **Rule**: Do not put *everything* in Zustand. Only global/cross-cutting concerns. Local UI state (like whether a dropdown is open) belongs in local component state (`useState`).
+
+### Component Decoupling via Data Attributes
+To prevent UI components from becoming heavily coupled, we use HTML `data-*` attributes as a "Service Discovery" mechanism.
+- **Example**: The `Coachmark` (tooltip) component needs to point to a specific button. Instead of wrapping the button in a complicated higher-order component, we simply add `data-coachmark="next-step"` to the button.
+- **DevOps Analogy**: This is identical to Kubernetes pod labels (`app=frontend`). The Coachmark acts like a Sidecar or DaemonSet that queries the DOM (the orchestrator) for an element with that label, calculates its X/Y coordinates, and renders itself there.
+- **How to add new Coachmarks**: 
+  1. Add `data-coachmark="your-new-anchor"` to any UI element.
+  2. Render a `<Coachmark anchorId="your-new-anchor">` somewhere near the top-level page layout. The Coachmark will automatically "find" the anchor.
+
+---
+
 ## Real-time Collaboration (SSE)
 
 ### Event Types (RetroEvent.EventType)

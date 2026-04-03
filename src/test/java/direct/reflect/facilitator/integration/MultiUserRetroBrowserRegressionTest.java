@@ -1,13 +1,17 @@
 package direct.reflect.facilitator.integration;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.Timeout;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 
 import static org.junit.jupiter.api.Assertions.*;
+import java.util.List;
 import java.util.UUID;
 
 import direct.reflect.facilitator.facilitation.RetroPhase;
@@ -38,9 +42,11 @@ import lombok.extern.slf4j.Slf4j;
  */
 @DisplayName("Multi-User Retro Browser Regression Tests")
 @Slf4j
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
 
     @Test
+    @Order(7)
     @Timeout(600) // 10 minutes max - flow test has many steps with multi-page sync
     @DisplayName("Should validate complete retro flow with columnId isolation")
     void shouldValidateCompleteRetroFlowWithColumnIsolation() throws InterruptedException {
@@ -70,17 +76,10 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             joinRetroSession(bobPage, sessionId);
             joinRetroSession(carolPage, sessionId);
 
+            waitForElement(facilitatorPage, "[data-testid='start-retro-button']", SSE_PROPAGATION_TIMEOUT_MS);
+            startRetroSession(facilitatorPage, sessionId);
 
-
-            log.info("Waiting for SSE connections on participant lobby pages...");
-            waitForSseConnection(bobPage, UUID.fromString(sessionId));
-            waitForSseConnection(carolPage, UUID.fromString(sessionId));
-            log.info("\u2705 SSE connections established on all participant pages");
-            Thread.sleep(500);
-            startRetroSession(facilitatorPage);
-
-            log.info("Waiting for participant pages to transition to retro...");
-            waitForAllPagesElement("h2:has-text('Step')", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
+            waitForAllPagesElement("[data-testid='retro-content']", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
 
             // ===== PHASE 1: SET_THE_STAGE — ESVP Check-in (2 steps) =====
             log.info("\n┌─ PHASE 1: SET_THE_STAGE (ESVP Check-in)");
@@ -253,6 +252,31 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             waitForElement(facilitatorPage, "[data-column='Start']", DEFAULT_TIMEOUT_MS);
             waitForAllPagesElement("[data-column='Start']", SSE_PROPAGATION_TIMEOUT_MS, bobPage, carolPage);
 
+            // ── S8: Both facilitator and participants see guidance at the same active step ──────
+            // All three pages are on the SSC brainstorm step — assert guidance-sidebar + guidance-content
+            // are rendered for both facilitator and participant, and that the text is identical (S8).
+            logTestProgress("PHASE_4", 12, 23, "S8: Asserting guidance-sidebar visible on facilitator and participant pages");
+            waitForAllPagesElement("[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS, facilitatorPage, bobPage);
+            assertTrue(facilitatorPage.locator("[data-testid='guidance-sidebar']").isVisible(),
+                "S8: guidance-sidebar should be visible on facilitator page at SSC brainstorm step");
+            assertTrue(facilitatorPage.locator("[data-testid='guidance-content']").isVisible(),
+                "S8: guidance-content should be visible on facilitator page");
+            assertTrue(bobPage.locator("[data-testid='guidance-sidebar']").isVisible(),
+                "S8: guidance-sidebar should be visible on participant (Bob) page at SSC brainstorm step");
+            assertTrue(bobPage.locator("[data-testid='guidance-content']").isVisible(),
+                "S8: guidance-content should be visible on participant (Bob) page");
+
+            String facilitatorGuidanceAtBrainstorm = facilitatorPage.locator("[data-testid='guidance-content']").textContent();
+            String bobGuidanceAtBrainstorm = bobPage.locator("[data-testid='guidance-content']").textContent();
+            assertNotNull(facilitatorGuidanceAtBrainstorm, "S8: Facilitator guidance text must not be null");
+            assertFalse(facilitatorGuidanceAtBrainstorm.isBlank(), "S8: Facilitator guidance text must not be blank");
+            assertEquals(facilitatorGuidanceAtBrainstorm, bobGuidanceAtBrainstorm,
+                "S8: Facilitator and participant must see identical guidance text on the same step");
+            log.info("  ├─ ✅ S8: guidance-sidebar visible and identical on facilitator + participant pages");
+
+            // Capture brainstorm guidance text now so we can assert it CHANGES after step advance (S10)
+            String sscBrainstormGuidanceText = facilitatorGuidanceAtBrainstorm;
+
             fillElement(bobPage, "[data-column='Start'] textarea[name='content']", "Bob Start: Daily standups");
             clickElement(bobPage, "[data-column='Start'] button[type='submit']");
 
@@ -301,6 +325,24 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             assertTrue(bobPage.locator("[data-column='Stop'] p:has-text('Carol Stop: Long meetings')").isVisible(),
                 "Bob should see Carol's Stop card after reveal");
             log.info("  ├─ ✅ Cross-user visibility verified after reveal");
+
+            // S10: Guidance text must change when the step advances (brainstorm → reveal)
+            // S16: All participants must see the same updated guidance text after advance
+            logTestProgress("PHASE_4", 15, 23, "S10/S16: Asserting guidance changed and is identical across all pages");
+            waitForAllPagesElement("[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS,
+                facilitatorPage, bobPage, carolPage);
+            String facilitatorRevealGuidance = facilitatorPage.locator("[data-testid='guidance-content']").textContent();
+            String bobRevealGuidance = bobPage.locator("[data-testid='guidance-content']").textContent();
+            String carolRevealGuidance = carolPage.locator("[data-testid='guidance-content']").textContent();
+            assertNotNull(facilitatorRevealGuidance, "S10: Facilitator reveal guidance must not be null");
+            assertFalse(facilitatorRevealGuidance.isBlank(), "S10: Facilitator reveal guidance must not be blank");
+            assertNotEquals(sscBrainstormGuidanceText, facilitatorRevealGuidance,
+                "S10: Guidance text must change when advancing from SSC brainstorm to reveal step");
+            assertEquals(facilitatorRevealGuidance, bobRevealGuidance,
+                "S16: Facilitator and Bob must see identical guidance text at SSC reveal step");
+            assertEquals(facilitatorRevealGuidance, carolRevealGuidance,
+                "S16: Facilitator and Carol must see identical guidance text at SSC reveal step");
+            log.info("  ├─ ✅ S10/S16: Guidance changed on advance and is identical on all 3 pages");
 
             // Step 3 (orderIndex=3): cluster — allowMerging=true
             logTestProgress("PHASE_4", 16, 23, "Testing clustering on SSC cluster step");
@@ -396,6 +438,454 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
 
     // ==================== HELPERS ====================
 
+    @Test
+    @Order(1)
+    @Timeout(300)
+    @DisplayName("Should show identical current assistant message to facilitator and participant on the same step")
+    void shouldShowIdenticalCurrentMessageToFacilitatorAndParticipant() {
+        BrowserContext facilitatorContext = createMonitoredContext();
+        Page facilitatorPage = facilitatorContext.newPage();
+        BrowserContext participantContext = createMonitoredContext();
+        Page participantLobbyPage = participantContext.newPage();
+
+        try {
+            logTestProgress("SETUP", 1, 4, "Authenticate facilitator and participant");
+            authenticateAsGuest(facilitatorPage, "Facilitator");
+            authenticateAsGuest(participantLobbyPage, "Participant");
+
+            logTestProgress("SETUP", 2, 4, "Create session, participant joins before retro start, start session");
+            String sessionId = createRetroSession(facilitatorPage, "Shared Message Test");
+            joinRetroSession(participantLobbyPage, sessionId);
+            waitForSseConnection(participantLobbyPage, UUID.fromString(sessionId));
+            participantLobbyPage.close();
+            startRetroSession(facilitatorPage, sessionId);
+
+            logTestProgress("ADVANCE", 3, 4, "Fast-forwarding to GATHER_DATA step 1 and loading retro URL");
+            String retroUrl = baseUrl + "/retro/" + sessionId;
+            fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 1);
+
+            facilitatorPage.navigate(retroUrl);
+            waitForElement(facilitatorPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForElement(facilitatorPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
+
+            Page participantRetroPage = participantContext.newPage();
+            participantRetroPage.navigate(retroUrl);
+            waitForElement(participantRetroPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForElement(participantRetroPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
+
+            logTestProgress("ASSERT", 4, 4, "Asserting guidance-content is identical on both pages");
+            String facilitatorGuidance = getGuidanceContentText(facilitatorPage);
+            String participantGuidance = getGuidanceContentText(participantRetroPage);
+
+            assertNotNull(facilitatorGuidance, "Facilitator guidance-content must not be null");
+            assertFalse(facilitatorGuidance.isBlank(), "Facilitator guidance-content must not be blank");
+            assertNotNull(participantGuidance, "Participant guidance-content must not be null");
+            assertFalse(participantGuidance.isBlank(), "Participant guidance-content must not be blank");
+            assertEquals(facilitatorGuidance, participantGuidance,
+                "Facilitator and participant must see identical guidance-content on the same step");
+
+        } catch (Exception e) {
+            reportTestFailure(facilitatorPage, "Shared Current Message", e);
+            throw e;
+        } finally {
+            facilitatorContext.close();
+            participantContext.close();
+        }
+    }
+
+    @Test
+    @Order(2)
+    @Timeout(300)
+    @DisplayName("Should shift current message into history list after step advances, with new current message on both pages")
+    void shouldShiftCurrentMessageToHistoryAfterStepAdvance() {
+        BrowserContext facilitatorContext = createMonitoredContext();
+        Page facilitatorPage = facilitatorContext.newPage();
+        BrowserContext participantContext = createMonitoredContext();
+        Page participantPage = participantContext.newPage();
+
+        try {
+            logTestProgress("SETUP", 1, 6, "Authenticate facilitator, create and start session");
+            authenticateAsGuest(facilitatorPage, "Facilitator");
+            String sessionId = createRetroSession(facilitatorPage, "History Shift Test");
+            waitForElement(facilitatorPage, "[data-testid='start-retro-button']", SSE_PROPAGATION_TIMEOUT_MS);
+            startRetroSession(facilitatorPage, sessionId);
+
+            logTestProgress("ADVANCE_1", 2, 6, "Fast-forwarding to GATHER_DATA step 1 (facilitator only)");
+            String retroUrl = baseUrl + "/retro/" + sessionId;
+            fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 1);
+            facilitatorPage.navigate(retroUrl);
+
+            waitForElement(facilitatorPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForElement(facilitatorPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForHistoryItemCount(facilitatorPage, 1);
+
+            logTestProgress("CAPTURE", 3, 6, "Capturing current guidance-content before advance");
+            String guidanceBeforeAdvance = getGuidanceContentText(facilitatorPage);
+            int historyCountBefore = getHistoryItemCount(facilitatorPage);
+
+            assertNotNull(guidanceBeforeAdvance, "Guidance before advance must not be null");
+            assertFalse(guidanceBeforeAdvance.isBlank(), "Guidance before advance must not be blank");
+            assertEquals(1, historyCountBefore,
+                "Expected 1 history item at step 1. Actual: " + historyCountBefore);
+
+            logTestProgress("ADVANCE_2", 4, 6, "Fast-forwarding to GATHER_DATA step 2");
+            fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 2);
+            facilitatorPage.navigate("about:blank");
+            facilitatorPage.navigate(retroUrl);
+
+            waitForElement(facilitatorPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForElement(facilitatorPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForHistoryItemCount(facilitatorPage, 2);
+
+            logTestProgress("AUTH_PARTICIPANT", 5, 6, "Authenticate participant and join at step 2 (tests late-join history)");
+            authenticateAsGuest(participantPage, "Participant");
+            joinRetroSession(participantPage, sessionId);
+            waitForElement(participantPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForElement(participantPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForHistoryItemCount(participantPage, 2);
+
+            logTestProgress("ASSERT", 6, 6, "Asserting new current, history shift, and cross-page alignment");
+            String facilitatorGuidanceAfter = facilitatorPage.locator("[data-testid='guidance-content']").textContent();
+            String participantGuidanceAfter = participantPage.locator("[data-testid='guidance-content']").textContent();
+            List<String> facilitatorHistoryTexts = getHistoryItemTexts(facilitatorPage);
+            List<String> participantHistoryTexts = getHistoryItemTexts(participantPage);
+
+            assertNotEquals(guidanceBeforeAdvance, facilitatorGuidanceAfter,
+                "Guidance must change after step advance (step 1 → step 2)");
+            assertFalse(facilitatorGuidanceAfter.isBlank(),
+                "New guidance-content after advance must not be blank");
+            assertTrue(facilitatorHistoryTexts.contains(guidanceBeforeAdvance),
+                "Previous current message must appear in history list after advancing. " +
+                "Expected history to contain: '" + guidanceBeforeAdvance + "'. " +
+                "Actual history texts: " + facilitatorHistoryTexts);
+            assertEquals(facilitatorGuidanceAfter, participantGuidanceAfter,
+                "Facilitator and participant must see identical guidance-content after step advance");
+            assertEquals(facilitatorHistoryTexts, participantHistoryTexts,
+                "Facilitator and participant must have identical history item texts after step advance");
+
+        } catch (Exception e) {
+            reportTestFailure(facilitatorPage, "History Shift After Step Advance", e);
+            throw e;
+        } finally {
+            facilitatorContext.close();
+            participantContext.close();
+        }
+    }
+
+    @Test
+    @Order(3)
+    @Timeout(300)
+    @DisplayName("Facilitator sees private coaching; participant sees only shared guidance")
+    void facilitatorSeesPrivateCoaching_ParticipantDoesNot() {
+        BrowserContext facilitatorContext = createMonitoredContext();
+        Page facilitatorPage = facilitatorContext.newPage();
+        BrowserContext participantContext = createMonitoredContext();
+        Page participantPage = participantContext.newPage();
+
+        try {
+            logTestProgress("SETUP", 1, 5, "Authenticate facilitator and participant");
+            authenticateAsGuest(facilitatorPage, "Facilitator");
+            authenticateAsGuest(participantPage, "Bob");
+
+            logTestProgress("SETUP", 2, 5, "Create and start session, Bob joins");
+            String sessionId = createRetroSession(facilitatorPage, "Private Coaching Visibility Test");
+            joinRetroSession(participantPage, sessionId);
+            waitForSseConnection(participantPage, UUID.fromString(sessionId));
+            waitForElement(facilitatorPage, "[data-testid='start-retro-button']", SSE_PROPAGATION_TIMEOUT_MS);
+            startRetroSession(facilitatorPage, sessionId);
+
+            waitForElement(participantPage, "h2:has-text('Step')", SSE_PROPAGATION_TIMEOUT_MS);
+
+            logTestProgress("ADVANCE", 3, 5, "Fast-forwarding to GATHER_DATA step 1");
+            fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 1);
+            facilitatorPage.reload();
+            participantPage.reload();
+
+            waitForElement(facilitatorPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForElement(participantPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
+
+            logTestProgress("ASSERT", 4, 5, "Private coaching visible to facilitator, absent for participant");
+            int facilitatorPrivateCount = facilitatorPage.locator("[data-testid='assistant-private-coaching']").count();
+            assertTrue(facilitatorPrivateCount > 0,
+                "Facilitator must see [data-testid='assistant-private-coaching'] on an active step");
+            assertTrue(facilitatorPage.locator("[data-testid='assistant-private-coaching']").isVisible(),
+                "Facilitator's assistant-private-coaching section must be visible");
+
+            int participantPrivateCount = participantPage.locator("[data-testid='assistant-private-coaching']").count();
+            assertEquals(0, participantPrivateCount,
+                "Participant must NOT see [data-testid='assistant-private-coaching'] — got count=" + participantPrivateCount);
+
+            int participantPlaceholderCount = participantPage.locator("[data-testid='assistant-private-coaching-placeholder']").count();
+            assertTrue(participantPlaceholderCount > 0,
+                "Participant must have [data-testid='assistant-private-coaching-placeholder'] in DOM");
+
+            logTestProgress("ASSERT", 5, 5, "Shared guidance-content identical on both pages");
+            String facilitatorGuidance = facilitatorPage.locator("[data-testid='guidance-content']").textContent();
+            String participantGuidance = participantPage.locator("[data-testid='guidance-content']").textContent();
+
+            assertNotNull(facilitatorGuidance, "Facilitator guidance-content must not be null");
+            assertNotNull(participantGuidance, "Participant guidance-content must not be null");
+            assertFalse(facilitatorGuidance.isBlank(), "Facilitator guidance-content must not be blank");
+            assertFalse(participantGuidance.isBlank(), "Participant guidance-content must not be blank");
+            assertEquals(facilitatorGuidance, participantGuidance,
+                "Shared guidance-content must be identical for facilitator and participant on the same step");
+
+        } catch (Exception e) {
+            reportTestFailure(facilitatorPage, "Private Coaching Visibility", e);
+            throw e;
+        } finally {
+            facilitatorContext.close();
+            participantContext.close();
+        }
+    }
+
+    @Test
+    @Order(4)
+    @Timeout(300)
+    @DisplayName("Should match assistant history on late join and stay aligned after step advance")
+    void shouldMatchAssistantHistoryOnLateJoin() {
+        BrowserContext facilitatorContext = createMonitoredContext();
+        Page facilitatorPage = facilitatorContext.newPage();
+        BrowserContext lateJoinerContext = createMonitoredContext();
+        Page lateJoinerPage = lateJoinerContext.newPage();
+
+        try {
+            logTestProgress("SETUP", 1, 8, "Authenticate facilitator and create session");
+            authenticateAsGuest(facilitatorPage, "Facilitator");
+            String sessionId = createRetroSession(facilitatorPage, "Late Join Consistency Test");
+            waitForElement(facilitatorPage, "[data-testid='start-retro-button']", SSE_PROPAGATION_TIMEOUT_MS);
+            startRetroSession(facilitatorPage, sessionId);
+
+            logTestProgress("ADVANCE", 2, 8, "Fast-forwarding to GATHER_DATA step 2 to build history");
+            fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 2);
+            facilitatorPage.reload();
+
+            waitForElement(facilitatorPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForElement(facilitatorPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForHistoryItemCount(facilitatorPage, 2);
+
+            logTestProgress("CAPTURE", 3, 8, "Capturing facilitator guidance and history");
+            String facilitatorGuidance = facilitatorPage.locator("[data-testid='guidance-content']").textContent();
+            int facilitatorHistoryCount = getHistoryItemCount(facilitatorPage);
+            List<String> facilitatorHistoryTexts = getHistoryItemTexts(facilitatorPage);
+
+            assertNotNull(facilitatorGuidance, "Facilitator guidance must not be null");
+            assertFalse(facilitatorGuidance.isBlank(), "Facilitator guidance must not be blank");
+
+            logTestProgress("LATE_JOIN", 4, 8, "Late joiner authenticating and joining active session");
+            authenticateAsGuest(lateJoinerPage, "LateJoiner");
+            joinRetroSession(lateJoinerPage, sessionId);
+
+            waitForElement(lateJoinerPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForElement(lateJoinerPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForHistoryItemCount(lateJoinerPage, facilitatorHistoryCount);
+
+            logTestProgress("ASSERT_JOIN", 5, 8, "Asserting late joiner matches facilitator state");
+            String lateJoinerGuidance = lateJoinerPage.locator("[data-testid='guidance-content']").textContent();
+            int lateJoinerHistoryCount = getHistoryItemCount(lateJoinerPage);
+            List<String> lateJoinerHistoryTexts = getHistoryItemTexts(lateJoinerPage);
+
+            assertEquals(facilitatorGuidance, lateJoinerGuidance,
+                "Late joiner guidance must match facilitator guidance at bootstrap");
+            assertEquals(facilitatorHistoryCount, lateJoinerHistoryCount,
+                "Late joiner history item count must match facilitator's at bootstrap");
+            assertEquals(facilitatorHistoryTexts, lateJoinerHistoryTexts,
+                "Late joiner history texts must match facilitator's at bootstrap");
+
+            logTestProgress("ADVANCE_2", 6, 8, "Fast-forwarding to step 3 to verify post-bootstrap alignment");
+            fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 3);
+            facilitatorPage.reload();
+
+            waitForElement(facilitatorPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForElement(facilitatorPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForHistoryItemCount(facilitatorPage, 3);
+
+            String retroUrl = facilitatorPage.url();
+            lateJoinerPage.navigate(retroUrl);
+            waitForElement(lateJoinerPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForElement(lateJoinerPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForHistoryItemCount(lateJoinerPage, 3);
+
+            logTestProgress("ASSERT_ADVANCE", 7, 8, "Asserting both pages aligned after step advance");
+            String facilitatorGuidanceAfter = facilitatorPage.locator("[data-testid='guidance-content']").textContent();
+            String lateJoinerGuidanceAfter = lateJoinerPage.locator("[data-testid='guidance-content']").textContent();
+            int facilitatorHistoryCountAfter = getHistoryItemCount(facilitatorPage);
+            int lateJoinerHistoryCountAfter = getHistoryItemCount(lateJoinerPage);
+            List<String> facilitatorHistoryTextsAfter = getHistoryItemTexts(facilitatorPage);
+            List<String> lateJoinerHistoryTextsAfter = getHistoryItemTexts(lateJoinerPage);
+
+            assertEquals(facilitatorGuidanceAfter, lateJoinerGuidanceAfter,
+                "Guidance must be identical on both pages after step advance");
+            assertEquals(facilitatorHistoryCountAfter, lateJoinerHistoryCountAfter,
+                "History item count must be identical on both pages after step advance");
+            assertEquals(facilitatorHistoryTextsAfter, lateJoinerHistoryTextsAfter,
+                "History item texts must be identical on both pages after step advance");
+            assertNotEquals(facilitatorGuidance, facilitatorGuidanceAfter,
+                "Guidance text must change when step advances (step 2 → step 3)");
+
+        } catch (Exception e) {
+            reportTestFailure(facilitatorPage, "Assistant History Late Join", e);
+            throw e;
+        } finally {
+            facilitatorContext.close();
+            lateJoinerContext.close();
+        }
+    }
+
+    @Test
+    @Order(5)
+    @Timeout(300)
+    @DisplayName("next-step coachmark visible to facilitator only, dismissible, Next button still works after dismiss")
+    void shouldShowNextStepCoachmarkOnlyToFacilitator() {
+        BrowserContext facilitatorContext = createMonitoredContext();
+        Page facilitatorPage = facilitatorContext.newPage();
+        BrowserContext participantContext = createMonitoredContext();
+        Page participantPage = participantContext.newPage();
+
+        try {
+            logTestProgress("SETUP", 1, 4, "Authenticating facilitator and participant");
+            authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
+            authenticateAsGuest(participantPage, "Bob");
+
+            logTestProgress("SETUP", 2, 4, "Creating and starting retro session");
+            String sessionId = createRetroSession(facilitatorPage, "Next-Step Coachmark Test");
+            joinRetroSession(participantPage, sessionId);
+            startRetroSession(facilitatorPage, sessionId);
+
+            waitForAllPagesElement("[data-testid='retro-content']", facilitatorPage, participantPage);
+            waitForElement(facilitatorPage, "[data-coachmark='next-step']");
+
+            logTestProgress("COACHMARK", 3, 4, "Verifying next-step coachmark visible to facilitator, hidden from participant");
+            waitForElement(facilitatorPage, "[data-testid='next-step-coachmark']");
+            assertTrue(
+                facilitatorPage.locator("[data-testid='next-step-coachmark']").isVisible(),
+                "next-step coachmark should be visible to the facilitator"
+            );
+            assertEquals(
+                0,
+                participantPage.locator("[data-testid='next-step-coachmark']").count(),
+                "next-step coachmark should NOT appear for a regular participant (no Next button anchor)"
+            );
+
+            logTestProgress("COACHMARK", 4, 4, "Dismissing next-step coachmark and verifying Next button still works");
+            clickElement(facilitatorPage, "[data-testid='next-step-coachmark-close']");
+            facilitatorPage.waitForFunction(
+                "() => document.querySelector('[data-testid=\"next-step-coachmark\"]') === null",
+                null,
+                new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS)
+            );
+            assertEquals(
+                0,
+                facilitatorPage.locator("[data-testid='next-step-coachmark']").count(),
+                "next-step coachmark should be removed from DOM after dismiss"
+            );
+            assertTrue(
+                facilitatorPage.locator("[data-testid='next-step-button']").isVisible(),
+                "Next button should still be visible and usable after coachmark is dismissed"
+            );
+
+        } catch (Exception e) {
+            reportTestFailure(facilitatorPage, "Next Step Coachmark Role Visibility", e);
+            throw e;
+        } finally {
+            facilitatorContext.close();
+            participantContext.close();
+        }
+    }
+
+    @Test
+    @Order(6)
+    @Timeout(300)
+    @DisplayName("note-input coachmark visible on MULTI_COLUMN_BOARD step, dismissible, note submission not blocked")
+    void shouldShowNoteInputCoachmarkAndNotBlockNoteSubmission() {
+        BrowserContext facilitatorContext = createMonitoredContext();
+        Page facilitatorPage = facilitatorContext.newPage();
+        BrowserContext participantContext = createMonitoredContext();
+        Page participantPage = participantContext.newPage();
+
+        try {
+            logTestProgress("SETUP", 1, 5, "Authenticating facilitator and participant");
+            authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
+            authenticateAsGuest(participantPage, "Bob");
+
+            logTestProgress("SETUP", 2, 5, "Creating and starting retro session");
+            String sessionId = createRetroSession(facilitatorPage, "Note-Input Coachmark Test");
+            joinRetroSession(participantPage, sessionId);
+            startRetroSession(facilitatorPage, sessionId);
+
+            logTestProgress("SETUP", 3, 5, "Fast-forwarding to GATHER_DATA step 0 (guaranteed board step)");
+            fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 0);
+
+            String retroUrl = baseUrl + "/retro/" + sessionId;
+            facilitatorPage.navigate(retroUrl);
+            participantPage.navigate(retroUrl);
+            waitForAllPagesElement("[data-column]", facilitatorPage, participantPage);
+
+            participantPage.evaluate("() => window.dispatchEvent(new Event('resize'))");
+            facilitatorPage.evaluate("() => window.dispatchEvent(new Event('resize'))");
+
+            logTestProgress("COACHMARK", 4, 5, "Verifying note-input coachmark visible on participant page");
+            waitForElement(participantPage, "[data-testid='note-input-coachmark']");
+            assertTrue(
+                participantPage.locator("[data-testid='note-input-coachmark']").isVisible(),
+                "note-input coachmark should be visible on a MULTI_COLUMN_BOARD step"
+            );
+
+            logTestProgress("COACHMARK", 5, 5, "Submitting note while coachmark is visible — verifying no interaction block");
+            Locator firstColumnTextarea = participantPage.locator("[data-column] textarea[name='content']").first();
+            firstColumnTextarea.fill("Coachmark non-blocking test note");
+            participantPage.locator("[data-column] button[type='submit']").first().click();
+
+            participantPage.waitForFunction(
+                "() => document.body.textContent.includes('Coachmark non-blocking test note')",
+                null,
+                new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS)
+            );
+            assertTrue(
+                participantPage.locator("p:has-text('Coachmark non-blocking test note')").count() > 0
+                    || participantPage.locator("text=Coachmark non-blocking test note").count() > 0,
+                "Note should appear on the board after submission — coachmark must not have blocked interaction"
+            );
+
+            if (participantPage.locator("[data-testid='note-input-coachmark']").count() > 0) {
+                clickElement(participantPage, "[data-testid='note-input-coachmark-close']");
+                participantPage.waitForFunction(
+                    "() => document.querySelector('[data-testid=\"note-input-coachmark\"]') === null",
+                    null,
+                    new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS)
+                );
+                assertEquals(
+                    0,
+                    participantPage.locator("[data-testid='note-input-coachmark']").count(),
+                    "note-input coachmark should be removed from DOM after dismiss"
+                );
+            }
+
+        } catch (Exception e) {
+            reportTestFailure(participantPage, "Note Input Coachmark Non-Blocking", e);
+            throw e;
+        } finally {
+            facilitatorContext.close();
+            participantContext.close();
+        }
+    }
+
+    // ==================== HELPERS ====================
+
+    private void waitForPageAtStepIndex(int expectedStepIndex, Page... pages) {
+        String js = String.format(
+            "() => { " +
+            "  const el = document.querySelector('[data-step-index]'); " +
+            "  return el && parseInt(el.getAttribute('data-step-index')) === %d; " +
+            "}",
+            expectedStepIndex
+        );
+        for (Page page : pages) {
+            page.waitForFunction(js, null,
+                new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+        }
+    }
+
     /**
      * Fast-forwards the session DB state to the given phase and step index,
      * bypassing steps with blocking advancement triggers (TIMER_EXPIRES, ALL_RESPONDED).
@@ -406,6 +896,51 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
         session.setPhase(phase);
         session.setCurrentStepIndex(stepIndex);
         retroSessionRepository.save(session);
+    }
+
+    private String getGuidanceContentText(Page page) {
+        Object result = page.evaluate(
+            "() => { " +
+            "  const el = document.querySelector('[data-testid=\"guidance-content\"]'); " +
+            "  return el ? el.innerText.replace(/\\s+/g, ' ').trim() : ''; " +
+            "}"
+        );
+        return result != null ? result.toString() : "";
+    }
+
+    private void waitForHistoryItemCount(Page page, int expectedCount) {
+        recordActivity("waitForHistoryItemCount: expected=" + expectedCount);
+        try {
+            page.waitForFunction(
+                String.format(
+                    "() => document.querySelectorAll('[data-testid=\"assistant-history-list\"] > div').length >= %d",
+                    expectedCount
+                ),
+                null,
+                new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS)
+            );
+        } catch (Exception e) {
+            int actual = getHistoryItemCount(page);
+            throw new AssertionError(String.format(
+                "History item count did not reach %d within %dms. Actual: %d. URL: %s",
+                expectedCount, (long) SSE_PROPAGATION_TIMEOUT_MS, actual, page.url()), e);
+        }
+    }
+
+    private int getHistoryItemCount(Page page) {
+        return page.locator("[data-testid='assistant-history-list'] > div").count();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> getHistoryItemTexts(Page page) {
+        Object result = page.evaluate(
+            "() => Array.from(document.querySelectorAll('[data-testid=\"assistant-history-list\"] > div p:last-child'))" +
+            ".map(p => p.textContent ? p.textContent.replace(/\\s+/g, ' ').trim() : '')"
+        );
+        if (result instanceof List) {
+            return (List<String>) result;
+        }
+        return List.of();
     }
 
 }

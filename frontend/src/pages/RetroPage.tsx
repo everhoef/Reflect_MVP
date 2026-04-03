@@ -4,7 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSSE } from "@/hooks/useSSE";
 import { EventType } from "@/types/events";
 import { ComponentRouter } from "@/components/ComponentRouter";
-import { GuidanceSidebar } from "@/components/retro/GuidanceSidebar";
+import { GuidanceSidebar, type PrivateCoachingNote, type FacilitatorQuickActionsConfig } from "@/components/retro/GuidanceSidebar";
+import { Coachmark } from "@/components/retro/Coachmark";
 import { TimerCountdown } from "@/components/retro/TimerCountdown";
 import { SSEProvider } from "@/contexts/SSEContext";
 import { useSSEContextDispatch } from "@/hooks/useSSEContext";
@@ -12,7 +13,12 @@ import { useRetroState, useParticipants, useNextStep, useStartSession, useTimer,
 import { useTimerState } from "@/hooks/useRetroState";
 import { ApiError } from "@/lib/api-client";
 import { useRetroStateStore } from "@/store/retroStore";
+import { useAssistantStore } from "@/store/assistantStore";
+import type { AssistantState } from "@/types/assistantState";
 import type { components } from "@/types/api.d.ts";
+
+const FACILITATOR_FALLBACK_COACHING_NOTE =
+  "Click Next when ready to advance the room to the next step.";
 
 // Normalized local types with required fields (schema generates optional fields from OpenAPI)
 interface StepSummaryDto {
@@ -34,6 +40,7 @@ interface RetroState {
   facilitatorId: string;
   isFacilitator: boolean;
   participantCount: number;
+  assistantState: AssistantState | null;
 }
 
 function normalizeStep(s: components["schemas"]["StepSummaryDto"]): StepSummaryDto {
@@ -48,6 +55,29 @@ function normalizeStep(s: components["schemas"]["StepSummaryDto"]): StepSummaryD
   };
 }
 
+function normalizeAssistantState(
+  raw: components["schemas"]["AssistantStateDto"] | null | undefined
+): AssistantState | null {
+  if (raw == null) return null;
+  return {
+    current: raw.current
+      ? {
+          retroId: raw.current.retroId ?? "",
+          stepId: raw.current.stepId ?? 0,
+          stepTitle: raw.current.stepTitle ?? "",
+          publicText: raw.current.publicText ?? "",
+        }
+      : null,
+    history: (raw.history ?? []).map((m) => ({
+      retroId: m.retroId ?? "",
+      stepId: m.stepId ?? 0,
+      stepTitle: m.stepTitle ?? "",
+      publicText: m.publicText ?? "",
+    })),
+    facilitatorCoachingNote: raw.facilitatorCoachingNote ?? null,
+  };
+}
+
 function normalizeState(raw: components["schemas"]["RetroStateDto"]): RetroState {
   return {
     retroId: raw.retroId ?? "",
@@ -58,6 +88,7 @@ function normalizeState(raw: components["schemas"]["RetroStateDto"]): RetroState
     facilitatorId: raw.facilitatorId ?? "",
     isFacilitator: raw.isFacilitator ?? false,
     participantCount: raw.participantCount ?? 0,
+    assistantState: normalizeAssistantState(raw.assistantState),
   };
 }
 
@@ -89,6 +120,9 @@ function RetroPageInner() {
   const navigate = useNavigate();
   const [sseConnected, setSseConnected] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showGuidanceTip, setShowGuidanceTip] = useState(true);
+  const [showNextStepTip, setShowNextStepTip] = useState(true);
+  const [showNoteInputTip, setShowNoteInputTip] = useState(true);
   const sseDispatch = useSSEContextDispatch();
 
   const handleCopyRetroId = () => {
@@ -122,6 +156,11 @@ function RetroPageInner() {
   const resumeTimerMutation = useResumeTimer(retroId);
   const { remainingSeconds, isPaused } = useTimerState();
 
+  const assistantCurrent = useAssistantStore((s) => s.current);
+  const assistantHistory = useAssistantStore((s) => s.history);
+  const facilitatorCoachingNote = useAssistantStore((s) => s.facilitatorCoachingNote);
+  const bootstrapAssistant = useAssistantStore((s) => s.bootstrapState);
+
   useEffect(() => {
     if (timerData != null) {
       setTimerState({
@@ -139,6 +178,13 @@ function RetroPageInner() {
       setCurrentPhase(rawState.phase);
     }
   }, [rawState?.phase, setCurrentPhase]);
+
+  useEffect(() => {
+    const normalized = rawState ? normalizeState(rawState) : null;
+    if (normalized?.assistantState != null) {
+      bootstrapAssistant(normalized.assistantState);
+    }
+  }, [rawState, bootstrapAssistant]);
 
   useSSE(retroId, {
     [EventType.STEP_ADVANCED]: (data) => {
@@ -259,8 +305,20 @@ function RetroPageInner() {
 
           <div className="flex-1 overflow-y-auto">
             <GuidanceSidebar
-              guidance={currentStep?.guidance}
+              guidance={assistantCurrent?.publicText}
               stepTitle={currentStep?.title}
+              isFacilitator={state.isFacilitator}
+              previousMessages={assistantHistory}
+              privateCoachingNote={
+                state.isFacilitator
+                  ? ({ text: facilitatorCoachingNote ?? FACILITATOR_FALLBACK_COACHING_NOTE } satisfies PrivateCoachingNote)
+                  : null
+              }
+              quickActions={
+                state.isFacilitator && currentStep != null
+                  ? ({ onAdvanceStep: handleNext } satisfies FacilitatorQuickActionsConfig)
+                  : null
+              }
             />
 
             {!currentStep && (
@@ -270,11 +328,6 @@ function RetroPageInner() {
             )}
           </div>
 
-          {state.isFacilitator && currentStep && (
-            <div className="bg-gray-800 px-4 py-3 border-t border-gray-700">
-              <p className="text-yellow-300 text-xs">💡 Click <strong>Next</strong> when ready to advance</p>
-            </div>
-          )}
         </aside>
 
         <main className="flex-1 bg-white overflow-y-auto">
@@ -297,6 +350,7 @@ function RetroPageInner() {
                 {state.isFacilitator && (
                   <button
                     data-testid="next-step-button"
+                    data-coachmark="next-step"
                     onClick={handleNext}
                     className="px-8 py-2.5 rounded-lg text-white font-medium transition-colors bg-[#C49A1A] hover:bg-[#a8831a]"
                   >
@@ -387,6 +441,42 @@ function RetroPageInner() {
         </aside>
 
       </div>
+
+      {currentStep && showGuidanceTip && (
+        <Coachmark
+          anchorId="guidance-sidebar"
+          placement="right"
+          label="Tip"
+          onDismiss={() => setShowGuidanceTip(false)}
+          data-testid="guidance-sidebar-coachmark"
+        >
+          The Virtual Facilitator guides you step by step. Dismiss when ready.
+        </Coachmark>
+      )}
+
+      {currentStep && state.isFacilitator && showNextStepTip && (
+        <Coachmark
+          anchorId="next-step"
+          placement="above"
+          label="Facilitator"
+          onDismiss={() => setShowNextStepTip(false)}
+          data-testid="next-step-coachmark"
+        >
+          When the room has shared their thoughts, click Next to advance everyone to the next step.
+        </Coachmark>
+      )}
+
+      {currentStep && currentStep.componentType === "MULTI_COLUMN_BOARD" && showNoteInputTip && (
+        <Coachmark
+          anchorId="note-input"
+          placement="below"
+          label="Tip"
+          onDismiss={() => setShowNoteInputTip(false)}
+          data-testid="note-input-coachmark"
+        >
+          Type your note and press Enter or click ➕ to add it to the board.
+        </Coachmark>
+      )}
     </div>
   );
 }

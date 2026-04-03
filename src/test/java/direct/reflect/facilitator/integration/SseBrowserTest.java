@@ -131,7 +131,7 @@ public class SseBrowserTest extends BaseIntegrationTest {
 
                 Thread.sleep(500);
 
-                startRetroSession(facilitatorPage);
+                startRetroSession(facilitatorPage, sessionId);
                 log.info("Retro started");
 
                 participantPage.waitForFunction(
