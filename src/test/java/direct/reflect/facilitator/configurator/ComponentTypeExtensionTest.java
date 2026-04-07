@@ -1,22 +1,22 @@
 package direct.reflect.facilitator.configurator;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
 
 class ComponentTypeExtensionTest {
 
     @Test
-    void shouldContainNewComponentTypes() {
-        assertNotNull(ComponentType.valueOf("SMART_ACTION_BUILDER"));
-        assertNotNull(ComponentType.valueOf("ACTION_REVIEW"));
-    }
-
-    @Test
-    void shouldPreserveExistingComponentTypes() {
-        assertNotNull(ComponentType.valueOf("MULTI_COLUMN_BOARD"));
-        assertNotNull(ComponentType.valueOf("RATING_SCALE"));
-        assertNotNull(ComponentType.valueOf("HISTOGRAM_CHART"));
-        assertNotNull(ComponentType.valueOf("GUIDANCE_MESSAGE"));
-        assertNotNull(ComponentType.valueOf("VISUAL_LAYOUT"));
+    void componentTypeSurface_matchesSupportedWizardComponents() {
+        assertThat(ComponentType.values())
+                .extracting(Enum::name)
+                .containsExactly(
+                        "MULTI_COLUMN_BOARD",
+                        "RATING_SCALE",
+                        "HISTOGRAM_CHART",
+                        "GUIDANCE_MESSAGE",
+                        "VISUAL_LAYOUT",
+                        "SMART_ACTION_BUILDER",
+                        "ACTION_REVIEW");
     }
 }

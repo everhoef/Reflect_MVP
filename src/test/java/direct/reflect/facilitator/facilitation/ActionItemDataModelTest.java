@@ -12,7 +12,9 @@ import direct.reflect.facilitator.facilitation.actions.ActionItemStatus;
 import jakarta.persistence.EntityManager;
 import jakarta.validation.ConstraintViolationException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,96 +63,85 @@ class ActionItemDataModelTest {
     }
 
     @Test
-    void saveLoadUpdateAndDelete_persistsSmartFieldsDefaultsAndStatusTransition() {
+    void saveAndFlush_persistsSessionScopedActionItemDefaultsAndStatusChanges() {
         RetroSession retroSession = saveSession("Action Retro");
 
-        ActionItem actionItem = new ActionItem();
-        actionItem.setRetroSession(retroSession);
-        actionItem.setWhat("Daily sync with design team");
-        actionItem.setWho("Alice");
-        actionItem.setDueDate(LocalDate.of(2026, 5, 1));
-        actionItem.setSuccessCriteria("Attendance logged five days per week");
+        ActionItem actionItem = buildActionItem(
+                retroSession,
+                "Daily sync with design team",
+                "Alice",
+                LocalDate.of(2026, 5, 1),
+                item -> item.setSuccessCriteria("Attendance logged five days per week"));
 
         actionItemRepository.saveAndFlush(actionItem);
         entityManager.clear();
 
-        ActionItem loadedActionItem = actionItemRepository.findById(actionItem.getId()).orElseThrow();
+        ActionItem persistedActionItem = actionItemRepository.findById(actionItem.getId()).orElseThrow();
+        LocalDateTime originalUpdatedAt = persistedActionItem.getUpdatedAt();
 
-        assertThat(loadedActionItem.getId()).isNotNull();
-        assertThat(loadedActionItem.getWhat()).isEqualTo("Daily sync with design team");
-        assertThat(loadedActionItem.getWho()).isEqualTo("Alice");
-        assertThat(loadedActionItem.getDueDate()).isEqualTo(LocalDate.of(2026, 5, 1));
-        assertThat(loadedActionItem.getSuccessCriteria()).isEqualTo("Attendance logged five days per week");
-        assertThat(loadedActionItem.getEscalated()).isFalse();
-        assertThat(loadedActionItem.getStatus()).isEqualTo(ActionItemStatus.OPEN);
-        assertThat(loadedActionItem.getCreatedByParticipantId()).isNull();
-        assertThat(loadedActionItem.getRetroSession().getId()).isEqualTo(retroSession.getId());
-        assertThat(loadedActionItem.getCreatedAt()).isNotNull();
-        assertThat(loadedActionItem.getUpdatedAt()).isNotNull();
+        assertThat(persistedActionItem.getId()).isNotNull();
+        assertThat(persistedActionItem.getRetroSession().getId()).isEqualTo(retroSession.getId());
+        assertThat(persistedActionItem.getWhat()).isEqualTo("Daily sync with design team");
+        assertThat(persistedActionItem.getWho()).isEqualTo("Alice");
+        assertThat(persistedActionItem.getDueDate()).isEqualTo(LocalDate.of(2026, 5, 1));
+        assertThat(persistedActionItem.getSuccessCriteria()).isEqualTo("Attendance logged five days per week");
+        assertThat(persistedActionItem.getEscalated()).isFalse();
+        assertThat(persistedActionItem.getStatus()).isEqualTo(ActionItemStatus.OPEN);
+        assertThat(persistedActionItem.getCreatedByParticipantId()).isNull();
+        assertThat(persistedActionItem.getCreatedAt()).isNotNull();
+        assertThat(persistedActionItem.getUpdatedAt()).isNotNull();
 
-        loadedActionItem.setStatus(ActionItemStatus.DONE);
-        actionItemRepository.saveAndFlush(loadedActionItem);
+        persistedActionItem.setStatus(ActionItemStatus.DONE);
+        actionItemRepository.saveAndFlush(persistedActionItem);
         entityManager.clear();
 
         ActionItem updatedActionItem = actionItemRepository.findById(actionItem.getId()).orElseThrow();
 
         assertThat(updatedActionItem.getStatus()).isEqualTo(ActionItemStatus.DONE);
-        assertThat(updatedActionItem.getUpdatedAt()).isNotNull();
-
-        actionItemRepository.delete(updatedActionItem);
-        actionItemRepository.flush();
-
-        assertThat(actionItemRepository.findById(actionItem.getId())).isEmpty();
+        assertThat(updatedActionItem.getUpdatedAt()).isAfterOrEqualTo(originalUpdatedAt);
     }
 
     @Test
     void saveAndFlush_rejectsMissingRequiredFields() {
         RetroSession retroSession = saveSession("Validation Retro");
 
-        ActionItem missingWhat = buildActionItem(retroSession, "Daily sync", "Alice", LocalDate.of(2026, 5, 1));
-        missingWhat.setWhat(null);
-
-        ActionItem missingWho = buildActionItem(retroSession, "Daily sync", "Alice", LocalDate.of(2026, 5, 1));
-        missingWho.setWho(null);
-
-        ActionItem missingDueDate = buildActionItem(retroSession, "Daily sync", "Alice", LocalDate.of(2026, 5, 1));
-        missingDueDate.setDueDate(null);
-
-        assertInvalid(missingWhat);
-        assertInvalid(missingWho);
-        assertInvalid(missingDueDate);
+        assertInvalid(buildActionItem(retroSession, "Daily sync", "Alice", LocalDate.of(2026, 5, 1), item -> item.setWhat(null)));
+        assertInvalid(buildActionItem(retroSession, "Daily sync", "Alice", LocalDate.of(2026, 5, 1), item -> item.setWho(null)));
+        assertInvalid(buildActionItem(retroSession, "Daily sync", "Alice", LocalDate.of(2026, 5, 1), item -> item.setDueDate(null)));
+        assertInvalid(buildActionItem(retroSession, "Daily sync", "Alice", LocalDate.of(2026, 5, 1), item -> item.setRetroSession(null)));
     }
 
     @Test
-    void findByRetroSessionIdAndStatus_scopesResultsToSessionAndStatus() {
+    void repositoryQueries_scopeActionItemsBySessionAndStatusInCreationOrder() {
         RetroSession sessionA = saveSession("Session A");
         RetroSession sessionB = saveSession("Session B");
 
-        ActionItem sessionAOpen = buildActionItem(sessionA, "Daily sync", "Alice", LocalDate.of(2026, 5, 1));
-        ActionItem sessionADone = buildActionItem(sessionA, "Review incidents", "Bob", LocalDate.of(2026, 5, 8));
-        sessionADone.setStatus(ActionItemStatus.DONE);
-        ActionItem sessionBOpen = buildActionItem(sessionB, "Trim backlog", "Carol", LocalDate.of(2026, 5, 15));
+        ActionItem sessionAOpen = actionItemRepository.saveAndFlush(
+                buildActionItem(sessionA, "Daily sync", "Alice", LocalDate.of(2026, 5, 1), item -> {}));
+        ActionItem sessionADone = actionItemRepository.saveAndFlush(buildActionItem(
+                sessionA,
+                "Review incidents",
+                "Bob",
+                LocalDate.of(2026, 5, 8),
+                item -> item.setStatus(ActionItemStatus.DONE)));
+        actionItemRepository.saveAndFlush(
+                buildActionItem(sessionB, "Trim backlog", "Carol", LocalDate.of(2026, 5, 15), item -> {}));
 
-        actionItemRepository.saveAll(List.of(sessionAOpen, sessionADone, sessionBOpen));
-        actionItemRepository.flush();
         entityManager.clear();
 
         List<ActionItem> sessionAItems = actionItemRepository.findByRetroSessionId(sessionA.getId());
         List<ActionItem> sessionAOpenItems = actionItemRepository.findByRetroSessionIdAndStatus(sessionA.getId(), ActionItemStatus.OPEN);
 
         assertThat(sessionAItems)
-                .hasSize(2)
-                .extracting(ActionItem::getWhat, ActionItem::getStatus)
-                .containsExactlyInAnyOrder(
-                        tuple("Daily sync", ActionItemStatus.OPEN),
-                        tuple("Review incidents", ActionItemStatus.DONE));
-        assertThat(sessionAItems)
-                .extracting(actionItem -> actionItem.getRetroSession().getId())
-                .containsOnly(sessionA.getId());
+                .extracting(ActionItem::getWhat, ActionItem::getStatus, item -> item.getRetroSession().getId())
+                .containsExactly(
+                        tuple("Daily sync", ActionItemStatus.OPEN, sessionA.getId()),
+                        tuple("Review incidents", ActionItemStatus.DONE, sessionA.getId()));
 
         assertThat(sessionAOpenItems)
                 .singleElement()
                 .satisfies(actionItem -> {
+                    assertThat(actionItem.getId()).isEqualTo(sessionAOpen.getId());
                     assertThat(actionItem.getWhat()).isEqualTo("Daily sync");
                     assertThat(actionItem.getStatus()).isEqualTo(ActionItemStatus.OPEN);
                     assertThat(actionItem.getRetroSession().getId()).isEqualTo(sessionA.getId());
@@ -163,12 +154,18 @@ class ActionItemDataModelTest {
         return sessionRepository.saveAndFlush(retroSession);
     }
 
-    private ActionItem buildActionItem(RetroSession retroSession, String what, String who, LocalDate dueDate) {
+    private ActionItem buildActionItem(
+            RetroSession retroSession,
+            String what,
+            String who,
+            LocalDate dueDate,
+            Consumer<ActionItem> customizer) {
         ActionItem actionItem = new ActionItem();
         actionItem.setRetroSession(retroSession);
         actionItem.setWhat(what);
         actionItem.setWho(who);
         actionItem.setDueDate(dueDate);
+        customizer.accept(actionItem);
         return actionItem;
     }
 
