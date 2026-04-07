@@ -25,5 +25,33 @@ public enum ComponentType {
      * Configuration: min, max, showComments, groupBy
      * Use cases: Display results for RATING_SCALE activities
      */
-    HISTOGRAM_CHART
+    HISTOGRAM_CHART,
+
+    /**
+     * Simple message for guidance or information.
+     * Configuration: title, message, variant
+     * Use cases: Welcome screens, instructions
+     */
+    GUIDANCE_MESSAGE,
+
+    /**
+     * Visual layout for media or static content.
+     * Configuration: layoutType, contentUrl
+     * Use cases: Video check-ins, image displays
+     */
+    VISUAL_LAYOUT,
+
+    /**
+     * Guided UI for building SMART action points.
+     * Configuration: maxLength, templates[], categories[]
+     * Use cases: Decide Actions phase
+     */
+    SMART_ACTION_BUILDER,
+
+    /**
+     * Review list for created action points.
+     * Configuration: allowEdit, allowDelete, showStatus
+     * Use cases: Close Retro phase, summary screens
+     */
+    ACTION_REVIEW
 }
