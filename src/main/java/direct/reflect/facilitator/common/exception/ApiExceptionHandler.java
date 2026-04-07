@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tools.jackson.databind.exc.InvalidFormatException;
 
 import direct.reflect.facilitator.common.exception.NotAuthenticatedException;
@@ -22,16 +24,17 @@ import direct.reflect.facilitator.common.exception.RetroTemplateNotFoundExceptio
 import direct.reflect.facilitator.common.exception.InvalidSessionStateException;
 import direct.reflect.facilitator.common.exception.InvalidStepException;
 import direct.reflect.facilitator.common.exception.VoteLimitExceededException;
-import lombok.extern.slf4j.Slf4j;
+import direct.reflect.facilitator.organization.DuplicateOrganizationSlugException;
 
 /**
  * Exception handler for API controllers.
  * Handles custom exceptions and provides appropriate HTTP status codes.
  */
-@ControllerAdvice(basePackages = {"direct.reflect.facilitator.eventing", "direct.reflect.facilitator.facilitation"})
+@ControllerAdvice(basePackages = {"direct.reflect.facilitator.eventing", "direct.reflect.facilitator.facilitation", "direct.reflect.facilitator.organization"})
 @Order(1)
-@Slf4j
 public class ApiExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<String> handleResponseStatusException(ResponseStatusException ex) {
@@ -146,6 +149,13 @@ public class ApiExceptionHandler {
     public ResponseEntity<String> handleVoteLimitExceeded(VoteLimitExceededException ex) {
         log.warn("Vote limit exceeded: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(DuplicateOrganizationSlugException.class)
+    public ResponseEntity<String> handleDuplicateOrganizationSlug(DuplicateOrganizationSlugException ex) {
+        log.warn("Duplicate organization slug: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
             .body(ex.getMessage());
     }
 
