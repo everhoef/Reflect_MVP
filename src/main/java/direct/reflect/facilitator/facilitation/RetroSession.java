@@ -1,24 +1,21 @@
 package direct.reflect.facilitator.facilitation;
 
+import direct.reflect.facilitator.common.entity.GeneratedUuidV7;
 import java.time.LocalDateTime;
 import java.util.UUID;
-
-import direct.reflect.facilitator.facilitation.RetroPhase;
 import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.configurator.RetroStage;
-import direct.reflect.facilitator.configurator.RetroStep;
-import direct.reflect.facilitator.common.entity.GeneratedUuidV7;
 import direct.reflect.facilitator.organization.Team;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Data;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.EnumType;
 
 @Entity
 @Data
@@ -51,38 +48,6 @@ public class RetroSession {
 
   @Enumerated(EnumType.STRING)
   private RetroPhase phase = RetroPhase.CREATED;
-
-  public UUID getId() {
-    return id;
-  }
-
-  public void setId(UUID id) {
-    this.id = id;
-  }
-
-  public String getName() {
-    return name;
-  }
-
-  public void setName(String name) {
-    this.name = name;
-  }
-
-  public Team getTeam() {
-    return team;
-  }
-
-  public void setTeam(Team team) {
-    this.team = team;
-  }
-
-  public RetroPhase getPhase() {
-    return phase;
-  }
-
-  public void setPhase(RetroPhase phase) {
-    this.phase = phase;
-  }
 
   public RetroStage getCurrentStage() {
     return template.getStageForPhase(phase);

@@ -48,28 +48,4 @@ public class EscalatedItemVote {
     public UUID getParticipantId() {
         return id != null ? id.getParticipantId() : null;
     }
-
-    public EscalatedItemVoteId getId() {
-        return id;
-    }
-
-    public void setId(EscalatedItemVoteId id) {
-        this.id = id;
-    }
-
-    public EscalatedItem getEscalatedItem() {
-        return escalatedItem;
-    }
-
-    public void setEscalatedItem(EscalatedItem escalatedItem) {
-        this.escalatedItem = escalatedItem;
-    }
-
-    public LocalDateTime getVotedAt() {
-        return votedAt;
-    }
-
-    public void setVotedAt(LocalDateTime votedAt) {
-        this.votedAt = votedAt;
-    }
 }

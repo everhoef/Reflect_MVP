@@ -31,28 +31,4 @@ public class TeamMember {
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
     private TeamRole role;
-
-    public Team getTeam() {
-        return team;
-    }
-
-    public void setTeam(Team team) {
-        this.team = team;
-    }
-
-    public UUID getUserId() {
-        return userId;
-    }
-
-    public void setUserId(UUID userId) {
-        this.userId = userId;
-    }
-
-    public TeamRole getRole() {
-        return role;
-    }
-
-    public void setRole(TeamRole role) {
-        this.role = role;
-    }
 }
