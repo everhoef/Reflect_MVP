@@ -2,6 +2,8 @@ package direct.reflect.facilitator.auth;
 
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,8 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -27,8 +27,9 @@ import java.util.Map;
 @RestController
 @RequestMapping("/test")
 @Profile("test")
-@Slf4j
 public class TestAuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(TestAuthController.class);
 
     @RequestMapping(value = "/login-oauth-user", method = {RequestMethod.POST, RequestMethod.GET})
     public ResponseEntity<String> loginOAuthUser(

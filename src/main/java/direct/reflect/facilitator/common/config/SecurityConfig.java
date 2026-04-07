@@ -1,5 +1,6 @@
 package direct.reflect.facilitator.common.config;
 
+import direct.reflect.facilitator.auth.AuthService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -8,7 +9,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
@@ -16,14 +16,12 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.logout.SimpleUrlLogoutSuccessHandler;
-import org.springframework.stereotype.Component;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -46,12 +44,12 @@ import java.util.Set;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, OidcSuccessHandler oidcSuccessHandler) throws Exception {
         return http
             // OIDC authentication for registered users
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/login")
-                .successHandler(oidcSuccessHandler())
+                .successHandler(oidcSuccessHandler)
             )
             .csrf(csrf -> csrf.spa())
             // Authorization rules - permissive approach with service-level enforcement
@@ -114,8 +112,8 @@ public class SecurityConfig {
     }
     
     @Bean
-    public OidcSuccessHandler oidcSuccessHandler() {
-        return new OidcSuccessHandler();
+    public OidcSuccessHandler oidcSuccessHandler(AuthService authService) {
+        return new OidcSuccessHandler(authService);
     }
     
     /**
@@ -127,8 +125,13 @@ public class SecurityConfig {
         return handler;
     }
     
-    @Component
     public static class OidcSuccessHandler implements AuthenticationSuccessHandler {
+
+        private final AuthService authService;
+
+        public OidcSuccessHandler(AuthService authService) {
+            this.authService = authService;
+        }
         
         @Override
         public void onAuthenticationSuccess(HttpServletRequest request, 
@@ -155,8 +158,10 @@ public class SecurityConfig {
                 // Create new authentication token with ROLE_USER
                 OAuth2User userPrincipal = oauth2Token.getPrincipal();
                 
-                Set<GrantedAuthority> authorities = new HashSet<>(userPrincipal.getAuthorities());
-                authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+                Set<GrantedAuthority> authorities = authService.resolveOidcAuthorities(
+                    userPrincipal.getAuthorities(),
+                    username
+                );
                 
                 OAuth2User userWithRole = new DefaultOAuth2User(
                     authorities,

@@ -1,18 +1,26 @@
 package direct.reflect.facilitator.auth;
 
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
+import direct.reflect.facilitator.organization.TeamMemberRepository;
+import direct.reflect.facilitator.organization.TeamRole;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.context.SecurityContextImpl;
+import org.springframework.stereotype.Component;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Authentication Service for OIDC + Guest hybrid model.
@@ -29,8 +37,15 @@ import java.util.UUID;
  * - ParticipantService for user identity lookups
  */
 @Component("authService")
-@Slf4j
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
+    private final TeamMemberRepository teamMemberRepository;
+
+    public AuthService(ObjectProvider<TeamMemberRepository> teamMemberRepositoryProvider) {
+        this.teamMemberRepository = teamMemberRepositoryProvider.getIfAvailable();
+    }
     
     /**
      * Get participant ID (subject identifier) for current user.
@@ -45,7 +60,7 @@ public class AuthService {
             if (username == null) {
                 throw new IllegalStateException("OIDC session missing authenticatedUser");
             }
-            UUID participantId = generateUserBasedId(username);
+            UUID participantId = toOidcUserId(username);
             log.debug("Retrieved OIDC participantId: {} for username: {}, httpSessionId: {}",
                 participantId, username, session.getId());
             return participantId;
@@ -102,6 +117,37 @@ public class AuthService {
         HttpSession session = request.getSession(false);
         return session != null && "OIDC".equals(session.getAttribute("authType"));
     }
+
+    public Set<GrantedAuthority> resolveOidcAuthorities(Collection<? extends GrantedAuthority> existingAuthorities,
+                                                        String username) {
+        Set<GrantedAuthority> authorities = new HashSet<>(existingAuthorities);
+        authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+
+        if (hasManagerRole(username)) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_MANAGER"));
+        }
+
+        return authorities;
+    }
+
+    public boolean hasManagerRole(String username) {
+        if (teamMemberRepository == null) {
+            return false;
+        }
+
+        UUID userId = toOidcUserId(username);
+        return teamMemberRepository.findAll().stream()
+            .anyMatch(teamMember -> userId.equals(teamMember.getUserId()) && teamMember.getRole() == TeamRole.MANAGER);
+    }
+
+    public UUID toOidcUserId(String username) {
+        if (username == null || username.isBlank()) {
+            throw new IllegalArgumentException("OIDC username cannot be blank");
+        }
+
+        UUID namespace = UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
+        return UUID.nameUUIDFromBytes((namespace.toString() + username).getBytes());
+    }
     
     /**
      * Initialize guest session using unified session structure.
@@ -157,13 +203,4 @@ public class AuthService {
         return UUID.fromString(guestUsername);
     }
     
-    /**
-     * Generate consistent UUID for OIDC users based on username.
-     * Uses UUID v5 (namespace-based) for deterministic results.
-     */
-    private UUID generateUserBasedId(String username) {
-        // Use standard namespace UUID for consistent hashing
-        UUID namespace = UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
-        return UUID.nameUUIDFromBytes((namespace.toString() + username).getBytes());
-    }
 }

@@ -1,5 +1,6 @@
 package direct.reflect.facilitator.config;
 
+import direct.reflect.facilitator.auth.AuthService;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -20,11 +21,12 @@ public class TestSecurityOverride {
 
     @Bean
     @Primary
-    public SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain testSecurityFilterChain(HttpSecurity http,
+                                                       SecurityConfig.OidcSuccessHandler oidcSuccessHandler) throws Exception {
         return http
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/login")
-                .successHandler(oidcSuccessHandler())
+                .successHandler(oidcSuccessHandler)
             )
             .csrf(csrf -> csrf
                 .spa()
@@ -69,8 +71,8 @@ public class TestSecurityOverride {
     }
 
     @Bean
-    public SecurityConfig.OidcSuccessHandler oidcSuccessHandler() {
-        return new SecurityConfig.OidcSuccessHandler();
+    public SecurityConfig.OidcSuccessHandler oidcSuccessHandler(AuthService authService) {
+        return new SecurityConfig.OidcSuccessHandler(authService);
     }
 
     private SimpleUrlLogoutSuccessHandler hybridLogoutHandler() {

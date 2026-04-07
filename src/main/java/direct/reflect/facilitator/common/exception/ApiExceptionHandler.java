@@ -2,6 +2,7 @@ package direct.reflect.facilitator.common.exception;
 
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.validation.BindException;
@@ -77,9 +78,9 @@ public class ApiExceptionHandler {
     @ExceptionHandler(AuthorizationDeniedException.class)
     public ResponseEntity<String> handleAuthorizationDenied(AuthorizationDeniedException ex) {
         log.error("Access denied: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-            .header("HX-Redirect", "/home?error=authentication_required")
-            .body("{\"error\":\"Authentication required\",\"loginUrl\":\"/login\"}");
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .contentType(MediaType.APPLICATION_JSON)
+            .body("{\"error\":\"Access denied\"}");
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
