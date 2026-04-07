@@ -12,16 +12,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
 public class AuthApiController {
 
     private final AuthService authService;
-
-    public AuthApiController(AuthService authService) {
-        this.authService = authService;
-    }
 
     @GetMapping("/me")
     public ResponseEntity<?> getCurrentUser(HttpServletRequest request) {

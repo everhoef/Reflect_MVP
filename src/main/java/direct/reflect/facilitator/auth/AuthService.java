@@ -2,6 +2,9 @@ package direct.reflect.facilitator.auth;
 
 import direct.reflect.facilitator.organization.TeamMemberRepository;
 import direct.reflect.facilitator.organization.TeamRole;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -19,8 +22,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.stereotype.Component;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 
 /**
  * Authentication Service for OIDC + Guest hybrid model.
@@ -40,6 +41,7 @@ import jakarta.servlet.http.HttpSession;
 public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+    private static final UUID OIDC_USER_ID_NAMESPACE = UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
 
     private final TeamMemberRepository teamMemberRepository;
 
@@ -136,8 +138,7 @@ public class AuthService {
         }
 
         UUID userId = toOidcUserId(username);
-        return teamMemberRepository.findAll().stream()
-            .anyMatch(teamMember -> userId.equals(teamMember.getUserId()) && teamMember.getRole() == TeamRole.MANAGER);
+        return teamMemberRepository.existsByUserIdAndRole(userId, TeamRole.MANAGER);
     }
 
     public UUID toOidcUserId(String username) {
@@ -145,8 +146,7 @@ public class AuthService {
             throw new IllegalArgumentException("OIDC username cannot be blank");
         }
 
-        UUID namespace = UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
-        return UUID.nameUUIDFromBytes((namespace.toString() + username).getBytes());
+        return UUID.nameUUIDFromBytes((OIDC_USER_ID_NAMESPACE + username).getBytes(StandardCharsets.UTF_8));
     }
     
     /**

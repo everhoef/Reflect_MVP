@@ -1,8 +1,8 @@
 package direct.reflect.facilitator.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
@@ -28,15 +28,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
  */
 @Controller
 @RequestMapping("/auth")
+@RequiredArgsConstructor
+@Slf4j
 public class AuthController {
 
-    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
-
     private final AuthService authenticationHelper;
-
-    public AuthController(AuthService authenticationHelper) {
-        this.authenticationHelper = authenticationHelper;
-    }
 
     /**
      * Guest authentication endpoint.
