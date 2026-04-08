@@ -637,12 +637,12 @@ docker compose up -d
 
 ### Application Management
 
-**User runs the application in a separate iTerm2 terminal tab.**
+**Agent may manage the application directly.**
 
 #### How It Works
-- User runs: `./mvnw spring-boot:run -Dspring-boot.run.profiles=import` in dedicated terminal
-- Spring Boot logs to **both** console (for user) **and** `/tmp/facilitator.log` (for Claude)
-- User sees live logs in their terminal, Claude reads from log file
+- Start the application with `./mvnw spring-boot:run -Dspring-boot.run.profiles=import`
+- Check whether it is already running before starting another instance
+- Use `/tmp/facilitator.log` for log inspection when startup or runtime output is being written there
 
 #### Starting the Application
 1. **Check if running**:
@@ -650,13 +650,12 @@ docker compose up -d
    curl -s http://localhost:8080/ > /dev/null && echo "✅ Running" || echo "❌ Not running"
    ```
 
-2. **If not running**, tell the user:
-   > "Please start the application in a separate iTerm2 tab:
-   > ```bash
-   > ./mvnw spring-boot:run -Dspring-boot.run.profiles=import
-   > ```"
+2. **If not running, start it yourself**:
+   ```bash
+   ./mvnw spring-boot:run -Dspring-boot.run.profiles=import
+   ```
 
-3. Wait for user confirmation before proceeding
+3. Wait until the HTTP check succeeds or the logs show startup completed before proceeding
 
 #### Monitoring Logs (Claude)
 ```bash
