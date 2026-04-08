@@ -360,6 +360,31 @@ public class RetroApiController {
         }
     }
 
+    @DeleteMapping("/{retroId}/response/{responseId}")
+    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    @Operation(summary = "Delete a response", description = "Deletes the participant's own response (used for ESVP re-selection and similar single-select scenarios)")
+    @ApiResponse(responseCode = "204", description = "Response deleted successfully")
+    @ApiResponse(responseCode = "403", description = "Not authorized to delete this response")
+    public ResponseEntity<Void> deleteResponse(
+            @PathVariable UUID retroId,
+            @PathVariable UUID responseId,
+            HttpServletRequest httpRequest) {
+
+        try {
+            Participant participant = participantService.getParticipantForSession(httpRequest, retroId);
+            responseService.deleteResponse(responseId, participant);
+            return ResponseEntity.noContent().build();
+        } catch (SecurityException e) {
+            log.warn("Unauthorized response delete attempt: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error deleting response: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     @PutMapping("/{retroId}/response/{responseId}")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Update a response", description = "Updates the content of an existing participant response")

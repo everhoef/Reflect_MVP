@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class RetroTemplateContractTest {
 
     private static final Set<ComponentType> SUPPORTED_COMPONENT_TYPES =
-            EnumSet.of(ComponentType.MULTI_COLUMN_BOARD, ComponentType.RATING_SCALE, ComponentType.HISTOGRAM_CHART);
+            EnumSet.of(ComponentType.MULTI_COLUMN_BOARD, ComponentType.RATING_SCALE, ComponentType.HISTOGRAM_CHART, ComponentType.ESVP_SELECTOR);
 
     private static final Set<AdvancementTrigger> SUPPORTED_ADVANCEMENT_TRIGGERS =
             EnumSet.of(AdvancementTrigger.AUTO, AdvancementTrigger.FACILITATOR_CLICK,
@@ -157,6 +157,17 @@ class RetroTemplateContractTest {
                     stepLabel + ": HISTOGRAM_CHART must have 'max' key");
             assertNotNull(config.get("min"), stepLabel + ": 'min' must not be null");
             assertNotNull(config.get("max"), stepLabel + ": 'max' must not be null");
+        }
+
+        if (step.getComponentType() == ComponentType.ESVP_SELECTOR) {
+            assertTrue(config.containsKey("columns"),
+                    stepLabel + ": ESVP_SELECTOR must have 'columns' key");
+            Object columns = config.get("columns");
+            assertNotNull(columns, stepLabel + ": 'columns' must not be null");
+            assertTrue(columns instanceof List,
+                    stepLabel + ": 'columns' must be a List, was " + columns.getClass().getSimpleName());
+            assertEquals(4, ((List<?>) columns).size(),
+                    stepLabel + ": ESVP_SELECTOR must have exactly 4 columns (E/S/V/P)");
         }
 
         log.debug("✅ {} (type={}, trigger={}) passed contract",

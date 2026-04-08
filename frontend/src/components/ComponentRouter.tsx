@@ -2,11 +2,13 @@ import type { ComponentType as ReactComponentType } from "react";
 import { MultiColumnBoard } from "@/components/retro/MultiColumnBoard";
 import { RatingScale } from "@/components/retro/RatingScale";
 import { HistogramChart } from "@/components/retro/HistogramChart";
+import { ESVPSelector } from "@/components/retro/ESVPSelector";
 
 export type RetroComponentType =
   | "MULTI_COLUMN_BOARD"
   | "RATING_SCALE"
   | "HISTOGRAM_CHART"
+  | "ESVP_SELECTOR"
   | "GUIDANCE_MESSAGE"
   | "VISUAL_LAYOUT";
 
@@ -54,6 +56,7 @@ const COMPONENT_REGISTRY: Record<
   MULTI_COLUMN_BOARD: MultiColumnBoard,
   RATING_SCALE: RatingScale,
   HISTOGRAM_CHART: HistogramChart,
+  ESVP_SELECTOR: ESVPSelector,
   GUIDANCE_MESSAGE: GuidanceMessagePlaceholder,
   VISUAL_LAYOUT: VisualLayoutPlaceholder,
 };

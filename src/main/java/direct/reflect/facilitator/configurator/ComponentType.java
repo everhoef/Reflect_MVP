@@ -25,5 +25,13 @@ public enum ComponentType {
      * Configuration: min, max, showComments, groupBy
      * Use cases: Display results for RATING_SCALE activities
      */
-    HISTOGRAM_CHART
+    HISTOGRAM_CHART,
+
+    /**
+     * ESVP single-select category component.
+     * Configuration: columns[] (id, title, emoji, color), capabilities{allowInput, showContent}
+     * Use cases: ESVP check-in (Explorer/Shopper/Vacationer/Prisoner)
+     * Each participant selects exactly one category; reveal shows aggregated counts per category.
+     */
+    ESVP_SELECTOR
 }

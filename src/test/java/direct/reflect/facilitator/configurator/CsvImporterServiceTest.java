@@ -131,16 +131,19 @@ class CsvImporterServiceTest {
                 .filter(step -> step.getComponentType() == ComponentType.RATING_SCALE).count();
         long histogramSteps = retroStepRepository.findAll().stream()
                 .filter(step -> step.getComponentType() == ComponentType.HISTOGRAM_CHART).count();
+        long esvpSteps = retroStepRepository.findAll().stream()
+                .filter(step -> step.getComponentType() == ComponentType.ESVP_SELECTOR).count();
 
-        log.info("Component distribution - Board: {}, Rating: {}, Histogram: {}",
-                boardSteps, ratingSteps, histogramSteps);
+        log.info("Component distribution - Board: {}, Rating: {}, Histogram: {}, ESVP: {}",
+                boardSteps, ratingSteps, histogramSteps, esvpSteps);
 
         // For debugging, let's verify the expected total matches what we imported
         assertTrue(totalSteps > 0, "Should have imported some steps");
         assertEquals(23, totalSteps, "Should have imported all 23 steps from CSV");
-        assertEquals(21, boardSteps, "Should have 21 MULTI_COLUMN_BOARD steps");
+        assertEquals(19, boardSteps, "Should have 19 MULTI_COLUMN_BOARD steps");
         assertEquals(1, ratingSteps, "Should have 1 RATING_SCALE step");
         assertEquals(1, histogramSteps, "Should have 1 HISTOGRAM_CHART step");
+        assertEquals(2, esvpSteps, "Should have 2 ESVP_SELECTOR steps");
 
         // Test RetroSteps for each RetroStage, ensuring they are properly ordered
         for (RetroStage stage : stages) {
