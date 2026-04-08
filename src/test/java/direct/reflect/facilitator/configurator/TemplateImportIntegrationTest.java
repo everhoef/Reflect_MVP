@@ -97,7 +97,42 @@ class TemplateImportIntegrationTest {
 
     @Test
     @Transactional
-    void stage29_allStepsShouldBeMultiColumnBoard() {
+    void stage29_step6_shouldBeSmartActionBuilder() {
+        RetroStage stage29 = retroStageRepository.findAll().stream()
+                .filter(s -> s.getMastersheetID() != null && s.getMastersheetID() == 29)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Stage with mastersheetID=29 (Start Stop Continue) not found"));
+
+        List<RetroStep> steps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(stage29);
+        RetroStep step6 = steps.get(5);
+
+        assertThat(step6.getOrderIndex()).isEqualTo(6);
+        assertThat(step6.getComponentType()).isEqualTo(ComponentType.SMART_ACTION_BUILDER);
+        assertThat(step6.getAdvancementTrigger()).isEqualTo(AdvancementTrigger.FACILITATOR_CLICK);
+        
+        Map<String, Object> config = step6.getComponentConfig();
+        assertThat(config).containsKey("templates");
+        assertThat(config).containsKey("categories");
+    }
+
+    @Test
+    @Transactional
+    void stage31_shouldExistWithActionReviewStep() {
+        RetroStage stage31 = retroStageRepository.findAll().stream()
+                .filter(s -> s.getMastersheetID() != null && s.getMastersheetID() == 31)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Stage with mastersheetID=31 (Action Review) not found"));
+
+        assertThat(stage31.getName()).isEqualTo("Action Review");
+
+        List<RetroStep> steps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(stage31);
+        assertThat(steps).hasSize(1);
+        assertThat(steps.get(0).getComponentType()).isEqualTo(ComponentType.ACTION_REVIEW);
+    }
+
+    @Test
+    @Transactional
+    void stage29_allStepsExceptStep6ShouldBeMultiColumnBoard() {
         RetroStage stage29 = retroStageRepository.findAll().stream()
                 .filter(s -> s.getMastersheetID() != null && s.getMastersheetID() == 29)
                 .findFirst()
@@ -105,9 +140,12 @@ class TemplateImportIntegrationTest {
 
         List<RetroStep> steps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(stage29);
 
-        assertThat(steps)
-                .as("All Start Stop Continue steps should use MULTI_COLUMN_BOARD component type")
-                .allMatch(step -> step.getComponentType() == ComponentType.MULTI_COLUMN_BOARD);
+        for (int i = 0; i < steps.size(); i++) {
+            if (i == 5) continue;
+            assertThat(steps.get(i).getComponentType())
+                    .as("Step %d should use MULTI_COLUMN_BOARD", i + 1)
+                    .isEqualTo(ComponentType.MULTI_COLUMN_BOARD);
+        }
     }
 
     @Test
