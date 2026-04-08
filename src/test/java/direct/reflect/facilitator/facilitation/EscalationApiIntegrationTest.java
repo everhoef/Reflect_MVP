@@ -1,0 +1,430 @@
+package direct.reflect.facilitator.facilitation;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.redis.testcontainers.RedisContainer;
+import direct.reflect.facilitator.auth.AuthService;
+import direct.reflect.facilitator.config.TestRedisConfig;
+import direct.reflect.facilitator.config.TestSecurityOverride;
+import direct.reflect.facilitator.eventing.EventService;
+import direct.reflect.facilitator.eventing.RetroEvent;
+import direct.reflect.facilitator.facilitation.actions.ActionItem;
+import direct.reflect.facilitator.facilitation.actions.ActionItemRepository;
+import direct.reflect.facilitator.facilitation.escalation.EscalatedItem;
+import direct.reflect.facilitator.facilitation.escalation.EscalatedItemRepository;
+import direct.reflect.facilitator.facilitation.escalation.EscalatedItemVote;
+import direct.reflect.facilitator.facilitation.escalation.EscalatedItemVoteId;
+import direct.reflect.facilitator.facilitation.escalation.EscalatedItemVoteRepository;
+import direct.reflect.facilitator.organization.Organization;
+import direct.reflect.facilitator.organization.OrganizationRepository;
+import direct.reflect.facilitator.organization.Team;
+import direct.reflect.facilitator.organization.TeamMember;
+import direct.reflect.facilitator.organization.TeamMemberRepository;
+import direct.reflect.facilitator.organization.TeamRepository;
+import direct.reflect.facilitator.organization.TeamRole;
+import jakarta.servlet.http.HttpServletRequest;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@Testcontainers
+@ActiveProfiles({"import", "test"})
+@Import({TestSecurityOverride.class, TestRedisConfig.class})
+class EscalationApiIntegrationTest {
+
+    @Container
+    @ServiceConnection
+    @SuppressWarnings("resource")
+    static PostgreSQLContainer<?> postgresContainer = new PostgreSQLContainer<>("postgres:17-alpine")
+            .withDatabaseName("postgres")
+            .withUsername("postgres")
+            .withPassword("postgres");
+
+    @Container
+    @ServiceConnection
+    @SuppressWarnings("resource")
+    static RedisContainer redisContainer = new RedisContainer("redis:alpine")
+            .withExposedPorts(6379);
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ActionItemRepository actionItemRepository;
+
+    @Autowired
+    private EscalatedItemRepository escalatedItemRepository;
+
+    @Autowired
+    private EscalatedItemVoteRepository escalatedItemVoteRepository;
+
+    @Autowired
+    private ParticipantRepository participantRepository;
+
+    @Autowired
+    private RetroSessionRepository sessionRepository;
+
+    @Autowired
+    private TeamMemberRepository teamMemberRepository;
+
+    @Autowired
+    private TeamRepository teamRepository;
+
+    @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @MockitoBean
+    private AuthService authService;
+
+    @MockitoBean
+    private EventService eventService;
+
+    private UsernamePasswordAuthenticationToken participantAuth;
+    private UsernamePasswordAuthenticationToken managerAuth;
+    private UsernamePasswordAuthenticationToken nonManagerAuth;
+    private UUID managerUserId;
+
+    @BeforeEach
+    void setUp() {
+        participantAuth = new UsernamePasswordAuthenticationToken(
+                "retro-user",
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        managerAuth = new UsernamePasswordAuthenticationToken(
+                "manager-user",
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER"), new SimpleGrantedAuthority("ROLE_MANAGER")));
+        nonManagerAuth = new UsernamePasswordAuthenticationToken(
+                "member-user",
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+        managerUserId = UUID.randomUUID();
+        when(authService.toOidcUserId("manager-user")).thenReturn(managerUserId);
+    }
+
+    @AfterEach
+    void cleanUp() {
+        escalatedItemVoteRepository.deleteAll();
+        escalatedItemRepository.deleteAll();
+        actionItemRepository.deleteAll();
+        participantRepository.deleteAll();
+        sessionRepository.deleteAll();
+        teamMemberRepository.deleteAll();
+        teamRepository.deleteAll();
+        organizationRepository.deleteAll();
+    }
+
+    @Test
+    void escalateAction_createsEscalatedItemAndCalculatesThreshold() throws Exception {
+        Team team = saveTeam("Platform");
+        RetroSession retroSession = saveSession("Platform Retro", team);
+        Participant facilitator = saveParticipant(retroSession, "Facilitator", ParticipantRole.FACILITATOR);
+        saveParticipant(retroSession, "Alice", ParticipantRole.PARTICIPANT);
+        saveParticipant(retroSession, "Bob", ParticipantRole.PARTICIPANT);
+        saveParticipant(retroSession, "Carol", ParticipantRole.PARTICIPANT);
+        saveParticipant(retroSession, "Dave", ParticipantRole.PARTICIPANT);
+        setCurrentParticipant(facilitator);
+
+        ActionItem actionItem = saveActionItem(retroSession, "Stabilize cross-team deployment handoff");
+
+        mockMvc.perform(post("/api/retro/{retroId}/actions/{actionId}/escalate", retroSession.getId(), actionItem.getId())
+                        .with(authentication(participantAuth))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" +
+                                "\"problemDescription\":\"Cross-team API dependency blocking releases\"" +
+                                "}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.problemDescription").value("Cross-team API dependency blocking releases"))
+                .andExpect(jsonPath("$.voteCount").value(0))
+                .andExpect(jsonPath("$.threshold").value(3))
+                .andExpect(jsonPath("$.thresholdMet").value(false));
+
+        EscalatedItem escalatedItem = escalatedItemRepository.findAll().getFirst();
+        assertThat(escalatedItem.getRetroSession().getId()).isEqualTo(retroSession.getId());
+        assertThat(escalatedItem.getTeam().getId()).isEqualTo(team.getId());
+        assertThat(escalatedItem.getVoteThreshold()).isEqualTo(3);
+        assertThat(escalatedItem.getProblemDescription()).isEqualTo("Cross-team API dependency blocking releases");
+
+        ActionItem reloadedActionItem = actionItemRepository.findById(actionItem.getId()).orElseThrow();
+        assertThat(reloadedActionItem.getEscalated()).isTrue();
+    }
+
+    @Test
+    void voteEscalation_togglesVoteAndPublishesEscalationVoteUpdated() throws Exception {
+        Team team = saveTeam("Delivery");
+        RetroSession retroSession = saveSession("Delivery Retro", team);
+        Participant facilitator = saveParticipant(retroSession, "Facilitator", ParticipantRole.FACILITATOR);
+        Participant voter = saveParticipant(retroSession, "Alice", ParticipantRole.PARTICIPANT);
+        saveParticipant(retroSession, "Bob", ParticipantRole.PARTICIPANT);
+        setCurrentParticipant(voter);
+
+        EscalatedItem escalatedItem = saveEscalation(
+                retroSession,
+                "Release coordination needs manager intervention",
+                2,
+                LocalDateTime.of(2026, 4, 7, 10, 0));
+
+        mockMvc.perform(post("/api/retro/{retroId}/escalations/{escalationId}/vote", retroSession.getId(), escalatedItem.getId())
+                        .with(authentication(participantAuth))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.escalationId").value(escalatedItem.getId().toString()))
+                .andExpect(jsonPath("$.voteCount").value(1))
+                .andExpect(jsonPath("$.threshold").value(2))
+                .andExpect(jsonPath("$.thresholdMet").value(false))
+                .andExpect(jsonPath("$.voted").value(true));
+
+        assertThat(escalatedItemVoteRepository.countByEscalatedItemId(escalatedItem.getId())).isEqualTo(1);
+
+        mockMvc.perform(post("/api/retro/{retroId}/escalations/{escalationId}/vote", retroSession.getId(), escalatedItem.getId())
+                        .with(authentication(participantAuth))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.voteCount").value(0))
+                .andExpect(jsonPath("$.threshold").value(2))
+                .andExpect(jsonPath("$.thresholdMet").value(false))
+                .andExpect(jsonPath("$.voted").value(false));
+
+        assertThat(escalatedItemVoteRepository.countByEscalatedItemId(escalatedItem.getId())).isZero();
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<RetroEvent<?>> eventCaptor = ArgumentCaptor.forClass((Class) RetroEvent.class);
+        verify(eventService, times(2)).publish(eventCaptor.capture());
+
+        List<RetroEvent<?>> publishedEvents = eventCaptor.getAllValues();
+        assertThat(publishedEvents)
+                .extracting(RetroEvent::type)
+                .containsOnly(RetroEvent.EventType.ESCALATION_VOTE_UPDATED);
+
+        RetroEvent.EscalationVoteData firstPayload = (RetroEvent.EscalationVoteData) publishedEvents.get(0).payload();
+        assertThat(firstPayload.escalationId()).isEqualTo(escalatedItem.getId().toString());
+        assertThat(firstPayload.voteCount()).isEqualTo(1);
+        assertThat(firstPayload.threshold()).isEqualTo(2);
+        assertThat(firstPayload.thresholdMet()).isFalse();
+
+        RetroEvent.EscalationVoteData secondPayload = (RetroEvent.EscalationVoteData) publishedEvents.get(1).payload();
+        assertThat(secondPayload.voteCount()).isZero();
+        assertThat(secondPayload.thresholdMet()).isFalse();
+
+        assertThat(participantRepository.findBySession_Id(retroSession.getId()))
+                .extracting(Participant::getParticipantId)
+                .contains(facilitator.getParticipantId(), voter.getParticipantId());
+    }
+
+    @Test
+    void getEscalations_returnsVoteCountsAndFacilitatorTieBreakThresholdMet() throws Exception {
+        Team team = saveTeam("Enablement");
+        RetroSession retroSession = saveSession("Enablement Retro", team);
+        Participant facilitator = saveParticipant(retroSession, "Facilitator", ParticipantRole.FACILITATOR);
+        Participant participantOne = saveParticipant(retroSession, "Alice", ParticipantRole.PARTICIPANT);
+        Participant participantTwo = saveParticipant(retroSession, "Bob", ParticipantRole.PARTICIPANT);
+        saveParticipant(retroSession, "Carol", ParticipantRole.PARTICIPANT);
+        setCurrentParticipant(participantOne);
+
+        EscalatedItem facilitatorTieBreak = saveEscalation(
+                retroSession,
+                "Manager prioritization needed for vendor access",
+                3,
+                LocalDateTime.of(2026, 4, 7, 10, 0));
+        saveVote(facilitatorTieBreak, facilitator);
+        saveVote(facilitatorTieBreak, participantOne);
+
+        EscalatedItem stillBelowThreshold = saveEscalation(
+                retroSession,
+                "Budget alignment still blocked",
+                3,
+                LocalDateTime.of(2026, 4, 7, 11, 0));
+        saveVote(stillBelowThreshold, participantOne);
+        saveVote(stillBelowThreshold, participantTwo);
+
+        mockMvc.perform(get("/api/retro/{retroId}/escalations", retroSession.getId())
+                        .with(authentication(participantAuth)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].problemDescription").value("Manager prioritization needed for vendor access"))
+                .andExpect(jsonPath("$[0].voteCount").value(2))
+                .andExpect(jsonPath("$[0].threshold").value(3))
+                .andExpect(jsonPath("$[0].thresholdMet").value(true))
+                .andExpect(jsonPath("$[1].problemDescription").value("Budget alignment still blocked"))
+                .andExpect(jsonPath("$[1].voteCount").value(2))
+                .andExpect(jsonPath("$[1].threshold").value(3))
+                .andExpect(jsonPath("$[1].thresholdMet").value(false));
+    }
+
+    @Test
+    void managerEscalations_nonManagerIsForbiddenForListAndDetail() throws Exception {
+        UUID escalationId = UUID.randomUUID();
+
+        mockMvc.perform(get("/api/manager/escalations").with(authentication(nonManagerAuth)))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("{\"error\":\"Access denied\"}"));
+
+        mockMvc.perform(get("/api/manager/escalations/{id}", escalationId).with(authentication(nonManagerAuth)))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("{\"error\":\"Access denied\"}"));
+    }
+
+    @Test
+    void managerEscalations_managerSeesOnlyThresholdMetItemsForManagedTeams() throws Exception {
+        Team managedTeam = saveTeam("Managed");
+        Team otherTeam = saveTeam("Other");
+        saveManagerMembership(managedTeam, managerUserId);
+
+        RetroSession managedRetro = saveSession("Managed Retro", managedTeam);
+        Participant facilitator = saveParticipant(managedRetro, "Facilitator", ParticipantRole.FACILITATOR);
+        Participant participantOne = saveParticipant(managedRetro, "Alice", ParticipantRole.PARTICIPANT);
+        Participant participantTwo = saveParticipant(managedRetro, "Bob", ParticipantRole.PARTICIPANT);
+        saveParticipant(managedRetro, "Carol", ParticipantRole.PARTICIPANT);
+
+        EscalatedItem thresholdMet = saveEscalation(
+                managedRetro,
+                "Cross-team dependency blocks releases",
+                3,
+                LocalDateTime.of(2026, 4, 7, 10, 0));
+        saveVote(thresholdMet, facilitator);
+        saveVote(thresholdMet, participantOne);
+
+        EscalatedItem belowThreshold = saveEscalation(
+                managedRetro,
+                "Tooling upgrade needs budget",
+                3,
+                LocalDateTime.of(2026, 4, 7, 11, 0));
+        saveVote(belowThreshold, participantOne);
+
+        RetroSession otherRetro = saveSession("Other Retro", otherTeam);
+        Participant otherFacilitator = saveParticipant(otherRetro, "Other Facilitator", ParticipantRole.FACILITATOR);
+        Participant otherParticipant = saveParticipant(otherRetro, "Other Alice", ParticipantRole.PARTICIPANT);
+        EscalatedItem foreignThresholdMet = saveEscalation(
+                otherRetro,
+                "Other team issue should stay hidden",
+                2,
+                LocalDateTime.of(2026, 4, 7, 12, 0));
+        saveVote(foreignThresholdMet, otherFacilitator);
+        saveVote(foreignThresholdMet, otherParticipant);
+
+        mockMvc.perform(get("/api/manager/escalations").with(authentication(managerAuth)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(thresholdMet.getId().toString()))
+                .andExpect(jsonPath("$[0].problemDescription").value("Cross-team dependency blocks releases"))
+                .andExpect(jsonPath("$[0].voteCount").value(2))
+                .andExpect(jsonPath("$[0].threshold").value(3))
+                .andExpect(jsonPath("$[0].thresholdMet").value(true));
+
+        mockMvc.perform(get("/api/manager/escalations/{id}", thresholdMet.getId()).with(authentication(managerAuth)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(thresholdMet.getId().toString()))
+                .andExpect(jsonPath("$.problemDescription").value("Cross-team dependency blocks releases"))
+                .andExpect(jsonPath("$.voteCount").value(2))
+                .andExpect(jsonPath("$.thresholdMet").value(true));
+    }
+
+    private void setCurrentParticipant(Participant participant) {
+        when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(participant.getParticipantId());
+    }
+
+    private ActionItem saveActionItem(RetroSession retroSession, String what) {
+        ActionItem actionItem = new ActionItem();
+        actionItem.setRetroSession(retroSession);
+        actionItem.setWhat(what);
+        actionItem.setWho("Alice");
+        actionItem.setDueDate(LocalDate.of(2026, 4, 30));
+        actionItem.setSuccessCriteria("Clear ownership across teams");
+        return actionItemRepository.saveAndFlush(actionItem);
+    }
+
+    private EscalatedItem saveEscalation(
+            RetroSession retroSession,
+            String problemDescription,
+            int threshold,
+            LocalDateTime createdAt) {
+        EscalatedItem escalatedItem = new EscalatedItem();
+        escalatedItem.setRetroSession(retroSession);
+        escalatedItem.setTeam(retroSession.getTeam());
+        escalatedItem.setProblemDescription(problemDescription);
+        escalatedItem.setVoteThreshold(threshold);
+        escalatedItem.setCreatedAt(createdAt);
+        return escalatedItemRepository.saveAndFlush(escalatedItem);
+    }
+
+    private void saveVote(EscalatedItem escalatedItem, Participant participant) {
+        EscalatedItemVote vote = new EscalatedItemVote();
+        vote.setId(new EscalatedItemVoteId(escalatedItem.getId(), participant.getParticipantId()));
+        vote.setEscalatedItem(escalatedItem);
+        escalatedItemVoteRepository.saveAndFlush(vote);
+    }
+
+    private Participant saveParticipant(RetroSession retroSession, String displayName, ParticipantRole role) {
+        Participant participant = new Participant();
+        participant.setParticipantId(UUID.randomUUID());
+        participant.setSession(retroSession);
+        participant.setDisplayName(displayName);
+        participant.setRole(role);
+        participant.setStatus(ParticipantStatus.ACTIVE);
+        return participantRepository.saveAndFlush(participant);
+    }
+
+    private RetroSession saveSession(String name, Team team) {
+        RetroSession retroSession = new RetroSession();
+        retroSession.setName(name);
+        retroSession.setTeam(team);
+        retroSession.setPhase(RetroPhase.CREATED);
+        retroSession.setCreatedAt(LocalDateTime.of(2026, 4, 7, 9, 0));
+        return sessionRepository.saveAndFlush(retroSession);
+    }
+
+    private void saveManagerMembership(Team team, UUID userId) {
+        TeamMember teamMember = new TeamMember();
+        teamMember.setTeam(team);
+        teamMember.setUserId(userId);
+        teamMember.setRole(TeamRole.MANAGER);
+        teamMemberRepository.saveAndFlush(teamMember);
+    }
+
+    private Team saveTeam(String teamName) {
+        Organization organization = new Organization();
+        organization.setName(teamName + " Org");
+        organization.setSlug(teamName.toLowerCase() + "-org-" + UUID.randomUUID());
+        Organization savedOrganization = organizationRepository.saveAndFlush(organization);
+
+        Team team = new Team();
+        team.setName(teamName);
+        team.setOrganization(savedOrganization);
+        return teamRepository.saveAndFlush(team);
+    }
+}

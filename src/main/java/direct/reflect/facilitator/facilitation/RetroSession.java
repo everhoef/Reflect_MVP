@@ -53,6 +53,14 @@ public class RetroSession {
     return template.getStageForPhase(phase);
   }
 
+  public UUID getId() {
+    return id;
+  }
+
+  public void setName(String name) {
+    this.name = name;
+  }
+
   public boolean isFinished() {
     return phase == RetroPhase.COMPLETED || phase == RetroPhase.ABANDONED;
   }

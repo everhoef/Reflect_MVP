@@ -42,6 +42,13 @@ public record RetroEvent<T>(
         TIMER_FINISHED
     }
 
+    public record EscalationVoteData(
+        String escalationId,
+        long voteCount,
+        int threshold,
+        boolean thresholdMet
+    ) {}
+
     /**
      * Create a participant joined event
      */
@@ -130,5 +137,18 @@ public record RetroEvent<T>(
      */
     public static RetroEvent<Void> timerStarted(UUID retroId) {
         return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.TIMER_STARTED, "system", Instant.now(), null);
+    }
+
+    public static RetroEvent<EscalationVoteData> escalationVoteUpdated(
+            UUID retroId,
+            String participantId,
+            EscalationVoteData payload) {
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId,
+            EventType.ESCALATION_VOTE_UPDATED,
+            participantId,
+            Instant.now(),
+            payload);
     }
 }
