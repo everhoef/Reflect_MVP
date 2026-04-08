@@ -4,11 +4,13 @@ import { RatingScale } from "@/modules/facilitation/components/retro/RatingScale
 import { HistogramChart } from "@/modules/facilitation/components/retro/HistogramChart";
 import { SmartActionBuilder } from "@/modules/facilitation/components/retro/SmartActionBuilder";
 import { ActionReview } from "@/modules/facilitation/components/retro/ActionReview";
+import { ESVPSelector } from "@/modules/facilitation/components/retro/ESVPSelector";
 
 export type RetroComponentType =
   | "MULTI_COLUMN_BOARD"
   | "RATING_SCALE"
   | "HISTOGRAM_CHART"
+  | "ESVP_SELECTOR"
   | "GUIDANCE_MESSAGE"
   | "VISUAL_LAYOUT"
   | "SMART_ACTION_BUILDER"
@@ -58,6 +60,7 @@ const COMPONENT_REGISTRY: Record<
   MULTI_COLUMN_BOARD: MultiColumnBoard,
   RATING_SCALE: RatingScale,
   HISTOGRAM_CHART: HistogramChart,
+  ESVP_SELECTOR: ESVPSelector,
   GUIDANCE_MESSAGE: GuidanceMessagePlaceholder,
   VISUAL_LAYOUT: VisualLayoutPlaceholder,
   SMART_ACTION_BUILDER: SmartActionBuilder,

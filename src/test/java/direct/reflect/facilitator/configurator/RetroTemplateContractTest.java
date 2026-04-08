@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -39,6 +40,7 @@ class RetroTemplateContractTest {
                     ComponentType.MULTI_COLUMN_BOARD,
                     ComponentType.RATING_SCALE,
                     ComponentType.HISTOGRAM_CHART,
+                    ComponentType.ESVP_SELECTOR,
                     ComponentType.SMART_ACTION_BUILDER,
                     ComponentType.ACTION_REVIEW);
 
@@ -161,6 +163,17 @@ class RetroTemplateContractTest {
                     stepLabel + ": HISTOGRAM_CHART must have 'max' key");
             assertNotNull(config.get("min"), stepLabel + ": 'min' must not be null");
             assertNotNull(config.get("max"), stepLabel + ": 'max' must not be null");
+        }
+
+        if (step.getComponentType() == ComponentType.ESVP_SELECTOR) {
+            assertTrue(config.containsKey("columns"),
+                    stepLabel + ": ESVP_SELECTOR must have 'columns' key");
+            Object columns = config.get("columns");
+            assertNotNull(columns, stepLabel + ": 'columns' must not be null");
+            assertTrue(columns instanceof List,
+                    stepLabel + ": 'columns' must be a List, was " + columns.getClass().getSimpleName());
+            assertEquals(4, ((List<?>) columns).size(),
+                    stepLabel + ": ESVP_SELECTOR must have exactly 4 columns (E/S/V/P)");
         }
     }
 }

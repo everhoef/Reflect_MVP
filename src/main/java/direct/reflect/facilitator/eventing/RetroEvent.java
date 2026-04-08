@@ -126,6 +126,15 @@ public record RetroEvent<T>(
     }
 
     /**
+     * Create a response deleted event (NOTE_DELETED).
+     */
+    public static RetroEvent<ResponseData> responseDeleted(UUID retroId, String participantId, ResponseData responseData) {
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId, EventType.NOTE_DELETED, participantId, Instant.now(), responseData);
+    }
+
+    /**
      * Create a response privacy changed event (NOTE_UPDATED).
      */
     public static RetroEvent<ResponseData> responsePrivacyChanged(UUID retroId, String facilitatorId, ResponseData responseData) {

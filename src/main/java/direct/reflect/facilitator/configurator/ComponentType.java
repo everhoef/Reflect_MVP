@@ -29,6 +29,14 @@ public enum ComponentType {
     HISTOGRAM_CHART,
 
     /**
+     * ESVP single-select category component.
+     * Configuration: columns[] (id, title, emoji, color), capabilities{allowInput, showContent}
+     * Use cases: ESVP check-in (Explorer/Shopper/Vacationer/Prisoner)
+     * Each participant selects exactly one category; reveal shows aggregated counts per category.
+     */
+    ESVP_SELECTOR,
+
+    /**
      * Simple message for guidance or information.
      * Configuration: title, message, variant
      * Use cases: Welcome screens, instructions

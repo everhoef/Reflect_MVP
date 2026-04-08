@@ -123,20 +123,23 @@ class CsvImporterServiceTest {
                 .filter(step -> step.getComponentType() == ComponentType.RATING_SCALE).count();
         long histogramSteps = retroStepRepository.findAll().stream()
                 .filter(step -> step.getComponentType() == ComponentType.HISTOGRAM_CHART).count();
+        long esvpSteps = retroStepRepository.findAll().stream()
+                .filter(step -> step.getComponentType() == ComponentType.ESVP_SELECTOR).count();
         long smartActionBuilderSteps = retroStepRepository.findAll().stream()
                 .filter(step -> step.getComponentType() == ComponentType.SMART_ACTION_BUILDER).count();
         long actionReviewSteps = retroStepRepository.findAll().stream()
                 .filter(step -> step.getComponentType() == ComponentType.ACTION_REVIEW).count();
 
-        log.info("Component distribution - Board: {}, Rating: {}, Histogram: {}",
-                boardSteps, ratingSteps, histogramSteps);
+        log.info("Component distribution - Board: {}, Rating: {}, Histogram: {}, ESVP: {}, SmartAction: {}, ActionReview: {}",
+                boardSteps, ratingSteps, histogramSteps, esvpSteps, smartActionBuilderSteps, actionReviewSteps);
 
         // For debugging, let's verify the expected total matches what we imported
         assertTrue(totalSteps > 0, "Should have imported some steps");
         assertEquals(24, totalSteps, "Should have imported all 24 steps from CSV");
-        assertEquals(20, boardSteps, "Should have 20 MULTI_COLUMN_BOARD steps");
+        assertEquals(19, boardSteps, "Should have 19 MULTI_COLUMN_BOARD steps");
         assertEquals(1, ratingSteps, "Should have 1 RATING_SCALE step");
         assertEquals(1, histogramSteps, "Should have 1 HISTOGRAM_CHART step");
+        assertEquals(2, esvpSteps, "Should have 2 ESVP_SELECTOR steps");
         assertEquals(1, smartActionBuilderSteps, "Should have 1 SMART_ACTION_BUILDER step");
         assertEquals(1, actionReviewSteps, "Should have 1 ACTION_REVIEW step");
 

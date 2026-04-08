@@ -27,6 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -247,6 +248,38 @@ public class ResponseApiController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } catch (Exception e) {
             log.error("Error toggling vote: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @DeleteMapping("/api/retros/{retroId}/responses/{responseId}")
+    @PreAuthorize("hasAnyRole('USER', 'GUEST')")
+    @Operation(summary = "Delete a response", description = "Deletes a participant's own response (used by ESVP_SELECTOR for re-selection)")
+    @ApiResponse(responseCode = "204", description = "Response deleted successfully")
+    @ApiResponse(responseCode = "403", description = "Not authorized to delete this response")
+    public ResponseEntity<Void> deleteResponse(
+            @PathVariable UUID retroId,
+            @PathVariable UUID responseId,
+            HttpServletRequest httpRequest) {
+
+        log.debug("Deleting response {} for retro: {}", responseId, retroId);
+
+        try {
+            Participant participant = participantService.getParticipantForSession(httpRequest, retroId);
+            if (participant == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+
+            responseService.deleteResponse(responseId, participant);
+            log.debug("Deleted response: {}", responseId);
+
+            return ResponseEntity.noContent().build();
+
+        } catch (SecurityException e) {
+            log.warn("Unauthorized response delete attempt: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (Exception e) {
+            log.error("Error deleting response: ", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

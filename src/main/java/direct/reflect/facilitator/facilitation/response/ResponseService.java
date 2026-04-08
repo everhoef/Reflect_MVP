@@ -141,6 +141,31 @@ public class ResponseService {
         return savedResponse;
     }
 
+    public void deleteResponse(UUID responseId, Participant participant) {
+        ParticipantResponse response = responseRepository.findById(responseId)
+            .orElseThrow(() -> new IllegalArgumentException("Response not found"));
+
+        if (!response.getParticipant().getParticipantId().equals(participant.getParticipantId())) {
+            throw new SecurityException("Cannot delete another participant's response");
+        }
+
+        UUID sessionId = response.getParticipant().getSession().getId();
+        RetroEvent.ResponseData eventData = new RetroEvent.ResponseData(
+            response.getId().toString(),
+            response.getRetroStep().getId(),
+            response.getParticipant().getParticipantId().toString(),
+            response.getParticipant().getDisplayName(),
+            null,
+            response.getIsVisible(),
+            response.getSubmittedAt() != null ? response.getSubmittedAt().atZone(ZoneId.systemDefault()).toInstant() : null
+        );
+
+        responseRepository.delete(response);
+        log.info("Deleted response {} by participant {}", responseId, participant.getDisplayName());
+
+        eventService.publish(RetroEvent.responseDeleted(sessionId, participant.getParticipantId().toString(), eventData));
+    }
+
     public ParticipantResponse updateResponse(UUID responseId, Participant participant, String newContent) {
         ParticipantResponse response = responseRepository.findById(responseId)
             .orElseThrow(() -> new IllegalArgumentException("Response not found"));
