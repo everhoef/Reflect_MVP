@@ -2,13 +2,15 @@ import type { ComponentType as ReactComponentType } from "react";
 import { MultiColumnBoard } from "@/components/retro/MultiColumnBoard";
 import { RatingScale } from "@/components/retro/RatingScale";
 import { HistogramChart } from "@/components/retro/HistogramChart";
+import { SmartActionBuilder } from "@/components/retro/SmartActionBuilder";
 
 export type RetroComponentType =
   | "MULTI_COLUMN_BOARD"
   | "RATING_SCALE"
   | "HISTOGRAM_CHART"
   | "GUIDANCE_MESSAGE"
-  | "VISUAL_LAYOUT";
+  | "VISUAL_LAYOUT"
+  | "SMART_ACTION_BUILDER";
 
 export interface StepComponentProps {
   retroId: string;
@@ -56,6 +58,7 @@ const COMPONENT_REGISTRY: Record<
   HISTOGRAM_CHART: HistogramChart,
   GUIDANCE_MESSAGE: GuidanceMessagePlaceholder,
   VISUAL_LAYOUT: VisualLayoutPlaceholder,
+  SMART_ACTION_BUILDER: SmartActionBuilder,
 };
 
 interface ComponentRouterProps {
