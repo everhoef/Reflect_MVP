@@ -443,8 +443,8 @@ Each test class belongs to exactly one layer. The layer determines the package a
 **Layer 3 — Configurator/import** (`configurator/`, SpringBootTest, real DB, no browser):
 - `TemplateImportIntegrationTest` — template CSV import integrity and stage data contracts
 
-**Layer 4 — Data/repository** (`facilitation/`, no browser, no MockMvc):
-- `ClusteringDataModelTest` — repository query correctness and entity persistence
+**Layer 4 — Data/repository** (`facilitation/`, usually `@SpringBootTest` + real DB/Testcontainers, no browser, no MockMvc):
+- `ClusteringDataModelTest` — narrow repository/entity mapping contract: deliberate query methods, persistence defaults, FK/composite-key rules, and other database invariants the module intentionally exposes
 
 **Layer 5 — Contract** (module-aligned package, no browser, no Spring context beyond what's needed):
 - `RetroTemplateContractTest` — template structure contracts
@@ -458,8 +458,8 @@ Suffix conventions:
 - `BrowserSmokeTest` — Playwright, narrow proof-of-concept check
 - `BrowserTest` — Playwright, focused browser test (e.g., SSE browser tests)
 - `ApiIntegrationTest` — MockMvc, HTTP contract
-- `DataIntegrationTest` — SpringBootTest, real DB, no browser
-- `DataModelTest` — repository query contract
+- `DataIntegrationTest` — SpringBootTest, real DB, no browser; service-level or multi-repository workflow contract
+- `DataModelTest` — narrower SpringBootTest/repository contract focused on intentional persistence/query invariants, not generic CRUD plumbing and not HTTP/service behaviour
 
 #### Security Testing Approach
 
