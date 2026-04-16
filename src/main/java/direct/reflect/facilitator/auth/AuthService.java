@@ -4,15 +4,15 @@ import direct.reflect.facilitator.organization.TeamMemberRepository;
 import direct.reflect.facilitator.organization.TeamRole;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -38,16 +38,12 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
  * - ParticipantService for user identity lookups
  */
 @Component("authService")
+@Slf4j
+@RequiredArgsConstructor
 public class AuthService {
-
-    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
     private static final UUID OIDC_USER_ID_NAMESPACE = UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
 
     private final TeamMemberRepository teamMemberRepository;
-
-    public AuthService(ObjectProvider<TeamMemberRepository> teamMemberRepositoryProvider) {
-        this.teamMemberRepository = teamMemberRepositoryProvider.getIfAvailable();
-    }
     
     /**
      * Get participant ID (subject identifier) for current user.
