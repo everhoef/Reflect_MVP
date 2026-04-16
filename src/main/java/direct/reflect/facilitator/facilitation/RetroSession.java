@@ -56,22 +56,6 @@ public class RetroSession {
     return template.getStageForPhase(phase);
   }
 
-  public UUID getId() {
-    return id;
-  }
-
-  public void setName(String name) {
-    this.name = name;
-  }
-
-  public Long getSyncVersion() {
-    return syncVersion;
-  }
-
-  public void setSyncVersion(Long syncVersion) {
-    this.syncVersion = syncVersion;
-  }
-
   public boolean isFinished() {
     return phase == RetroPhase.COMPLETED || phase == RetroPhase.ABANDONED;
   }

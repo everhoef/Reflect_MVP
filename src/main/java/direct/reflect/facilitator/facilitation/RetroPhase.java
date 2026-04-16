@@ -1,5 +1,10 @@
 package direct.reflect.facilitator.facilitation;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
+@Getter
+@RequiredArgsConstructor
 public enum RetroPhase {
     CREATED("Creating Retro", "Initial state"),
     LOBBY("Lobby", "Waiting for participants"),
@@ -14,19 +19,6 @@ public enum RetroPhase {
 
     private final String displayName;
     private final String description;
-
-    RetroPhase(String displayName, String description) {
-        this.displayName = displayName;
-        this.description = description;
-    }
-
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public String getDescription() {
-        return description;
-    }
 
     public RetroPhase next() {
         return switch(this) {

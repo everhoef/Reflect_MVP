@@ -1,8 +1,11 @@
 package direct.reflect.facilitator.common.exception;
 
+import lombok.Getter;
+
 /**
  * Thrown when a participant attempts to vote but has already used all available votes.
  */
+@Getter
 public class VoteLimitExceededException extends RuntimeException {
 
     private final long votesUsed;
@@ -12,13 +15,5 @@ public class VoteLimitExceededException extends RuntimeException {
         super(String.format("Vote limit exceeded. You have used %d of %d votes.", votesUsed, voteLimit));
         this.votesUsed = votesUsed;
         this.voteLimit = voteLimit;
-    }
-
-    public long getVotesUsed() {
-        return votesUsed;
-    }
-
-    public int getVoteLimit() {
-        return voteLimit;
     }
 }

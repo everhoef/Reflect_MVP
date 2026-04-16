@@ -78,32 +78,4 @@ public class Participant {
             ", lastSeen=" + lastSeen +
             '}';
     }
-
-    public UUID getParticipantId() {
-        return participantId;
-    }
-
-    public void setParticipantId(UUID participantId) {
-        this.participantId = participantId;
-    }
-
-    public RetroSession getSession() {
-        return session;
-    }
-
-    public void setSession(RetroSession session) {
-        this.session = session;
-    }
-
-    public void setDisplayName(String displayName) {
-        this.displayName = displayName;
-    }
-
-    public void setRole(ParticipantRole role) {
-        this.role = role;
-    }
-
-    public void setStatus(ParticipantStatus status) {
-        this.status = status;
-    }
 }

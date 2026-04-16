@@ -398,8 +398,9 @@ Facilitators can ALWAYS advance - the system shows warnings but never blocks. Th
 ## Code Conventions
 
 ### Java Coding Standards
-- Use Lombok annotations (`@Data`, `@RequiredArgsConstructor`, `@Slf4j`) to reduce boilerplate
-- Use `@Slf4j` for logging in all classes
+- Use Lombok by default for Java boilerplate elimination when possible. Prefer Lombok annotations such as `@Getter`, `@Setter`, `@Data`, `@RequiredArgsConstructor`, `@AllArgsConstructor`, `@NoArgsConstructor`, `@Builder`, and `@Slf4j` unless custom behavior is required.
+- Do not hand-write getters, setters, constructors, or logger fields when Lombok can express the intent clearly.
+- Use `@Slf4j` for logging in all classes unless a class genuinely requires a different logger setup.
 - **Logging Policy**: DO NOT add INFO/WARN logs for debugging. Use DEBUG/TRACE level and adjust logging configuration. Only use INFO/WARN for genuinely important production events.
 - Prefer constructor injection over field injection
 - Use `@Service` for all business function implementations
@@ -536,7 +537,8 @@ A feature is READY FOR REVIEW when ALL of the following conditions are true:
 - [ ] No `@Disabled`, `@Ignore`, or `@Tag("flaky")` annotations added
 - [ ] No suppressed errors (`@SuppressWarnings`, empty catch blocks, `as any`)
 - [ ] Notion story status updated to `Needs review`
-- [ ] Code follows existing patterns in this AGENTS.md (GRASP, controller separation, Lombok, etc.)
+- [ ] Code follows existing patterns in this AGENTS.md (GRASP, controller separation, Lombok-first boilerplate reduction, etc.)
+- [ ] New Java code uses Lombok for boilerplate by default where appropriate, instead of manual getters, setters, constructors, or logger fields unless custom behavior is required
 
 ### Test Requirements
 
@@ -724,7 +726,8 @@ ps aux | grep -i "[m]vn spring-boot:run"
 
 ### Code Generation Patterns
 - Follow Spring MVC patterns (not WebFlux - we use standard Spring MVC)
-- Use Lombok annotations consistently
+- Use Lombok annotations consistently, and default to Lombok for Java boilerplate when it expresses the intent clearly
+- Avoid generating manual getters, setters, constructors, or logger declarations unless the class needs custom behavior that Lombok should not hide
 - Implement proper error handling with custom exceptions
 - Use UUID v7 with `@GeneratedUuidV7` annotation for primary keys
 

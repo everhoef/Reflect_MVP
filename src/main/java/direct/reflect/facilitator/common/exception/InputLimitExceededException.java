@@ -1,8 +1,11 @@
 package direct.reflect.facilitator.common.exception;
 
+import lombok.Getter;
+
 /**
  * Thrown when a participant attempts to submit more than the allowed number of inputs per step.
  */
+@Getter
 public class InputLimitExceededException extends RuntimeException {
     private final long inputsSubmitted;
     private final int inputLimit;
@@ -13,7 +16,4 @@ public class InputLimitExceededException extends RuntimeException {
         this.inputsSubmitted = inputsSubmitted;
         this.inputLimit = inputLimit;
     }
-
-    public long getInputsSubmitted() { return inputsSubmitted; }
-    public int getInputLimit() { return inputLimit; }
 }
