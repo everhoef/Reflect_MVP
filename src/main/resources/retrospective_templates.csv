@@ -1,3 +1,3 @@
 Template Name,Description,Maturity,IsReleased,SetTheStage_ID,GatherData_ID,GenerateInsights_ID,DecideActions_ID,CloseRetro_ID
-Default,A concise 5-phase retrospective: ESVP check-in → Mad Sad Glad → Perfection Game → Start Stop Continue → +/- Delta.,3,TRUE,27,28,19,29,30
+Default,A concise 5-phase retrospective: ESVP check-in → Mad Sad Glad → Perfection Game → Start Stop Continue → Action Review.,3,TRUE,27,28,19,29,31
 Quick Check-in,A fast-paced format for a quick health check.,2,TRUE,6,14,18,21,24

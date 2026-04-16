@@ -67,3 +67,13 @@ logging:
     org.springframework.web.servlet.mvc.method.annotation: "debug"
   file:
     name: /tmp/facilitator.log
+
+---
+spring:
+  config:
+    activate:
+      on-profile: "import & !test"
+
+facilitator:
+  local-auth:
+    enabled: true
