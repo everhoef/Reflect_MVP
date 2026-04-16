@@ -2,7 +2,6 @@ package direct.reflect.facilitator.eventing;
 
 import java.time.Instant;
 import java.util.UUID;
-import lombok.Getter;
 
 /**
  * Event message for retro-related events
@@ -36,6 +35,7 @@ public record RetroEvent<T>(
         ACTION_CREATED,
         ACTION_UPDATED,
         ACTION_DELETED,
+        ESCALATION_CREATED,
         ESCALATION_VOTE_UPDATED,
         TIMER_STARTED,
         TIMER_PAUSED,
@@ -150,5 +150,18 @@ public record RetroEvent<T>(
             participantId,
             Instant.now(),
             payload);
+    }
+
+    public static RetroEvent<String> escalationCreated(
+            UUID retroId,
+            String participantId,
+            String escalationId) {
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId,
+            EventType.ESCALATION_CREATED,
+            participantId,
+            Instant.now(),
+            escalationId);
     }
 }

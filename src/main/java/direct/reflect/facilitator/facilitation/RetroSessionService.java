@@ -1,6 +1,7 @@
 package direct.reflect.facilitator.facilitation;
 
 import org.springframework.stereotype.Service;
+import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.configurator.RetroStage;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.RetroTemplate;
@@ -21,25 +22,49 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import jakarta.transaction.Transactional;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.JsonNode;
 
 @Service
-@Slf4j
-@RequiredArgsConstructor
 public class RetroSessionService {
+    private static final Logger log = LoggerFactory.getLogger(RetroSessionService.class);
+
     private final RetroSessionRepository sessionRepository;
     private final RetroTemplateService retroTemplateService;
     private final RetroStepRepository stepRepository;
     private final ParticipantResponseRepository responseRepository;
     private final ParticipantService participantService;
+    private final AuthService authService;
     private final EventService eventService;
+    private final RetroSyncVersionService retroSyncVersionService;
     private final ObjectMapper objectMapper;
+
+    public RetroSessionService(
+            RetroSessionRepository sessionRepository,
+            RetroTemplateService retroTemplateService,
+            RetroStepRepository stepRepository,
+            ParticipantResponseRepository responseRepository,
+            ParticipantService participantService,
+            AuthService authService,
+            EventService eventService,
+            RetroSyncVersionService retroSyncVersionService,
+            ObjectMapper objectMapper) {
+        this.sessionRepository = sessionRepository;
+        this.retroTemplateService = retroTemplateService;
+        this.stepRepository = stepRepository;
+        this.responseRepository = responseRepository;
+        this.participantService = participantService;
+        this.authService = authService;
+        this.eventService = eventService;
+        this.retroSyncVersionService = retroSyncVersionService;
+        this.objectMapper = objectMapper;
+    }
 
     @Transactional
     public RetroSession createNewSession(String sessionName) {
@@ -53,6 +78,7 @@ public class RetroSessionService {
         session.setPhase(RetroPhase.LOBBY);
 
         RetroSession savedSession = sessionRepository.save(session);
+        retroSyncVersionService.bumpSyncVersion(savedSession.getId());
 
         // Publish RETRO_CREATED event to establish SSE connection immediately
         eventService.publish(RetroEvent.retroCreated(savedSession.getId(), "system"));
@@ -73,6 +99,9 @@ public class RetroSessionService {
 
         // Step 2: Create the retro session (publishes RETRO_CREATED event)
         RetroSession session = createNewSession(sessionName);
+        Optional.ofNullable(authService.findSingleManagedTeam(request))
+                .orElseGet(Optional::empty)
+                .ifPresent(session::setTeam);
         log.info("Created new retro session: {} (id: {})", session.getName(), session.getId());
 
         // Step 3: Add creator as facilitator (publishes PARTICIPANT_JOINED event)
@@ -87,6 +116,7 @@ public class RetroSessionService {
         RetroSession session = getSessionOrThrow(sessionId);
         session.setPhase(RetroPhase.SET_THE_STAGE);
         sessionRepository.save(session);
+        retroSyncVersionService.bumpSyncVersion(sessionId);
 
         // Start first step
         advanceToNextStep(sessionId);
@@ -255,6 +285,7 @@ public class RetroSessionService {
         if (session.getTimerPausedAt() == null) {
             session.setTimerPausedAt(LocalDateTime.now());
             sessionRepository.save(session);
+            retroSyncVersionService.bumpSyncVersion(sessionId);
             eventService.publish(RetroEvent.timerPaused(sessionId));
         }
     }
@@ -268,6 +299,7 @@ public class RetroSessionService {
             session.setAccumulatedPauseSeconds(accumulated);
             session.setTimerPausedAt(null);
             sessionRepository.save(session);
+            retroSyncVersionService.bumpSyncVersion(sessionId);
             eventService.publish(RetroEvent.timerStarted(sessionId));
         }
     }
@@ -378,6 +410,7 @@ public class RetroSessionService {
         }
 
         sessionRepository.save(session);
+        retroSyncVersionService.bumpSyncVersion(sessionId);
 
         // Publish step_advanced event (must be within transaction for @TransactionalEventListener)
         eventService.publish(RetroEvent.stepAdvanced(sessionId));

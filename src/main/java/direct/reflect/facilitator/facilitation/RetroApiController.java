@@ -31,6 +31,7 @@ import direct.reflect.facilitator.facilitation.dto.AssistantStateDto;
 import direct.reflect.facilitator.facilitation.dto.RetroStateDto;
 import direct.reflect.facilitator.facilitation.dto.StepSummaryDto;
 import direct.reflect.facilitator.facilitation.dto.ParticipantDto;
+import direct.reflect.facilitator.facilitation.dto.SyncVersionedResponse;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponse;
 import direct.reflect.facilitator.facilitation.response.ResponseService;
 import direct.reflect.facilitator.configurator.RetroStep;
@@ -47,9 +48,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 
 import jakarta.validation.Valid;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,15 +58,31 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/retro")
-@RequiredArgsConstructor
-@Slf4j
 @Tag(name = "Retro API", description = "Retrospective session management and participant responses")
 public class RetroApiController {
+    private static final Logger log = LoggerFactory.getLogger(RetroApiController.class);
+
     private final RetroSessionService retroService;
     private final ParticipantService participantService;
     private final EventService eventService;
     private final ResponseService responseService;
     private final RetroStepRepository stepRepository;
+    private final RetroSyncVersionService retroSyncVersionService;
+
+    public RetroApiController(
+            RetroSessionService retroService,
+            ParticipantService participantService,
+            EventService eventService,
+            ResponseService responseService,
+            RetroStepRepository stepRepository,
+            RetroSyncVersionService retroSyncVersionService) {
+        this.retroService = retroService;
+        this.participantService = participantService;
+        this.eventService = eventService;
+        this.responseService = responseService;
+        this.stepRepository = stepRepository;
+        this.retroSyncVersionService = retroSyncVersionService;
+    }
 
     @PostMapping(value = "/create", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
@@ -471,7 +487,7 @@ public class RetroApiController {
 
      @GetMapping("/{retroId}/timer")
      @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-     public ResponseEntity<TimerStateDto> getTimerState(
+     public ResponseEntity<SyncVersionedResponse<TimerStateDto>> getTimerState(
              @PathVariable UUID retroId,
              HttpServletRequest httpRequest) {
          
@@ -484,16 +500,17 @@ public class RetroApiController {
              return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
          }
          
-         TimerStateDto state = retroService.getTimerState(retroId);
-         if (state == null) {
-             log.debug("No timer for current step in retro: {}", retroId);
-             return ResponseEntity.noContent().build();
-         }
-         
-         log.debug("Returning timer state for retro: {} - remaining: {}s, paused: {}", 
-             retroId, state.remainingSeconds(), state.isPaused());
-         return ResponseEntity.ok(state);
-     }
+          TimerStateDto state = retroService.getTimerState(retroId);
+          if (state == null) {
+              log.debug("No timer for current step in retro: {}", retroId);
+              return ResponseEntity.noContent().build();
+          }
+
+          long syncVersion = retroSyncVersionService.getSyncVersion(retroId);
+          log.debug("Returning timer state for retro: {} - remaining: {}s, paused: {}", 
+              retroId, state.remainingSeconds(), state.isPaused());
+          return ResponseEntity.ok(new SyncVersionedResponse<>(syncVersion, state));
+      }
 
      @PostMapping("/{retroId}/timer/pause")
      @PreAuthorize("hasAnyRole('USER', 'GUEST')")
@@ -596,9 +613,11 @@ public class RetroApiController {
             boolean isFacilitator = currentParticipant.getRole() == ParticipantRole.FACILITATOR;
 
             AssistantStateDto assistantState = retroService.getAssistantHistory(retroId);
+            long syncVersion = retroSyncVersionService.getSyncVersion(retroId);
 
             RetroStateDto dto = new RetroStateDto(
                 session.getId(),
+                syncVersion,
                 session.getPhase().name(),
                 currentStepId,
                 session.getCurrentStepIndex(),
@@ -623,13 +642,14 @@ public class RetroApiController {
 
     @GetMapping("/{retroId}/participants")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    public ResponseEntity<List<ParticipantDto>> getParticipants(
+    public ResponseEntity<SyncVersionedResponse<List<ParticipantDto>>> getParticipants(
             @PathVariable UUID retroId,
             HttpServletRequest httpRequest) {
 
         try {
             participantService.getParticipantForSession(httpRequest, retroId);
 
+            long syncVersion = retroSyncVersionService.getSyncVersion(retroId);
             List<ParticipantDto> participants = participantService.getSessionParticipants(retroId)
                 .stream()
                 .map(p -> new ParticipantDto(
@@ -639,7 +659,7 @@ public class RetroApiController {
                 ))
                 .toList();
 
-            return ResponseEntity.ok(participants);
+            return ResponseEntity.ok(new SyncVersionedResponse<>(syncVersion, participants));
 
         } catch (ParticipantNotFoundException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();

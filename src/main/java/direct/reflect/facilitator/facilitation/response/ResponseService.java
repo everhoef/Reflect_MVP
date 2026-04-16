@@ -6,6 +6,7 @@ import direct.reflect.facilitator.facilitation.RetroSession;
 import direct.reflect.facilitator.facilitation.Participant;
 import direct.reflect.facilitator.facilitation.ParticipantService;
 import direct.reflect.facilitator.facilitation.RetroSessionService;
+import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
 import direct.reflect.facilitator.facilitation.dto.ComponentResponseDto;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.RetroStage;
@@ -30,21 +31,36 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 @Transactional
-@RequiredArgsConstructor
-@Slf4j
 public class ResponseService {
+
+    private static final Logger log = LoggerFactory.getLogger(ResponseService.class);
 
     private final ParticipantResponseRepository responseRepository;
     private final RetroStepRepository retroStepRepository;
     private final EventService eventService;
     private final RetroSessionService retroSessionService;
     private final ParticipantService participantService;
+    private final RetroSyncVersionService retroSyncVersionService;
+
+    public ResponseService(
+            ParticipantResponseRepository responseRepository,
+            RetroStepRepository retroStepRepository,
+            EventService eventService,
+            RetroSessionService retroSessionService,
+            ParticipantService participantService,
+            RetroSyncVersionService retroSyncVersionService) {
+        this.responseRepository = responseRepository;
+        this.retroStepRepository = retroStepRepository;
+        this.eventService = eventService;
+        this.retroSessionService = retroSessionService;
+        this.participantService = participantService;
+        this.retroSyncVersionService = retroSyncVersionService;
+    }
 
     /**
      * Polymorphic method accepting ComponentResponseDto.
@@ -142,6 +158,7 @@ public class ResponseService {
         }
 
         ParticipantResponse savedResponse = responseRepository.save(response);
+        retroSyncVersionService.bumpSyncVersion(session.getId());
         publishResponseSubmittedEvent(session.getId(), savedResponse);
 
         return savedResponse;
@@ -160,6 +177,7 @@ public class ResponseService {
         response.setEditedAt(LocalDateTime.now());
 
         ParticipantResponse saved = responseRepository.save(response);
+        retroSyncVersionService.bumpSyncVersion(response.getParticipant().getSession().getId());
         log.info("Updated response {} by participant {}", responseId, participant.getDisplayName());
 
         publishResponseSubmittedEvent(response.getParticipant().getSession().getId(), saved);
@@ -201,6 +219,7 @@ public class ResponseService {
         List<ParticipantResponse> responses = responseRepository.findBySessionAndRetroStep(session, step);
         responses.forEach(response -> response.setIsVisible(true));
         responseRepository.saveAll(responses);
+        retroSyncVersionService.bumpSyncVersion(session.getId());
 
         log.info("Revealed {} responses for step {} in session {}", responses.size(), stepId, session.getId());
 
@@ -280,6 +299,7 @@ public class ResponseService {
 
         response.setEditedAt(LocalDateTime.now());
         ParticipantResponse saved = responseRepository.save(response);
+        retroSyncVersionService.bumpSyncVersion(retroId);
 
         // Publish event to refresh UI for all participants
         publishResponseSubmittedEvent(retroId, saved);

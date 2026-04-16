@@ -3,13 +3,14 @@ package direct.reflect.facilitator.eventing;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.UUID;
 
@@ -35,14 +36,21 @@ class EventServiceTest {
     private ApplicationEventPublisher applicationEventPublisher;
 
     @Mock
-    private direct.reflect.facilitator.facilitation.ParticipantService participantService;
+    private ObjectMapper objectMapper;
 
-    @InjectMocks
+    @Mock
+    private RetroSyncVersionService retroSyncVersionService;
+
     private EventService eventService;
     private UUID testRetroId;
 
     @BeforeEach
     void setUp() {
+        eventService = new EventService(
+                redisTemplate,
+                objectMapper,
+                applicationEventPublisher,
+                retroSyncVersionService);
         testRetroId = UUID.randomUUID();
         ReflectionTestUtils.setField(eventService, "sseTimeoutMs", 3600000L);
     }
@@ -167,5 +175,33 @@ class EventServiceTest {
 
         // Assert - verify both events are published to ApplicationEventPublisher (transaction-aware)
         verify(applicationEventPublisher, times(2)).publishEvent(any(RetroEvent.class));
+    }
+
+    @Test
+    void shouldCreateSseEnvelopeWithAuthoritativeSyncVersion() {
+        when(retroSyncVersionService.getSyncVersion(testRetroId)).thenReturn(14L);
+
+        RetroEvent<String> event = RetroEvent.participantJoined(testRetroId, "Alice");
+
+        RetroSseEnvelope<?> envelope = eventService.toSseEnvelope(event);
+
+        assertThat(envelope.syncVersion()).isEqualTo(14L);
+        assertThat(envelope.payload()).isEqualTo("Alice");
+    }
+
+    @Test
+    void shouldSerializeCurrentSyncVersionIntoSseTransportEnvelope() {
+        UUID participantId = UUID.randomUUID();
+        RetroEvent<String> event = RetroEvent.participantJoined(testRetroId, "Alice");
+
+        when(retroSyncVersionService.getSyncVersion(testRetroId)).thenReturn(22L);
+        when(objectMapper.writeValueAsString(any())).thenReturn("{\"syncVersion\":22,\"payload\":\"Alice\"}");
+
+        eventService.createSseEmitter(testRetroId, participantId, "Test User");
+        ReflectionTestUtils.invokeMethod(eventService, "sendToLocalEmitters", testRetroId, event);
+
+        verify(objectMapper).writeValueAsString(argThat(argument -> argument instanceof RetroSseEnvelope<?> envelope
+                && envelope.syncVersion() == 22L
+                && "Alice".equals(envelope.payload())));
     }
 }

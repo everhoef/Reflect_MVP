@@ -1,14 +1,14 @@
 package direct.reflect.facilitator.eventing;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -30,13 +30,25 @@ import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
-@Slf4j
 public class EventService {
+    private static final Logger log = LoggerFactory.getLogger(EventService.class);
+
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final RetroSyncVersionService retroSyncVersionService;
     private final AtomicInteger activeConnections = new AtomicInteger(0);
+
+    public EventService(
+            RedisTemplate<String, Object> redisTemplate,
+            ObjectMapper objectMapper,
+            ApplicationEventPublisher applicationEventPublisher,
+            RetroSyncVersionService retroSyncVersionService) {
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
+        this.applicationEventPublisher = applicationEventPublisher;
+        this.retroSyncVersionService = retroSyncVersionService;
+    }
 
     @Value("${facilitator.sse.timeout-ms:3600000}")
     private long sseTimeoutMs;
@@ -226,7 +238,7 @@ public class EventService {
 
         String eventData;
         try {
-            eventData = event.payload() != null ? objectMapper.writeValueAsString(event.payload()) : "null";
+            eventData = objectMapper.writeValueAsString(toSseEnvelope(event));
         } catch (JacksonException e) {
             log.error("[{}] Failed to serialize payload for event type {}: {}",
                 event.correlationId(), event.type(), e.getMessage());
@@ -258,6 +270,11 @@ public class EventService {
 
         log.debug("[{}] Broadcast completed: {} succeeded, {} failed",
             event.correlationId(), successCount, failureCount);
+    }
+
+    RetroSseEnvelope<?> toSseEnvelope(RetroEvent<?> event) {
+        long syncVersion = retroSyncVersionService.getSyncVersion(event.retroId());
+        return new RetroSseEnvelope<>(syncVersion, event.payload());
     }
     
     /**

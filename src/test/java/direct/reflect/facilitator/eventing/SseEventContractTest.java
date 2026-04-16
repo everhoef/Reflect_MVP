@@ -219,4 +219,16 @@ class SseEventContractTest {
         assertThat(envelope.get("type").asText()).isEqualTo("NOTE_ADDED");
         assertThat(envelope.get("payload").has("responseId")).isTrue();
     }
+
+    @Test
+    @DisplayName("SSE transport envelope serializes syncVersion plus existing payload")
+    void sseTransportEnvelope_serializesSyncVersionAndPayload() throws Exception {
+        RetroSseEnvelope<String> envelope = new RetroSseEnvelope<>(17L, "Alice");
+
+        String json = objectMapper.writeValueAsString(envelope);
+
+        JsonNode node = objectMapper.readTree(json);
+        assertThat(node.get("syncVersion").asLong()).isEqualTo(17L);
+        assertThat(node.get("payload").asText()).isEqualTo("Alice");
+    }
 }

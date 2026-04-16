@@ -83,6 +83,9 @@ public class RetroApiControllerTest {
     @MockitoBean
     private direct.reflect.facilitator.configurator.RetroStepRepository stepRepository;
 
+    @MockitoBean
+    private RetroSyncVersionService retroSyncVersionService;
+
     @BeforeEach
     void setUpDefaultMocks() {
         ParticipantResponse defaultResponse = new ParticipantResponse();
@@ -506,13 +509,15 @@ public class RetroApiControllerTest {
         TimerStateDto timerState = new TimerStateDto(300, false, "green");
         
         when(retroSessionService.getTimerState(retroId)).thenReturn(timerState);
+        when(retroSyncVersionService.getSyncVersion(retroId)).thenReturn(12L);
 
         // Act & Assert
         mockMvc.perform(get("/api/retro/{retroId}/timer", retroId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.remainingSeconds").value(300))
-                .andExpect(jsonPath("$.isPaused").value(false))
-                .andExpect(jsonPath("$.state").value("green"));
+                .andExpect(jsonPath("$.syncVersion").value(12))
+                .andExpect(jsonPath("$.data.remainingSeconds").value(300))
+                .andExpect(jsonPath("$.data.isPaused").value(false))
+                .andExpect(jsonPath("$.data.state").value("green"));
     }
 
     @Test
@@ -899,10 +904,12 @@ public class RetroApiControllerTest {
         when(retroSessionService.getCurrentStep(retroId)).thenReturn(null);
         when(participantService.getSessionParticipants(retroId)).thenReturn(List.of(mockParticipant));
         when(retroSessionService.getAssistantHistory(retroId)).thenReturn(assistantState);
+        when(retroSyncVersionService.getSyncVersion(retroId)).thenReturn(21L);
 
         mockMvc.perform(get("/api/retro/{retroId}/state", retroId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.retroId").value(retroId.toString()))
+                .andExpect(jsonPath("$.syncVersion").value(21))
                 .andExpect(jsonPath("$.assistantState").exists())
                 .andExpect(jsonPath("$.assistantState.history").isArray());
     }
@@ -914,5 +921,33 @@ public class RetroApiControllerTest {
         mockMvc.perform(get("/api/retro/{retroId}/state", retroId)
                 .with(anonymous()))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void getParticipants_ValidParticipant_ShouldReturnSyncVersionedParticipants() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Participant facilitator = new Participant();
+        facilitator.setParticipantId(UUID.randomUUID());
+        facilitator.setDisplayName("Facilitator");
+        facilitator.setRole(ParticipantRole.FACILITATOR);
+
+        Participant participant = new Participant();
+        participant.setParticipantId(UUID.randomUUID());
+        participant.setDisplayName("Participant");
+        participant.setRole(ParticipantRole.PARTICIPANT);
+
+        when(participantService.getParticipantForSession(any(HttpServletRequest.class), eq(retroId)))
+            .thenReturn(facilitator);
+        when(participantService.getSessionParticipants(retroId)).thenReturn(List.of(facilitator, participant));
+        when(retroSyncVersionService.getSyncVersion(retroId)).thenReturn(34L);
+
+        mockMvc.perform(get("/api/retro/{retroId}/participants", retroId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.syncVersion").value(34))
+                .andExpect(jsonPath("$.data[0].displayName").value("Facilitator"))
+                .andExpect(jsonPath("$.data[0].role").value("FACILITATOR"))
+                .andExpect(jsonPath("$.data[1].displayName").value("Participant"))
+                .andExpect(jsonPath("$.data[1].role").value("PARTICIPANT"));
     }
 }

@@ -46,6 +46,9 @@ public class RetroSession {
 
   private int currentStepIndex = -1;
 
+  @Column(nullable = false)
+  private Long syncVersion = 0L;
+
   @Enumerated(EnumType.STRING)
   private RetroPhase phase = RetroPhase.CREATED;
 
@@ -59,6 +62,14 @@ public class RetroSession {
 
   public void setName(String name) {
     this.name = name;
+  }
+
+  public Long getSyncVersion() {
+    return syncVersion;
+  }
+
+  public void setSyncVersion(Long syncVersion) {
+    this.syncVersion = syncVersion;
   }
 
   public boolean isFinished() {

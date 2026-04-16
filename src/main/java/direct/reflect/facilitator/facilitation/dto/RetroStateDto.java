@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record RetroStateDto(
     UUID retroId,
+    long syncVersion,
     String phase,
     Long currentStepId,
     int currentStepIndex,
