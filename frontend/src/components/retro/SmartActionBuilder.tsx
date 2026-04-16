@@ -1,33 +1,59 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Card } from "@/components/ui/card";
 import { useActionItems } from "@/hooks/api/useActionItems";
+import { useEscalations } from "@/hooks/api/useEscalations";
 import type { ActionItemDto, CreateActionItemRequest, UpdateActionItemRequest } from "@/hooks/api/useActionItems";
 import { useSSESubscription } from "@/hooks/useSSEContext";
 import { EventType } from "@/types/events";
 import type { StepComponentProps } from "@/components/ComponentRouter";
 import { toast } from "sonner";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, AlertCircle } from "lucide-react";
+import { EscalationVote } from "./EscalationVote";
 
 // Form Schema
-const actionItemSchema = z.object({
+const baseActionItemSchema = z.object({
   what: z.string().min(1, "What is required"),
   who: z.string().min(1, "Who is required"),
   dueDate: z.string().min(1, "Due Date is required"),
   successCriteria: z.string().optional(),
   escalated: z.boolean().optional(),
+  wasEscalated: z.boolean().optional(),
+  problemDescription: z.string().optional(),
 });
 
+const actionItemSchema = baseActionItemSchema.refine(
+  data => !data.escalated || data.wasEscalated || (data.escalated && data.problemDescription && data.problemDescription.length > 0), 
+  {
+    message: "Problem description is required when escalating",
+    path: ["problemDescription"]
+  }
+);
+
 type ActionItemFormValues = z.infer<typeof actionItemSchema>;
+
+function getErrorMessage(error: unknown, fallbackMessage: string): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return fallbackMessage;
+}
 
 export function SmartActionBuilder({ retroId, componentConfig }: StepComponentProps) {
   const capabilities = componentConfig?.capabilities as Record<string, unknown> | undefined;
   const allowEscalation = Boolean(componentConfig?.allowEscalation || capabilities?.allowEscalation);
 
-  const { data: actionItems, invalidate, createActionItem, updateActionItem, deleteActionItem } = useActionItems(retroId);
+  const { data: actionItems, invalidate: invalidateActions, createActionItem, updateActionItem, deleteActionItem } = useActionItems(retroId);
+  const { escalations, escalateAction, toggleVote, isVoting, getKnownVoteState, invalidate: invalidateEscalations } = useEscalations(retroId);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const invalidateEscalationLiveState = () => {
+    invalidateActions();
+    invalidateEscalations();
+  };
 
   const form = useForm<ActionItemFormValues>({
     resolver: zodResolver(actionItemSchema),
@@ -37,7 +63,14 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
       dueDate: "",
       successCriteria: "",
       escalated: false,
+      wasEscalated: false,
+      problemDescription: "",
     },
+  });
+
+  const isEscalated = useWatch({
+    control: form.control,
+    name: "escalated",
   });
 
   const editForm = useForm<ActionItemFormValues>({
@@ -45,9 +78,11 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
   });
 
   // SSE Subscriptions
-  useSSESubscription(EventType.ACTION_CREATED, invalidate);
-  useSSESubscription(EventType.ACTION_UPDATED, invalidate);
-  useSSESubscription(EventType.ACTION_DELETED, invalidate);
+  useSSESubscription(EventType.ACTION_CREATED, invalidateActions);
+  useSSESubscription(EventType.ACTION_UPDATED, invalidateActions);
+  useSSESubscription(EventType.ACTION_DELETED, invalidateActions);
+  useSSESubscription(EventType.ESCALATION_CREATED, invalidateEscalationLiveState);
+  useSSESubscription(EventType.ESCALATION_VOTE_UPDATED, invalidateEscalations);
 
   const onSubmit = async (values: ActionItemFormValues) => {
     try {
@@ -59,12 +94,25 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
       if (values.successCriteria) {
         payload.successCriteria = values.successCriteria;
       }
-      // Note: escalated is present in form but omitted from payload as backend doesn't support it yet
-      await createActionItem(payload);
+      
+      const createdItem = await createActionItem(payload);
+      
+      if (values.escalated && values.problemDescription && createdItem?.id) {
+        try {
+          await escalateAction({
+            actionId: createdItem.id as string,
+            problemDescription: values.problemDescription
+          });
+        } catch (escalateErr: unknown) {
+          toast.error(getErrorMessage(escalateErr, "Action created, but failed to escalate"));
+          return;
+        }
+      }
+      
       form.reset();
       toast.success("Action item created");
-    } catch (e) {
-      toast.error("Failed to create action item");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to create action item"));
     }
   };
 
@@ -83,10 +131,24 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
         actionId: editingId,
         req: payload,
       });
+
+      const itemWasAlreadyEscalated = actionItems?.find(a => a.id === editingId)?.escalated;
+      if (values.escalated && !itemWasAlreadyEscalated && values.problemDescription) {
+        try {
+          await escalateAction({
+            actionId: editingId,
+            problemDescription: values.problemDescription
+          });
+        } catch (escalateErr: unknown) {
+          toast.error(getErrorMessage(escalateErr, "Action updated, but failed to escalate"));
+          return;
+        }
+      }
+
       setEditingId(null);
       toast.success("Action item updated");
-    } catch (e) {
-      toast.error("Failed to update action item");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to update action item"));
     }
   };
 
@@ -109,6 +171,8 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
       dueDate: item.dueDate || "",
       successCriteria: item.successCriteria || "",
       escalated: item.escalated || false,
+      wasEscalated: item.escalated || false,
+      problemDescription: "",
     });
   };
 
@@ -168,17 +232,32 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
             </div>
             
             {allowEscalation && (
-              <div className="flex flex-col justify-center gap-1">
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer w-fit" data-testid="escalation-toggle-label">
-                  <input
-                    type="checkbox"
-                    {...form.register("escalated")}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    data-testid="escalation-toggle"
-                  />
-                  Escalate to Management
-                </label>
-                <p className="text-xs text-gray-500">Flag this item as an organizational bottleneck.</p>
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-col justify-center gap-1">
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer w-fit" data-testid="escalation-toggle-label">
+                    <input
+                      type="checkbox"
+                      {...form.register("escalated")}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      data-testid="escalation-toggle"
+                    />
+                    Escalate to Management
+                  </label>
+                  <p className="text-xs text-gray-500">Flag this item as an organizational bottleneck.</p>
+                </div>
+                
+                {isEscalated && (
+                  <div className="flex flex-col gap-1 mt-2">
+                    <label className="text-sm font-medium text-gray-700">Problem Description <span className="text-red-500">*</span></label>
+                    <textarea 
+                      {...form.register("problemDescription")} 
+                      className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                      placeholder="Why does this need management attention? What is the core problem?" 
+                      data-testid="problem-description-input"
+                    />
+                    {form.formState.errors.problemDescription && <p className="text-xs text-red-500">{form.formState.errors.problemDescription.message}</p>}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -230,16 +309,32 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
                   </div>
                   
                   {allowEscalation && (
-                    <div className="flex flex-col justify-center gap-1">
-                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer w-fit" data-testid={`edit-escalation-toggle-label-${item.id}`}>
-                        <input
-                          type="checkbox"
-                          {...editForm.register("escalated")}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          data-testid={`edit-escalation-toggle-${item.id}`}
-                        />
-                        Escalate to Management
-                      </label>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-col justify-center gap-1">
+                        <label className={`flex items-center gap-2 text-sm font-medium cursor-pointer w-fit ${item.escalated ? 'text-gray-400' : 'text-gray-700'}`} data-testid={`edit-escalation-toggle-label-${item.id}`}>
+                          <input
+                            type="checkbox"
+                            {...editForm.register("escalated")}
+                            disabled={item.escalated}
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                            data-testid={`edit-escalation-toggle-${item.id}`}
+                          />
+                          {item.escalated ? "Already Escalated" : "Escalate to Management"}
+                        </label>
+                      </div>
+                      
+                      {!item.escalated && editForm.watch("escalated") && (
+                        <div className="flex flex-col gap-1 mt-1">
+                          <label className="text-sm font-medium text-gray-700">Problem Description <span className="text-red-500">*</span></label>
+                          <textarea 
+                            {...editForm.register("problemDescription")} 
+                            className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                            placeholder="Why does this need management attention? What is the core problem?" 
+                            data-testid={`edit-problem-description-${item.id}`}
+                          />
+                          {editForm.formState.errors.problemDescription && <p className="text-xs text-red-500">{editForm.formState.errors.problemDescription.message}</p>}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -276,6 +371,13 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
                       </div>
                     )}
                   </div>
+                  
+                  {item.escalated && (
+                    <div className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>This action item has been escalated.</span>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex gap-2 shrink-0">
@@ -301,6 +403,30 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
           </Card>
         ))}
       </div>
+
+      {/* Escalations List */}
+      {allowEscalation && escalations && escalations.length > 0 && (
+        <div className="flex flex-col gap-3 mt-4 w-full">
+          <h3 className="text-lg font-medium text-gray-800">Management Escalations</h3>
+          <div className="flex flex-col gap-2">
+            {escalations.map(esc => (
+              <EscalationVote 
+                key={esc.id} 
+                escalation={esc} 
+                voted={esc.id ? getKnownVoteState(esc.id) : undefined}
+                isVoting={isVoting}
+                onToggleVote={() => {
+                  if (esc.id) {
+                    toggleVote(esc.id).catch(() => {
+                      toast.error("Failed to toggle vote");
+                    });
+                  }
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

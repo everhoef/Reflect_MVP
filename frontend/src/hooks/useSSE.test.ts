@@ -39,6 +39,10 @@ class MockEventSource {
     this.onopen?.()
   }
 
+  triggerError() {
+    this.onerror?.(new Event('error'))
+  }
+
   triggerEvent(type: string, data: string) {
     const listeners = this.namedListeners.get(type) ?? []
     const event = new MessageEvent(type, { data })
@@ -75,9 +79,14 @@ function latestInstance(): MockEventSource {
 }
 
 describe('useSSE', () => {
-  it('does not create an EventSource when retroId is undefined', () => {
-    renderHook(() => useSSE(undefined, {}))
+  it('returns idle transport state when retroId is undefined', () => {
+    const { result } = renderHook(() => useSSE(undefined, {}))
     expect(MockEventSource.instances).toHaveLength(0)
+    expect(result.current).toEqual({
+      signaledVersion: null,
+      connectionState: 'idle',
+      openCount: 0,
+    })
   })
 
   it('creates an EventSource with the correct URL when retroId is present', () => {
@@ -94,25 +103,98 @@ describe('useSSE', () => {
     }
   })
 
-  it('calls the matching handler with raw payload when a named event is emitted', () => {
+  it('unwraps the SSE transport envelope and passes the payload raw string to the handler', () => {
     const handler = vi.fn()
-    renderHook(() =>
+    const { result } = renderHook(() =>
       useSSE('retro-123', { [EventType.NOTE_ADDED]: handler })
     )
     act(() => {
-      latestInstance().triggerEvent(EventType.NOTE_ADDED, '{"responseId":"abc"}')
+      latestInstance().triggerEvent(
+        EventType.NOTE_ADDED,
+        '{"syncVersion":12,"payload":{"responseId":"abc"}}'
+      )
     })
     expect(handler).toHaveBeenCalledOnce()
     expect(handler).toHaveBeenCalledWith('{"responseId":"abc"}')
+    expect(result.current.signaledVersion).toBe(12)
+  })
+
+  it('preserves null payloads when the SSE transport envelope is emitted', () => {
+    const handler = vi.fn()
+    renderHook(() =>
+      useSSE('retro-123', { [EventType.STEP_ADVANCED]: handler })
+    )
+
+    act(() => {
+      latestInstance().triggerEvent(
+        EventType.STEP_ADVANCED,
+        '{"syncVersion":15,"payload":null}'
+      )
+    })
+
+    expect(handler).toHaveBeenCalledOnce()
+    expect(handler).toHaveBeenCalledWith('null')
   })
 
   it('calls onConnected when onopen fires', () => {
     const onConnected = vi.fn()
-    renderHook(() => useSSE('retro-123', {}, onConnected))
+    const { result } = renderHook(() => useSSE('retro-123', {}, onConnected))
     act(() => {
       latestInstance().triggerOpen()
     })
     expect(onConnected).toHaveBeenCalledOnce()
+    expect(result.current.connectionState).toBe('open')
+    expect(result.current.openCount).toBe(1)
+  })
+
+  it('tracks reconnect transitions after error then open', () => {
+    const { result } = renderHook(() => useSSE('retro-123', {}))
+
+    expect(result.current.connectionState).toBe('connecting')
+    expect(result.current.openCount).toBe(0)
+
+    act(() => {
+      latestInstance().triggerOpen()
+    })
+
+    expect(result.current.connectionState).toBe('open')
+    expect(result.current.openCount).toBe(1)
+
+    act(() => {
+      latestInstance().triggerError()
+    })
+
+    expect(result.current.connectionState).toBe('connecting')
+    expect(result.current.openCount).toBe(1)
+
+    act(() => {
+      latestInstance().triggerOpen()
+    })
+
+    expect(result.current.connectionState).toBe('open')
+    expect(result.current.openCount).toBe(2)
+  })
+
+  it('keeps signaledVersion monotonic when older envelopes arrive later', () => {
+    const { result } = renderHook(() => useSSE('retro-123', {}))
+
+    act(() => {
+      latestInstance().triggerEvent(
+        EventType.STEP_ADVANCED,
+        '{"syncVersion":9,"payload":null}'
+      )
+    })
+
+    expect(result.current.signaledVersion).toBe(9)
+
+    act(() => {
+      latestInstance().triggerEvent(
+        EventType.STEP_ADVANCED,
+        '{"syncVersion":4,"payload":null}'
+      )
+    })
+
+    expect(result.current.signaledVersion).toBe(9)
   })
 
   it('calls close() on unmount', () => {

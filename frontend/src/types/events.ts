@@ -1,6 +1,11 @@
 import type { ResponseData } from './generated/retro-event';
 export type { ResponseData };
 
+export interface RetroSseSignalEnvelope<TPayload = unknown> {
+  syncVersion: number;
+  payload: TPayload;
+}
+
 /**
  * SSE event types for Facilitator retrospective sessions.
  *
@@ -26,9 +31,11 @@ export const EventType = {
   ACTION_CREATED: "action_created",
   ACTION_UPDATED: "action_updated",
   ACTION_DELETED: "action_deleted",
+  ESCALATION_CREATED: "escalation_created",
   TIMER_STARTED: "timer_started",
   TIMER_PAUSED: "timer_paused",
   TIMER_FINISHED: "timer_finished",
+  ESCALATION_VOTE_UPDATED: "escalation_vote_updated",
 } as const;
 
 export type EventType = (typeof EventType)[keyof typeof EventType];
@@ -92,6 +99,8 @@ export type GroupDeletedEvent = RetroSseEvent<unknown>; // future
 export type ActionCreatedEvent = RetroSseEvent<unknown>; // future
 export type ActionUpdatedEvent = RetroSseEvent<unknown>; // future
 export type ActionDeletedEvent = RetroSseEvent<unknown>; // future
+export type EscalationCreatedEvent = RetroSseEvent<string>;
 export type TimerStartedEvent = RetroSseEvent<null>;
 export type TimerPausedEvent = RetroSseEvent<null>;
 export type TimerFinishedEvent = RetroSseEvent<null>;
+export type EscalationVoteUpdatedEvent = RetroSseEvent<unknown>; // future

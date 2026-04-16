@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSSE } from "@/hooks/useSSE";
@@ -9,13 +9,15 @@ import { Coachmark } from "@/components/retro/Coachmark";
 import { TimerCountdown } from "@/components/retro/TimerCountdown";
 import { SSEProvider } from "@/contexts/SSEContext";
 import { useSSEContextDispatch } from "@/hooks/useSSEContext";
-import { useRetroState, useParticipants, useNextStep, useStartSession, useTimer, usePauseTimer, useResumeTimer } from "@/hooks/api/useRetro";
+import { useAppliedVersion, useParticipants, useNextStep, useRetroState, useStartSession, useTimer, usePauseTimer, useResumeTimer, fetchParticipants, fetchRetroState, fetchTimerState } from "@/hooks/api/useRetro";
 import { useTimerState } from "@/hooks/useRetroState";
 import { ApiError } from "@/lib/api-client";
 import { useRetroStateStore } from "@/store/retroStore";
 import { useAssistantStore } from "@/store/assistantStore";
 import type { AssistantState } from "@/types/assistantState";
 import type { components } from "@/types/api.d.ts";
+import { fetchActionItems } from "@/hooks/api/useActionItems";
+import { useEscalations, fetchEscalations } from "@/hooks/api/useEscalations";
 
 const FACILITATOR_FALLBACK_COACHING_NOTE =
   "Click Next when ready to advance the room to the next step.";
@@ -33,6 +35,7 @@ interface StepSummaryDto {
 
 interface RetroState {
   retroId: string;
+  syncVersion: number | null;
   phase: string;
   currentStepId: number | null;
   currentStepIndex: number;
@@ -42,6 +45,10 @@ interface RetroState {
   participantCount: number;
   assistantState: AssistantState | null;
 }
+
+type RetroStateDtoWithSyncVersion = components["schemas"]["RetroStateDto"] & {
+  syncVersion?: number | null;
+};
 
 function normalizeStep(s: components["schemas"]["StepSummaryDto"]): StepSummaryDto {
   return {
@@ -78,9 +85,10 @@ function normalizeAssistantState(
   };
 }
 
-function normalizeState(raw: components["schemas"]["RetroStateDto"]): RetroState {
+function normalizeState(raw: RetroStateDtoWithSyncVersion): RetroState {
   return {
     retroId: raw.retroId ?? "",
+    syncVersion: raw.syncVersion ?? null,
     phase: raw.phase ?? "LOBBY",
     currentStepId: raw.currentStepId ?? null,
     currentStepIndex: raw.currentStepIndex ?? 0,
@@ -118,12 +126,13 @@ function RetroPageInner() {
   const { retroId } = useParams<{ retroId: string }>();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [sseConnected, setSseConnected] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showGuidanceTip, setShowGuidanceTip] = useState(true);
   const [showNextStepTip, setShowNextStepTip] = useState(true);
   const [showNoteInputTip, setShowNoteInputTip] = useState(true);
+  const reconcileInFlightRef = useRef<Promise<number | null> | null>(null);
   const sseDispatch = useSSEContextDispatch();
+  const appliedVersion = useAppliedVersion(retroId);
 
   const handleCopyRetroId = () => {
     if (!retroId) return;
@@ -133,7 +142,11 @@ function RetroPageInner() {
     });
   };
 
-  const { data: rawState, isLoading, error } = useRetroState(retroId);
+  const { data: rawState, isLoading, error } = useRetroState(retroId) as {
+    data: RetroStateDtoWithSyncVersion | undefined;
+    isLoading: boolean;
+    error: unknown;
+  };
 
   const { data: participants = [] } = useParticipants(retroId);
 
@@ -149,6 +162,7 @@ function RetroPageInner() {
   }, [queryClient, retroId]);
 
   const { data: timerData } = useTimer(retroId);
+  useEscalations(retroId);
   const setTimerState = useRetroStateStore((s) => s.setTimerState);
   const clearTimer = useRetroStateStore((s) => s.clearTimer);
   const setCurrentPhase = useRetroStateStore((s) => s.setCurrentPhase);
@@ -186,7 +200,57 @@ function RetroPageInner() {
     }
   }, [rawState, bootstrapAssistant]);
 
-  useSSE(retroId, {
+  const reconcileBundle = useCallback(() => {
+    if (!retroId) {
+      return Promise.resolve<number | null>(null);
+    }
+
+    if (reconcileInFlightRef.current) {
+      return reconcileInFlightRef.current;
+    }
+
+    const promise = (async () => {
+      try {
+        const [nextState] = await Promise.all([
+          queryClient.fetchQuery({
+            queryKey: ["retroState", retroId],
+            staleTime: 0,
+            queryFn: () => fetchRetroState(retroId),
+          }),
+          queryClient.fetchQuery({
+            queryKey: ["participants", retroId],
+            staleTime: 0,
+            queryFn: () => fetchParticipants(retroId),
+          }),
+          queryClient.fetchQuery({
+            queryKey: ["timer", retroId],
+            staleTime: 0,
+            queryFn: () => fetchTimerState(retroId),
+          }),
+          queryClient.fetchQuery({
+            queryKey: ["actionItems", retroId],
+            staleTime: 0,
+            queryFn: () => fetchActionItems(retroId),
+          }),
+          queryClient.fetchQuery({
+            queryKey: ["escalations", retroId],
+            staleTime: 0,
+            queryFn: () => fetchEscalations(retroId),
+          }),
+        ]);
+
+        const nextAppliedVersion = nextState.syncVersion ?? null;
+        return nextAppliedVersion;
+      } finally {
+        reconcileInFlightRef.current = null;
+      }
+    })();
+
+    reconcileInFlightRef.current = promise;
+    return promise;
+  }, [queryClient, retroId]);
+
+  const { signaledVersion, connectionState, openCount } = useSSE(retroId, {
     [EventType.STEP_ADVANCED]: (data) => {
       refreshState();
       void queryClient.invalidateQueries({ queryKey: ["timer", retroId] });
@@ -204,10 +268,30 @@ function RetroPageInner() {
     [EventType.ACTION_CREATED]: (data) => sseDispatch(EventType.ACTION_CREATED, data),
     [EventType.ACTION_UPDATED]: (data) => sseDispatch(EventType.ACTION_UPDATED, data),
     [EventType.ACTION_DELETED]: (data) => sseDispatch(EventType.ACTION_DELETED, data),
+    [EventType.ESCALATION_CREATED]: (data) => sseDispatch(EventType.ESCALATION_CREATED, data),
+    [EventType.ESCALATION_VOTE_UPDATED]: (data) => sseDispatch(EventType.ESCALATION_VOTE_UPDATED, data),
     [EventType.TIMER_STARTED]: () => { void queryClient.invalidateQueries({ queryKey: ["timer", retroId] }); },
     [EventType.TIMER_PAUSED]: () => { void queryClient.invalidateQueries({ queryKey: ["timer", retroId] }); },
     [EventType.TIMER_FINISHED]: () => { void queryClient.invalidateQueries({ queryKey: ["timer", retroId] }); },
-  }, () => setSseConnected(true));
+  });
+
+  useEffect(() => {
+    if (!retroId || openCount === 0) {
+      return;
+    }
+
+    void reconcileBundle();
+  }, [openCount, reconcileBundle, retroId]);
+
+  useEffect(() => {
+    if (signaledVersion == null) {
+      return;
+    }
+
+    if (appliedVersion == null || signaledVersion > appliedVersion) {
+      void reconcileBundle();
+    }
+  }, [appliedVersion, reconcileBundle, signaledVersion]);
 
   const handleNext = () => {
     if (!retroId) return;
@@ -259,7 +343,7 @@ function RetroPageInner() {
       data-testid="retro-content"
       data-step-index={state.currentStepIndex}
       data-phase={state.phase}
-      data-sse-connected={sseConnected ? "true" : "false"}
+      data-sse-connected={connectionState === "open" ? "true" : "false"}
     >
 
       {currentStep && (

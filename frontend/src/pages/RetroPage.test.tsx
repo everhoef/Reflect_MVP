@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import RetroPage from './RetroPage'
 import MainLayout from '@/layouts/MainLayout'
 import { EventType } from '@/types/events'
+import { useAppliedVersionStore } from '@/hooks/api/useRetro'
+import type { UseSSETransportState } from '@/hooks/useSSE'
 import { useSSESubscription } from '@/hooks/useSSEContext'
 import { useRetroStateStore } from '@/store/retroStore'
 import { useAssistantStore } from '@/store/assistantStore'
@@ -15,9 +17,18 @@ type OnConnected = (() => void) | undefined
 interface CapturedSSE {
   handlers: SSEHandlers
   onConnected: OnConnected
+  transportState: UseSSETransportState
 }
 
-const capturedSSE: CapturedSSE = { handlers: {}, onConnected: undefined }
+const capturedSSE: CapturedSSE = {
+  handlers: {},
+  onConnected: undefined,
+  transportState: { signaledVersion: null, connectionState: 'connecting', openCount: 0 },
+}
+
+function setCapturedTransportState(next: Partial<UseSSETransportState>) {
+  capturedSSE.transportState = { ...capturedSSE.transportState, ...next }
+}
 
 vi.mock('@/hooks/useSSE', () => ({
   useSSE: (
@@ -27,6 +38,7 @@ vi.mock('@/hooks/useSSE', () => ({
   ) => {
     capturedSSE.handlers = handlers
     capturedSSE.onConnected = onConnected
+    return capturedSSE.transportState
   },
 }))
 
@@ -59,6 +71,7 @@ const RETRO_ID = 'test-retro-123'
 
 const baseState = {
   retroId: RETRO_ID,
+  syncVersion: 1,
   phase: 'SET_THE_STAGE',
   currentStepId: 1,
   currentStepIndex: 0,
@@ -90,8 +103,8 @@ function buildQueryClient() {
   })
 }
 
-function renderRetroPage(queryClient: QueryClient) {
-  return render(
+function retroPageTree(queryClient: QueryClient) {
+  return (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[`/retro/${RETRO_ID}`]}>
         <Routes>
@@ -100,6 +113,10 @@ function renderRetroPage(queryClient: QueryClient) {
       </MemoryRouter>
     </QueryClientProvider>
   )
+}
+
+function renderRetroPage(queryClient: QueryClient) {
+  return render(retroPageTree(queryClient))
 }
 
 function renderRetroPageWithLayout(queryClient: QueryClient) {
@@ -127,6 +144,15 @@ function mockFetchSuccess(stateOverride?: Partial<typeof baseState>, participant
     if (url.includes('/participants')) {
       return Promise.resolve(new Response(JSON.stringify(participants), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     }
+    if (url.includes('/timer')) {
+      return Promise.resolve(new Response(null, { status: 204 }))
+    }
+    if (url.includes('/actions')) {
+      return Promise.resolve(new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    }
+    if (url.includes('/escalations')) {
+      return Promise.resolve(new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    }
     return Promise.resolve(new Response('{}', { status: 404 }))
   })
 }
@@ -134,9 +160,11 @@ function mockFetchSuccess(stateOverride?: Partial<typeof baseState>, participant
 beforeEach(() => {
   capturedSSE.handlers = {}
   capturedSSE.onConnected = undefined
+  capturedSSE.transportState = { signaledVersion: null, connectionState: 'connecting', openCount: 0 }
   subscriberEvents.length = 0
   vi.restoreAllMocks()
   useAssistantStore.getState().clearAssistant()
+  useAppliedVersionStore.setState({ appliedVersionByRetroId: {} })
 })
 
 describe('RetroPage SSE routing', () => {
@@ -151,19 +179,214 @@ describe('RetroPage SSE routing', () => {
     expect(screen.getByTestId('retro-content')).toHaveAttribute('data-sse-connected', 'false')
   })
 
-  it('sets data-sse-connected=true after onConnected fires', async () => {
+  it('sets data-sse-connected truthfully from transport connection state', async () => {
     mockFetchSuccess()
-    renderRetroPage(buildQueryClient())
+    const queryClient = buildQueryClient()
+    const view = renderRetroPage(queryClient)
 
     await waitFor(() => {
       expect(screen.getByTestId('retro-content')).toBeInTheDocument()
     })
 
-    act(() => {
-      capturedSSE.onConnected?.()
-    })
+    setCapturedTransportState({ connectionState: 'open', openCount: 1 })
+    view.rerender(retroPageTree(queryClient))
 
     expect(screen.getByTestId('retro-content')).toHaveAttribute('data-sse-connected', 'true')
+
+    setCapturedTransportState({ connectionState: 'connecting' })
+    view.rerender(retroPageTree(queryClient))
+
+    expect(screen.getByTestId('retro-content')).toHaveAttribute('data-sse-connected', 'false')
+  })
+
+  it('refetches the bounded bundle on SSE open/reconnect transitions', async () => {
+    const fetchCounts = { state: 0, participants: 0, timer: 0, actions: 0, escalations: 0 }
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (url.includes('/state')) {
+        fetchCounts.state += 1
+        return Promise.resolve(new Response(JSON.stringify(baseState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/participants')) {
+        fetchCounts.participants += 1
+        return Promise.resolve(new Response(JSON.stringify(baseParticipants), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/timer')) {
+        fetchCounts.timer += 1
+        return Promise.resolve(new Response(null, { status: 204 }))
+      }
+      if (url.includes('/actions')) {
+        fetchCounts.actions += 1
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/escalations')) {
+        fetchCounts.escalations += 1
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      return Promise.resolve(new Response('{}', { status: 404 }))
+    })
+
+    const queryClient = buildQueryClient()
+    const view = renderRetroPage(queryClient)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('retro-content')).toBeInTheDocument()
+    })
+
+    const baseline = { ...fetchCounts }
+    setCapturedTransportState({ connectionState: 'open', openCount: 1 })
+    view.rerender(retroPageTree(queryClient))
+
+    await waitFor(() => {
+      expect(fetchCounts.state).toBeGreaterThan(baseline.state)
+      expect(fetchCounts.participants).toBeGreaterThan(baseline.participants)
+      expect(fetchCounts.timer).toBeGreaterThan(baseline.timer)
+      expect(fetchCounts.actions).toBeGreaterThan(baseline.actions)
+      expect(fetchCounts.escalations).toBeGreaterThan(baseline.escalations)
+    })
+  })
+
+  it('refetches the bounded bundle when signaledVersion is ahead of appliedVersion', async () => {
+    let stateSyncVersion = 1
+    const fetchCounts = { state: 0, participants: 0, timer: 0, actions: 0, escalations: 0 }
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (url.includes('/state')) {
+        fetchCounts.state += 1
+        return Promise.resolve(new Response(JSON.stringify({ ...baseState, syncVersion: stateSyncVersion }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/participants')) {
+        fetchCounts.participants += 1
+        return Promise.resolve(new Response(JSON.stringify(baseParticipants), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/timer')) {
+        fetchCounts.timer += 1
+        return Promise.resolve(new Response(null, { status: 204 }))
+      }
+      if (url.includes('/actions')) {
+        fetchCounts.actions += 1
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/escalations')) {
+        fetchCounts.escalations += 1
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      return Promise.resolve(new Response('{}', { status: 404 }))
+    })
+
+    const queryClient = buildQueryClient()
+    const view = renderRetroPage(queryClient)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('retro-content')).toBeInTheDocument()
+    })
+
+    const baseline = { ...fetchCounts }
+    stateSyncVersion = 5
+    setCapturedTransportState({ signaledVersion: 5 })
+    view.rerender(retroPageTree(queryClient))
+
+    await waitFor(() => {
+      expect(fetchCounts.state).toBeGreaterThan(baseline.state)
+      expect(fetchCounts.participants).toBeGreaterThan(baseline.participants)
+      expect(fetchCounts.timer).toBeGreaterThan(baseline.timer)
+      expect(fetchCounts.actions).toBeGreaterThan(baseline.actions)
+      expect(fetchCounts.escalations).toBeGreaterThan(baseline.escalations)
+    })
+  })
+
+  it('reconnect/open recovery converges stale participants from the authoritative bundle', async () => {
+    let participantsState = [{ participantId: 'p1', displayName: 'Alice', role: 'PARTICIPANT' }]
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (url.includes('/state')) {
+        return Promise.resolve(new Response(JSON.stringify(baseState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/participants')) {
+        return Promise.resolve(new Response(JSON.stringify(participantsState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/timer')) {
+        return Promise.resolve(new Response(null, { status: 204 }))
+      }
+      if (url.includes('/actions')) {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/escalations')) {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      return Promise.resolve(new Response('{}', { status: 404 }))
+    })
+
+    const queryClient = buildQueryClient()
+    const view = renderRetroPage(queryClient)
+
+    await waitFor(() => {
+      expect(screen.getByText('Participants (1)')).toBeInTheDocument()
+      expect(screen.getByText('Alice')).toBeInTheDocument()
+    })
+
+    participantsState = [
+      { participantId: 'p1', displayName: 'Alice', role: 'PARTICIPANT' },
+      { participantId: 'p2', displayName: 'Bob', role: 'PARTICIPANT' },
+    ]
+
+    setCapturedTransportState({ connectionState: 'open', openCount: 1 })
+    view.rerender(retroPageTree(queryClient))
+
+    await waitFor(() => {
+      expect(screen.getByText('Participants (2)')).toBeInTheDocument()
+      expect(screen.getByText('Bob')).toBeInTheDocument()
+    })
+  })
+
+  it('version mismatch recovery converges stale participants when signaledVersion moves ahead', async () => {
+    let stateSyncVersion = 1
+    let participantsState = [{ participantId: 'p1', displayName: 'Alice', role: 'PARTICIPANT' }]
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (url.includes('/state')) {
+        return Promise.resolve(new Response(JSON.stringify({ ...baseState, syncVersion: stateSyncVersion }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/participants')) {
+        return Promise.resolve(new Response(JSON.stringify(participantsState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/timer')) {
+        return Promise.resolve(new Response(null, { status: 204 }))
+      }
+      if (url.includes('/actions')) {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (url.includes('/escalations')) {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      return Promise.resolve(new Response('{}', { status: 404 }))
+    })
+
+    const queryClient = buildQueryClient()
+    const view = renderRetroPage(queryClient)
+
+    await waitFor(() => {
+      expect(screen.getByText('Participants (1)')).toBeInTheDocument()
+      expect(screen.getByText('Alice')).toBeInTheDocument()
+    })
+
+    stateSyncVersion = 5
+    participantsState = [
+      { participantId: 'p1', displayName: 'Alice', role: 'PARTICIPANT' },
+      { participantId: 'p2', displayName: 'Bob', role: 'PARTICIPANT' },
+    ]
+
+    setCapturedTransportState({ signaledVersion: 5 })
+    view.rerender(retroPageTree(queryClient))
+
+    await waitFor(() => {
+      expect(screen.getByText('Participants (2)')).toBeInTheDocument()
+      expect(screen.getByText('Bob')).toBeInTheDocument()
+    })
   })
 
   it('refetches retro state when STEP_ADVANCED fires', async () => {

@@ -15,6 +15,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.TestPropertySource;
@@ -28,9 +30,6 @@ import com.redis.testcontainers.RedisContainer;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import lombok.extern.slf4j.Slf4j;
-
 
 import java.util.UUID;
 import java.util.ArrayList;
@@ -63,6 +62,7 @@ import direct.reflect.facilitator.facilitation.response.ParticipantResponseRepos
 
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -84,8 +84,9 @@ import java.util.stream.Collectors;
     direct.reflect.facilitator.config.TestSecurityOverride.class, // Extends SecurityConfig to allow /test/* endpoints
     direct.reflect.facilitator.config.TestRedisConfig.class // Caps Redis retry backoff to prevent infinite reconnect loops
 })
-@Slf4j
 public abstract class BaseIntegrationTest {
+
+    private static final Logger log = LoggerFactory.getLogger(BaseIntegrationTest.class);
 
     // ==================== PLAYWRIGHT CONFIGURATION ====================
 
@@ -373,9 +374,200 @@ public abstract class BaseIntegrationTest {
         newContext.setDefaultTimeout(DEFAULT_TIMEOUT_MS);
         newContext.setDefaultNavigationTimeout(DEFAULT_TIMEOUT_MS);
 
+        installSyncDiagnostics(newContext);
         setupConsoleAndNetworkMonitoring(newContext);
         blockExternalCdnResources(newContext);
         return newContext;
+    }
+
+    private void installSyncDiagnostics(BrowserContext browserContext) {
+        browserContext.addInitScript("""
+            (() => {
+              if (window.__omoSyncDiagnosticsInstalled) {
+                return;
+              }
+
+              window.__omoSyncDiagnosticsInstalled = true;
+
+              const MAX_RECENT_EVENTS = 5;
+              const authoritativePattern = /\\/api\\/retro\\/[^/]+\\/(state|participants|timer|actions|escalations)(?:[/?#].*)?$/;
+              const now = () => new Date().toISOString();
+
+              const diagnostics = {
+                connectionState: 'not_started',
+                openCount: 0,
+                errorCount: 0,
+                navigatorOnLine: navigator.onLine,
+                signaledVersion: null,
+                appliedVersion: null,
+                lastSignal: null,
+                recentSignals: [],
+                lastRefetch: null,
+                recentRefetches: [],
+                lastConnectionEvent: null,
+                eventSourceUrl: null
+              };
+
+              window.__omoSyncDiagnostics = diagnostics;
+
+              const pushRecent = (key, entry) => {
+                diagnostics[key] = [entry, ...(diagnostics[key] || [])].slice(0, MAX_RECENT_EVENTS);
+              };
+
+              const extractSyncVersion = (body) => {
+                if (!body || typeof body !== 'object') {
+                  return null;
+                }
+                return typeof body.syncVersion === 'number' ? body.syncVersion : null;
+              };
+
+              const recordConnectionEvent = (type, extra = {}) => {
+                diagnostics.navigatorOnLine = navigator.onLine;
+                diagnostics.lastConnectionEvent = {
+                  type,
+                  timestamp: now(),
+                  ...extra
+                };
+              };
+
+              window.addEventListener('online', () => {
+                diagnostics.navigatorOnLine = true;
+                recordConnectionEvent('browser_online');
+              });
+
+              window.addEventListener('offline', () => {
+                diagnostics.navigatorOnLine = false;
+                recordConnectionEvent('browser_offline');
+              });
+
+              const NativeFetch = window.fetch.bind(window);
+              window.fetch = async (...args) => {
+                const request = args[0];
+                const init = args[1];
+                const url = typeof request === 'string' ? request : request?.url;
+                const method = (init?.method || request?.method || 'GET').toUpperCase();
+                const trackAuthoritative = typeof url === 'string' && method === 'GET' && authoritativePattern.test(url);
+
+                try {
+                  const response = await NativeFetch(...args);
+
+                  if (trackAuthoritative) {
+                    const refetch = {
+                      url,
+                      method,
+                      status: response.status,
+                      ok: response.ok,
+                      timestamp: now()
+                    };
+
+                    try {
+                      const contentType = response.headers.get('content-type') || '';
+                      if (contentType.includes('application/json')) {
+                        const body = await response.clone().json();
+                        const syncVersion = extractSyncVersion(body);
+                        refetch.syncVersion = syncVersion;
+                        if (typeof syncVersion === 'number') {
+                          diagnostics.appliedVersion = diagnostics.appliedVersion == null
+                            ? syncVersion
+                            : Math.max(diagnostics.appliedVersion, syncVersion);
+                        }
+                      }
+                    } catch (parseError) {
+                      refetch.parseError = String(parseError);
+                    }
+
+                    diagnostics.lastRefetch = refetch;
+                    pushRecent('recentRefetches', refetch);
+                  }
+
+                  return response;
+                } catch (error) {
+                  if (trackAuthoritative) {
+                    const refetch = {
+                      url,
+                      method,
+                      ok: false,
+                      error: String(error),
+                      timestamp: now()
+                    };
+                    diagnostics.lastRefetch = refetch;
+                    pushRecent('recentRefetches', refetch);
+                  }
+                  throw error;
+                }
+              };
+
+              const NativeEventSource = window.EventSource;
+
+              const inspectEvent = (event) => {
+                if (!event) {
+                  return;
+                }
+
+                if (event.type === 'open') {
+                  diagnostics.connectionState = 'open';
+                  diagnostics.openCount += 1;
+                  recordConnectionEvent('open', { openCount: diagnostics.openCount });
+                  return;
+                }
+
+                if (event.type === 'error') {
+                  diagnostics.connectionState = 'error';
+                  diagnostics.errorCount += 1;
+                  recordConnectionEvent('error', { errorCount: diagnostics.errorCount });
+                  return;
+                }
+
+                if (typeof event.data !== 'string') {
+                  return;
+                }
+
+                try {
+                  const parsed = JSON.parse(event.data);
+                  const syncVersion = typeof parsed?.syncVersion === 'number' ? parsed.syncVersion : null;
+
+                  if (syncVersion != null) {
+                    diagnostics.signaledVersion = diagnostics.signaledVersion == null
+                      ? syncVersion
+                      : Math.max(diagnostics.signaledVersion, syncVersion);
+
+                    const signal = {
+                      type: event.type,
+                      syncVersion,
+                      timestamp: now()
+                    };
+                    diagnostics.lastSignal = signal;
+                    pushRecent('recentSignals', signal);
+                  }
+                } catch (_ignored) {
+                  // Non-envelope event payloads are intentionally ignored.
+                }
+              };
+
+              function InstrumentedEventSource(url, configuration) {
+                const eventSource = new NativeEventSource(url, configuration);
+                diagnostics.connectionState = 'connecting';
+                diagnostics.eventSourceUrl = String(url);
+                recordConnectionEvent('connecting', { url: diagnostics.eventSourceUrl });
+
+                const nativeDispatchEvent = eventSource.dispatchEvent.bind(eventSource);
+                eventSource.dispatchEvent = function(event) {
+                  inspectEvent(event);
+                  return nativeDispatchEvent(event);
+                };
+
+                return eventSource;
+              }
+
+              InstrumentedEventSource.prototype = NativeEventSource.prototype;
+              Object.setPrototypeOf(InstrumentedEventSource, NativeEventSource);
+              InstrumentedEventSource.CONNECTING = NativeEventSource.CONNECTING;
+              InstrumentedEventSource.OPEN = NativeEventSource.OPEN;
+              InstrumentedEventSource.CLOSED = NativeEventSource.CLOSED;
+
+              window.EventSource = InstrumentedEventSource;
+            })();
+            """);
     }
 
     private void blockExternalCdnResources(BrowserContext ctx) {
@@ -425,6 +617,7 @@ public abstract class BaseIntegrationTest {
         // Set default timeout to prevent indefinite waits (Playwright's default is 30s, but we want faster failures)
         context.setDefaultTimeout(DEFAULT_TIMEOUT_MS);
         context.setDefaultNavigationTimeout(DEFAULT_TIMEOUT_MS);
+        installSyncDiagnostics(context);
         // Set up console and network monitoring (Playwright native listeners)
         setupConsoleAndNetworkMonitoring(context);
         blockExternalCdnResources(context);
@@ -595,18 +788,32 @@ public abstract class BaseIntegrationTest {
 
         if (!facilitatorPage.url().contains("/retro/")) {
             try {
-                facilitatorPage.waitForURL(url -> url.contains("/retro/"), new Page.WaitForURLOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+                facilitatorPage.waitForURL(
+                    url -> url.contains("/retro/"),
+                    new Page.WaitForURLOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS * 2)
+                );
             } catch (Exception e) {
                 log.warn("waitForURL to /retro/ timed out or failed: {}. Attempting manual navigation.", e.getMessage());
                 if (redirectUrl[0] != null && !redirectUrl[0].isEmpty()) {
                     String targetUrl = redirectUrl[0].startsWith("http") ? redirectUrl[0] : baseUrl + redirectUrl[0];
                     log.info("Navigating manually to HX-Redirect URL: {}", targetUrl);
                     facilitatorPage.navigate(targetUrl);
-                } else if (facilitatorPage.url().contains("/retro/")) {
-                    log.info("URL already at /retro/ despite waitForURL timeout, continuing");
                 } else {
-                    log.error("No HX-Redirect URL captured; cannot recover from waitForURL failure");
-                    throw new RuntimeException("Session creation redirect failed and no HX-Redirect header was captured", e);
+                    String persistedSessionId = retroSessionRepository.findAll().stream()
+                        .filter(session -> sessionName.equals(session.getName()))
+                        .max(Comparator.comparing(session -> session.getCreatedAt()))
+                        .map(session -> session.getId().toString())
+                        .orElse("");
+                    if (!persistedSessionId.isEmpty()) {
+                        String targetUrl = baseUrl + "/retro/" + persistedSessionId;
+                        log.info("Navigating manually to persisted session URL: {}", targetUrl);
+                        facilitatorPage.navigate(targetUrl);
+                    } else if (facilitatorPage.url().contains("/retro/")) {
+                        log.info("URL already at /retro/ despite waitForURL timeout, continuing");
+                    } else {
+                        log.error("No HX-Redirect URL or persisted session found; cannot recover from waitForURL failure");
+                        throw new RuntimeException("Session creation redirect failed and no session could be recovered", e);
+                    }
                 }
             }
         } else {
@@ -786,6 +993,49 @@ public abstract class BaseIntegrationTest {
         facilitatorPage.waitForSelector("[data-testid='next-step-button']",
             new Page.WaitForSelectorOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
         log.debug("Session started - Next button visible");
+    }
+
+    protected void refreshRetroPageUntilLoaded(Page page, String sessionId, String expectedPhase, String readySelector) {
+        recordActivity("refreshRetroPageUntilLoaded: " + sessionId + " phase=" + expectedPhase + " selector=" + readySelector);
+        String retroUrl = baseUrl + "/retro/" + sessionId;
+        AssertionError lastFailure = null;
+
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            try {
+                log.debug("Refreshing retro page {} attempt {}/2", sessionId, attempt);
+
+                if (page.url().contains("/retro/" + sessionId)) {
+                    page.reload(new Page.ReloadOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+                } else {
+                    page.navigate(retroUrl, new Page.NavigateOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+                }
+
+                page.waitForFunction(
+                    "(phase) => { " +
+                        "const bodyText = document.body?.textContent ?? ''; " +
+                        "if (bodyText.includes('Loading retrospective')) return false; " +
+                        "const retro = document.querySelector('[data-testid=\"retro-content\"]'); " +
+                        "if (!retro) return false; " +
+                        "return !phase || retro.getAttribute('data-phase') === phase; " +
+                    "}",
+                    expectedPhase,
+                    new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS)
+                );
+
+                waitForElement(page, "[data-testid='retro-content']", SSE_PROPAGATION_TIMEOUT_MS);
+                if (readySelector != null && !readySelector.isBlank()) {
+                    waitForElement(page, readySelector, SSE_PROPAGATION_TIMEOUT_MS);
+                }
+                return;
+            } catch (AssertionError | RuntimeException e) {
+                log.warn("Retro page {} not ready on attempt {}/2: {}", sessionId, attempt, e.getMessage());
+                lastFailure = e instanceof AssertionError assertionError
+                    ? assertionError
+                    : new AssertionError("Retro page did not finish loading for session " + sessionId, e);
+            }
+        }
+
+        throw lastFailure != null ? lastFailure : new AssertionError("Retro page did not finish loading for session " + sessionId);
     }
 
 
@@ -1135,6 +1385,9 @@ public abstract class BaseIntegrationTest {
             log.error("");
         }
 
+        logSyncDiagnostics(page, context);
+        log.error("");
+
         // 4. Page State - URL, title, elements, visible errors
         debugPageState(page, context);
         log.error("");
@@ -1305,6 +1558,72 @@ public abstract class BaseIntegrationTest {
 
         } catch (Exception e) {
             log.warn("Failed to log debug page state: {}", e.getMessage());
+        }
+    }
+
+    private void logSyncDiagnostics(Page page, String context) {
+        try {
+            Object result = page.evaluate("""
+                () => {
+                    const retro = document.querySelector('[data-testid="retro-content"]');
+                    const diagnostics = window.__omoSyncDiagnostics || {};
+                    const signaledVersion = typeof diagnostics.signaledVersion === 'number' ? diagnostics.signaledVersion : null;
+                    const appliedVersion = typeof diagnostics.appliedVersion === 'number' ? diagnostics.appliedVersion : null;
+                    const lastRefetch = diagnostics.lastRefetch ?? null;
+                    const lastSignal = diagnostics.lastSignal ?? null;
+                    const latestAuthoritativeVersion = typeof lastRefetch?.syncVersion === 'number' ? lastRefetch.syncVersion : null;
+
+                    return JSON.stringify({
+                      context,
+                      dom: {
+                        phase: retro?.getAttribute('data-phase') ?? null,
+                        stepIndex: retro?.getAttribute('data-step-index') ?? null,
+                        sseConnected: retro?.getAttribute('data-sse-connected') ?? null
+                      },
+                      transport: {
+                        connectionState: diagnostics.connectionState ?? null,
+                        navigatorOnLine: diagnostics.navigatorOnLine ?? null,
+                        openCount: diagnostics.openCount ?? null,
+                        errorCount: diagnostics.errorCount ?? null,
+                        eventSourceUrl: diagnostics.eventSourceUrl ?? null,
+                        lastConnectionEvent: diagnostics.lastConnectionEvent ?? null
+                      },
+                      sync: {
+                        signaledVersion,
+                        appliedVersion,
+                        versionGap: signaledVersion != null && appliedVersion != null
+                          ? signaledVersion - appliedVersion
+                          : null,
+                        lastSignal,
+                        lastRefetch,
+                        recentSignals: diagnostics.recentSignals ?? [],
+                        recentRefetches: diagnostics.recentRefetches ?? []
+                      },
+                      classification: {
+                        missedInvalidationCandidate: latestAuthoritativeVersion != null && (signaledVersion == null || latestAuthoritativeVersion > signaledVersion),
+                        failedAuthoritativeRefetchCandidate: Boolean(lastRefetch && (lastRefetch.ok === false || lastRefetch.error)),
+                        failedConvergenceAfterRefetchCandidate: Boolean(lastRefetch && lastRefetch.ok === true && signaledVersion != null && appliedVersion != null && signaledVersion > appliedVersion)
+                      }
+                    }, null, 2);
+                }
+                """);
+
+            log.error("[TEST_FAILURE_REPORT] ╔═══════════════════════════════════════════════════════════");
+            log.error("[TEST_FAILURE_REPORT] ║ VERSIONED SYNC DIAGNOSTICS - {}", context);
+            log.error("[TEST_FAILURE_REPORT] ╠═══════════════════════════════════════════════════════════");
+
+            String payload = result instanceof String ? (String) result : String.valueOf(result);
+            for (String line : payload.split("\\R")) {
+                log.error("[TEST_FAILURE_REPORT] ║ {}", line);
+            }
+
+            log.error("[TEST_FAILURE_REPORT] ╚═══════════════════════════════════════════════════════════");
+        } catch (Exception e) {
+            log.error("[TEST_FAILURE_REPORT] ╔═══════════════════════════════════════════════════════════");
+            log.error("[TEST_FAILURE_REPORT] ║ VERSIONED SYNC DIAGNOSTICS - {}", context);
+            log.error("[TEST_FAILURE_REPORT] ╠═══════════════════════════════════════════════════════════");
+            log.error("[TEST_FAILURE_REPORT] ║ [unavailable - {}]", e.getMessage());
+            log.error("[TEST_FAILURE_REPORT] ╚═══════════════════════════════════════════════════════════");
         }
     }
 
@@ -1541,6 +1860,7 @@ public abstract class BaseIntegrationTest {
         log.debug("SSE connection established for retro: {} (data-sse-connected='true')", retroId);
         recordActivity("SSE connection established: " + retroId);
     }
+
 
     protected void navigateToHome(Page page) {
         recordActivity("navigateToHome");

@@ -61,8 +61,8 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
 
         try {
             log.info("═══════════════════════════════════════════════════════════════");
-            log.info("  COMPLETE RETROSPECTIVE FLOW TEST (23 STEPS - Default Template)");
-            log.info("  ESVP → Mad Sad Glad → Perfection Game → SSC → +/- Delta");
+            log.info("  COMPLETE RETROSPECTIVE FLOW TEST (21 STEPS - Default Template)");
+            log.info("  ESVP → Mad Sad Glad → Perfection Game → SSC → Action Review");
             log.info("═══════════════════════════════════════════════════════════════");
 
             // ── SETUP ──────────────────────────────────────────────────────────────
@@ -372,31 +372,19 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             logTestProgress("PHASE_4", 17, 23, "Fast-forwarding past SSC discuss/commit/AUTO into CLOSE_RETRO");
             fastForwardSession(sessionId, RetroPhase.CLOSE_RETRO, 0);
             facilitatorPage.reload();
-            waitForElement(facilitatorPage, "[data-column='Plus']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForElement(facilitatorPage, "[data-testid='action-review-container']", SSE_PROPAGATION_TIMEOUT_MS);
             log.info("  └─ ✓ Completed DECIDE_ACTIONS phase (Start Stop Continue)");
 
-            // ===== PHASE 5: CLOSE_RETRO — +/- Delta (3 steps) =====
-            log.info("\n├─ PHASE 5: CLOSE_RETRO (+/- Delta)");
+            log.info("\n├─ PHASE 5: CLOSE_RETRO (Action Review)");
 
-            // Step 1 (orderIndex=1): FACILITATOR_CLICK — Plus/Delta input
-            logTestProgress("PHASE_5", 18, 23, "Verifying Plus/Delta columns at CLOSE_RETRO");
+            logTestProgress("PHASE_5", 18, 23, "Verifying Action Review empty state at CLOSE_RETRO");
 
-            assertTrue(facilitatorPage.locator("[data-column='Plus']").isVisible(),
-                "Plus column should be visible at +/- Delta step");
-            assertTrue(facilitatorPage.locator("[data-column='Delta']").isVisible(),
-                "Delta column should be visible at +/- Delta step");
-            log.info("  ├─ ✅ Plus/Delta columns verified");
+            assertTrue(facilitatorPage.locator("[data-testid='action-review-container']").isVisible(),
+                "Action Review container should be visible at the Default template close-retro step");
+            assertTrue(facilitatorPage.locator("[data-testid='empty-actions-message']").isVisible(),
+                "Action Review should show the empty state when no SMART actions were created");
+            log.info("  ├─ ✅ Action Review empty state verified");
 
-            // Step 2 (orderIndex=2): FACILITATOR_CLICK — reveal
-            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // input (index 0) → reveal (index 1)
-
-            // Step 3 (orderIndex=3): AUTO — close/appreciation → COMPLETED
-            // First click advances from reveal (index 1) to AUTO (index 2).
-            // Second click advances from AUTO (index 2) to COMPLETED.
-            // We use a direct click + waitForFunction for the final transition because
-            // clickNextAndWait's waitForStepChange relies on [data-step-index] being present,
-            // which may not render in COMPLETED state.
-            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // reveal (index 1) → AUTO (index 2)
             logTestProgress("PHASE_5", 20, 23, "Advancing AUTO step to complete session");
             facilitatorPage.locator("[data-testid='next-step-button']")
                 .click(new Locator.ClickOptions().setTimeout(DEFAULT_TIMEOUT_MS));
@@ -422,8 +410,8 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             log.info("  - Mad Sad Glad (cross-user visibility): ✅");
             log.info("  - Perfection Game RATING_SCALE + HISTOGRAM_CHART: ✅");
             log.info("  - Start Stop Continue columns: ✅");
-            log.info("  - +/- Delta feedback: ✅");
-            log.info("  - Complete retro flow (23 steps): ✅");
+            log.info("  - Action Review close: ✅");
+            log.info("  - Complete retro flow (21 steps): ✅");
             log.info("═══════════════════════════════════════════════════════════════");
 
         } catch (Exception e) {
@@ -507,15 +495,12 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
             logTestProgress("SETUP", 1, 6, "Authenticate facilitator, create and start session");
             authenticateAsGuest(facilitatorPage, "Facilitator");
             String sessionId = createRetroSession(facilitatorPage, "History Shift Test");
-            waitForElement(facilitatorPage, "[data-testid='start-retro-button']", SSE_PROPAGATION_TIMEOUT_MS);
-            startRetroSession(facilitatorPage, sessionId);
+            sessionService.startSession(UUID.fromString(sessionId));
 
             logTestProgress("ADVANCE_1", 2, 6, "Fast-forwarding to GATHER_DATA step 1 (facilitator only)");
             String retroUrl = baseUrl + "/retro/" + sessionId;
             fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 1);
-            facilitatorPage.navigate(retroUrl);
-
-            waitForElement(facilitatorPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
+            refreshRetroPageUntilLoaded(facilitatorPage, sessionId, RetroPhase.GATHER_DATA.name(), "[data-testid='guidance-sidebar']");
             waitForElement(facilitatorPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
             waitForHistoryItemCount(facilitatorPage, 1);
 
@@ -530,10 +515,7 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
 
             logTestProgress("ADVANCE_2", 4, 6, "Fast-forwarding to GATHER_DATA step 2");
             fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 2);
-            facilitatorPage.navigate("about:blank");
-            facilitatorPage.navigate(retroUrl);
-
-            waitForElement(facilitatorPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
+            refreshRetroPageUntilLoaded(facilitatorPage, sessionId, RetroPhase.GATHER_DATA.name(), "[data-testid='guidance-sidebar']");
             waitForElement(facilitatorPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
             waitForHistoryItemCount(facilitatorPage, 2);
 
@@ -895,6 +877,7 @@ public class MultiUserRetroBrowserRegressionTest extends BaseIntegrationTest {
                 .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
         session.setPhase(phase);
         session.setCurrentStepIndex(stepIndex);
+        session.setStepStartedAt(java.time.LocalDateTime.now());
         retroSessionRepository.save(session);
     }
 
