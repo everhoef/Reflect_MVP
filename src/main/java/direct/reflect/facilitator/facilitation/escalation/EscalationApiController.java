@@ -1,6 +1,8 @@
 package direct.reflect.facilitator.facilitation.escalation;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
+import direct.reflect.facilitator.facilitation.dto.SyncVersionedResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class EscalationApiController {
 
     private final EscalationService escalationService;
+    private final RetroSyncVersionService retroSyncVersionService;
 
     @PostMapping("/actions/{actionId}/escalate")
     @PreAuthorize("@participantService.canAccessRetro(#retroId)")
@@ -46,9 +49,11 @@ public class EscalationApiController {
 
     @GetMapping("/escalations")
     @PreAuthorize("@participantService.canAccessRetro(#retroId)")
-    public ResponseEntity<List<EscalatedItemDto>> getEscalations(
+    public ResponseEntity<SyncVersionedResponse<List<EscalatedItemDto>>> getEscalations(
             @PathVariable UUID retroId,
             HttpServletRequest httpRequest) {
-        return ResponseEntity.ok(escalationService.getEscalations(retroId, httpRequest));
+        List<EscalatedItemDto> escalations = escalationService.getEscalations(retroId, httpRequest);
+        long syncVersion = retroSyncVersionService.getSyncVersion(retroId);
+        return ResponseEntity.ok(new SyncVersionedResponse<>(syncVersion, escalations));
     }
 }

@@ -8,8 +8,10 @@ import direct.reflect.facilitator.facilitation.Participant;
 import direct.reflect.facilitator.facilitation.ParticipantRole;
 import direct.reflect.facilitator.facilitation.ParticipantService;
 import direct.reflect.facilitator.facilitation.RetroSession;
+import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
 import direct.reflect.facilitator.facilitation.actions.ActionItem;
 import direct.reflect.facilitator.facilitation.actions.ActionItemRepository;
+import direct.reflect.facilitator.facilitation.escalation.domain.EscalationThresholdPolicy;
 import direct.reflect.facilitator.organization.TeamMemberRepository;
 import direct.reflect.facilitator.organization.TeamRole;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,6 +32,7 @@ public class EscalationService {
     private final EscalatedItemVoteRepository escalatedItemVoteRepository;
     private final ParticipantService participantService;
     private final EventService eventService;
+    private final RetroSyncVersionService retroSyncVersionService;
     private final TeamMemberRepository teamMemberRepository;
     private final AuthService authService;
 
@@ -57,12 +60,19 @@ public class EscalationService {
         escalatedItem.setRetroSession(retroSession);
         escalatedItem.setTeam(retroSession.getTeam());
         escalatedItem.setProblemDescription(problemDescription);
-        escalatedItem.setVoteThreshold(EscalatedItem.calculateVoteThreshold(participantCount));
+        escalatedItem.setVoteThreshold(EscalationThresholdPolicy.calculateVoteThreshold(participantCount));
 
         EscalatedItem savedEscalatedItem = escalatedItemRepository.save(escalatedItem);
 
         actionItem.setEscalated(true);
         actionItemRepository.save(actionItem);
+        retroSyncVersionService.bumpSyncVersion(retroId);
+
+        Participant participant = participantService.getParticipantForSession(request, retroId);
+        eventService.publish(RetroEvent.escalationCreated(
+                retroId,
+                participant.getParticipantId().toString(),
+                savedEscalatedItem.getId().toString()));
 
         return EscalatedItemDto.from(savedEscalatedItem, 0, false);
     }
@@ -90,6 +100,7 @@ public class EscalationService {
 
         long voteCount = escalatedItemVoteRepository.countByEscalatedItemId(escalationId);
         boolean thresholdMet = isThresholdMet(escalatedItem, voteCount);
+        retroSyncVersionService.bumpSyncVersion(retroId);
 
         RetroEvent.EscalationVoteData payload = new RetroEvent.EscalationVoteData(
                 escalationId.toString(),
@@ -99,6 +110,7 @@ public class EscalationService {
         eventService.publish(RetroEvent.escalationVoteUpdated(retroId, participant.getParticipantId().toString(), payload));
 
         return new EscalationVoteResultDto(
+                retroSyncVersionService.getSyncVersion(retroId),
                 escalationId,
                 voteCount,
                 escalatedItem.getVoteThreshold(),
@@ -110,8 +122,11 @@ public class EscalationService {
     public List<EscalatedItemDto> getEscalations(UUID retroId, HttpServletRequest request) {
         participantService.getParticipantForSession(request, retroId);
 
+        long syncVersion = retroSyncVersionService.getSyncVersion(retroId);
+
         return escalatedItemRepository.findByRetroSession_IdOrderByCreatedAtAsc(retroId).stream()
                 .map(this::toEscalatedItemDto)
+                .map(escalatedItemDto -> escalatedItemDto.withSyncVersion(syncVersion))
                 .toList();
     }
 
@@ -152,25 +167,28 @@ public class EscalationService {
     }
 
     private boolean isThresholdMet(EscalatedItem escalatedItem, long voteCount) {
-        if (voteCount >= escalatedItem.getVoteThreshold()) {
+        int threshold = escalatedItem.getVoteThreshold();
+        if (EscalationThresholdPolicy.hasReachedThreshold(voteCount, threshold)) {
             return true;
         }
 
-        if (voteCount != escalatedItem.getVoteThreshold() - 1) {
+        if (!EscalationThresholdPolicy.isTieBreakScenario(voteCount, threshold)) {
             return false;
         }
 
         List<Participant> participants = participantService.getSessionParticipants(escalatedItem.getRetroSession().getId());
-        if (participants.size() % 2 != 0) {
-            return false;
-        }
+        boolean facilitatorVoted = facilitatorHasVoted(escalatedItem.getId(), participants);
 
+        return EscalationThresholdPolicy.facilitatorTieBreakApplies(participants.size(), facilitatorVoted);
+    }
+
+    private boolean facilitatorHasVoted(UUID escalationId, List<Participant> participants) {
         return participants.stream()
                 .filter(participant -> participant.getRole() == ParticipantRole.FACILITATOR)
                 .findFirst()
                 .map(Participant::getParticipantId)
                 .flatMap(facilitatorId -> escalatedItemVoteRepository.findByEscalatedItemIdAndParticipantId(
-                        escalatedItem.getId(),
+                        escalationId,
                         facilitatorId))
                 .isPresent();
     }

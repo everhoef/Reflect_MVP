@@ -113,6 +113,9 @@ class ParticipantStateDataIntegrationTest {
 
         Participant firstParticipant = afterFirstCreate.get(0);
         UUID firstSessionId = firstParticipant.getSession().getId();
+        long firstSessionSyncVersionAfterCreate = retroSessionRepository.findById(firstSessionId)
+                .orElseThrow()
+                .getSyncVersion();
 
         // Business rule 2: new participant starts ACTIVE
         assertThat(firstParticipant.getStatus())
@@ -184,9 +187,14 @@ class ParticipantStateDataIntegrationTest {
                 .findFirst()
                 .orElseThrow();
 
+        RetroSession updatedFirstSession = retroSessionRepository.findById(firstSessionId).orElseThrow();
+        RetroSession updatedActiveSession = retroSessionRepository.findById(activeParticipant.getSession().getId()).orElseThrow();
+
         assertThat(activeParticipant.getSession().getId())
                 .as("New session participant should be ACTIVE and in the second session (rule 2)")
                 .isNotEqualTo(firstSessionId);
+        assertThat(updatedFirstSession.getSyncVersion()).isGreaterThan(firstSessionSyncVersionAfterCreate);
+        assertThat(updatedActiveSession.getSyncVersion()).isPositive();
 
         log.debug("All 7 business rules verified: both sessions exist, old=LEFT with lastSeen set, new=ACTIVE, same participantId");
     }

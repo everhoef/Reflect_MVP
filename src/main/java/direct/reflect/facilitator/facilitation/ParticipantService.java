@@ -12,9 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.auth.AuthService;
@@ -33,12 +32,24 @@ import direct.reflect.facilitator.eventing.RetroEvent;
  * associating them with RetroSessions, and handling participant lifecycle.
  */
 @Service
-@RequiredArgsConstructor
-@Slf4j
 public class ParticipantService {
+    private static final Logger log = LoggerFactory.getLogger(ParticipantService.class);
+
     private final ParticipantRepository participantRepository;
     private final EventService eventService;
     private final AuthService authHelper;
+    private final RetroSyncVersionService retroSyncVersionService;
+
+    public ParticipantService(
+            ParticipantRepository participantRepository,
+            EventService eventService,
+            AuthService authHelper,
+            RetroSyncVersionService retroSyncVersionService) {
+        this.participantRepository = participantRepository;
+        this.eventService = eventService;
+        this.authHelper = authHelper;
+        this.retroSyncVersionService = retroSyncVersionService;
+    }
 
     
 
@@ -61,6 +72,7 @@ public class ParticipantService {
 
         checkForActiveSession(participantId, session.getId());
         Participant participant = createParticipantForSession(session, role, request);
+        retroSyncVersionService.bumpSyncVersion(session.getId());
 
         // Publish PARTICIPANT_JOINED event
         try {
@@ -323,6 +335,7 @@ public class ParticipantService {
         participant.setStatus(ParticipantStatus.LEFT);
         participant.setLastSeen(LocalDateTime.now());
         participantRepository.save(participant);
+        retroSyncVersionService.bumpSyncVersion(participant.getSession().getId());
 
         log.info("Participant {} left session {}",
             participant.getDisplayName(), participant.getSession().getId());

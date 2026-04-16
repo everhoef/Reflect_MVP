@@ -214,6 +214,8 @@ class ActionItemApiIntegrationTest {
 
     @Test
     void getActionItems_returnsSessionScopedItems() throws Exception {
+        testSession.setSyncVersion(5L);
+        sessionRepository.saveAndFlush(testSession);
         saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), "Attendance logged");
         saveActionItem("Review incidents weekly", "Bob", LocalDate.of(2026, 5, 8), null);
 
@@ -221,10 +223,29 @@ class ActionItemApiIntegrationTest {
                         .with(authentication(testAuth)))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$[0].what").value("Daily sync with design team"))
-                .andExpect(jsonPath("$[0].who").value("Alice"))
-                .andExpect(jsonPath("$[1].what").value("Review incidents weekly"))
-                .andExpect(jsonPath("$[1].who").value("Bob"));
+                .andExpect(jsonPath("$.syncVersion").value(5))
+                .andExpect(jsonPath("$.data[0].syncVersion").value(5))
+                .andExpect(jsonPath("$.data[0].what").value("Daily sync with design team"))
+                .andExpect(jsonPath("$.data[0].who").value("Alice"))
+                .andExpect(jsonPath("$.data[1].syncVersion").value(5))
+                .andExpect(jsonPath("$.data[1].what").value("Review incidents weekly"))
+                .andExpect(jsonPath("$.data[1].who").value("Bob"));
+
+        verifyNoInteractions(eventService);
+    }
+
+    @Test
+    void getActionItems_returnsAuthoritativeSyncVersionWhenListIsEmpty() throws Exception {
+        testSession.setSyncVersion(7L);
+        sessionRepository.saveAndFlush(testSession);
+
+        mockMvc.perform(get("/api/retro/{retroId}/actions", testSession.getId())
+                        .with(authentication(testAuth)))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.syncVersion").value(7))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
 
         verifyNoInteractions(eventService);
     }
@@ -264,6 +285,27 @@ class ActionItemApiIntegrationTest {
         assertThat(payload.id()).isEqualTo(actionItem.getId());
         assertThat(payload.what()).isEqualTo("Daily 15-minute sync with design team");
         assertThat(payload.successCriteria()).isEqualTo("Attendance logged every weekday");
+    }
+
+    @Test
+    void createActionItem_incrementsPersistedRetroSyncVersion() throws Exception {
+        long initialSyncVersion = sessionRepository.findById(testSession.getId()).orElseThrow().getSyncVersion();
+
+        mockMvc.perform(post("/api/retro/{retroId}/actions", testSession.getId())
+                        .with(authentication(testAuth))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "what": "Introduce release checklist",
+                                  "who": "Alice",
+                                  "dueDate": "2026-05-02"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        RetroSession updatedSession = sessionRepository.findById(testSession.getId()).orElseThrow();
+        assertThat(updatedSession.getSyncVersion()).isGreaterThan(initialSyncVersion);
     }
 
     @Test

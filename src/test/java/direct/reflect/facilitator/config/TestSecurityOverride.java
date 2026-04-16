@@ -3,6 +3,7 @@ package direct.reflect.facilitator.config;
 import direct.reflect.facilitator.auth.AuthService;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.annotation.Order;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -21,6 +22,7 @@ public class TestSecurityOverride {
 
     @Bean
     @Primary
+    @Order(0)
     public SecurityFilterChain testSecurityFilterChain(HttpSecurity http,
                                                        SecurityConfig.OidcSuccessHandler oidcSuccessHandler) throws Exception {
         return http
@@ -30,13 +32,13 @@ public class TestSecurityOverride {
             )
             .csrf(csrf -> csrf
                 .spa()
-                .ignoringRequestMatchers("/test/**")
+                .ignoringRequestMatchers("/test/**", "/auth/guest")
             )
             .authorizeHttpRequests(requests -> requests
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/img/**", "/static/**", "/webjars/**", "/assets/**").permitAll()
                 .requestMatchers("/favicon.ico", "/favicon.svg", "/vite.svg").permitAll()
                 .requestMatchers("/login").permitAll()
-                .requestMatchers("/auth/guest").permitAll()
+                .requestMatchers("/auth/guest", "/auth/local/**").permitAll()
                 .requestMatchers("/test/**").permitAll()
                 .requestMatchers("/actuator/health/**").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()

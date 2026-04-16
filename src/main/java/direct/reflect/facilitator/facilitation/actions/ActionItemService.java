@@ -5,6 +5,7 @@ import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
 import direct.reflect.facilitator.facilitation.Participant;
 import direct.reflect.facilitator.facilitation.ParticipantService;
+import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.List;
@@ -23,6 +24,7 @@ public class ActionItemService {
     private final ActionItemRepository actionItemRepository;
     private final ParticipantService participantService;
     private final EventService eventService;
+    private final RetroSyncVersionService retroSyncVersionService;
 
     public ActionItemDto createActionItem(
             UUID retroId,
@@ -39,6 +41,7 @@ public class ActionItemService {
         actionItem.setSuccessCriteria(normalizeOptionalText(request.successCriteria()));
 
         ActionItem savedActionItem = actionItemRepository.save(actionItem);
+        retroSyncVersionService.bumpSyncVersion(retroId);
         ActionItemDto actionItemDto = ActionItemDto.from(savedActionItem);
 
         publishActionEvent(retroId, participant.getParticipantId(), RetroEvent.EventType.ACTION_CREATED, actionItemDto);
@@ -49,9 +52,11 @@ public class ActionItemService {
 
     @Transactional(readOnly = true)
     public List<ActionItemDto> getActionItems(UUID retroId) {
+        long syncVersion = retroSyncVersionService.getSyncVersion(retroId);
         return actionItemRepository.findByRetroSessionId(retroId)
                 .stream()
                 .map(ActionItemDto::from)
+                .map(actionItemDto -> actionItemDto.withSyncVersion(syncVersion))
                 .toList();
     }
 
@@ -82,6 +87,7 @@ public class ActionItemService {
         }
 
         ActionItem savedActionItem = actionItemRepository.save(actionItem);
+        retroSyncVersionService.bumpSyncVersion(retroId);
         ActionItemDto actionItemDto = ActionItemDto.from(savedActionItem);
 
         publishActionEvent(retroId, participant.getParticipantId(), RetroEvent.EventType.ACTION_UPDATED, actionItemDto);
@@ -96,6 +102,7 @@ public class ActionItemService {
         ActionItemDto deletedActionItem = ActionItemDto.from(actionItem);
 
         actionItemRepository.delete(actionItem);
+        retroSyncVersionService.bumpSyncVersion(retroId);
         publishActionEvent(retroId, participant.getParticipantId(), RetroEvent.EventType.ACTION_DELETED, deletedActionItem);
         log.debug("Deleted action item {} for retro {}", actionId, retroId);
     }
@@ -111,6 +118,7 @@ public class ActionItemService {
         actionItem.setStatus(request.status());
 
         ActionItem savedActionItem = actionItemRepository.save(actionItem);
+        retroSyncVersionService.bumpSyncVersion(retroId);
         ActionItemDto actionItemDto = ActionItemDto.from(savedActionItem);
 
         publishActionEvent(retroId, participant.getParticipantId(), RetroEvent.EventType.ACTION_UPDATED, actionItemDto);

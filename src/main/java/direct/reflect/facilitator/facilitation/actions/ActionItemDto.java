@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record ActionItemDto(
+        long syncVersion,
         UUID id,
         String what,
         String who,
@@ -18,6 +19,7 @@ public record ActionItemDto(
 
     public static ActionItemDto from(ActionItem actionItem) {
         return new ActionItemDto(
+                0L,
                 actionItem.getId(),
                 actionItem.getWhat(),
                 actionItem.getWho(),
@@ -28,5 +30,20 @@ public record ActionItemDto(
                 actionItem.getCreatedByParticipantId(),
                 actionItem.getCreatedAt(),
                 actionItem.getUpdatedAt());
+    }
+
+    public ActionItemDto withSyncVersion(long syncVersion) {
+        return new ActionItemDto(
+                syncVersion,
+                id,
+                what,
+                who,
+                dueDate,
+                successCriteria,
+                escalated,
+                status,
+                createdByParticipantId,
+                createdAt,
+                updatedAt);
     }
 }

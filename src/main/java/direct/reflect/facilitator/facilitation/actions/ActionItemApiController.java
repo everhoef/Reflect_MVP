@@ -1,11 +1,12 @@
 package direct.reflect.facilitator.facilitation.actions;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
+import direct.reflect.facilitator.facilitation.dto.SyncVersionedResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,11 +21,18 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/retro/{retroId}/actions")
-@RequiredArgsConstructor
 @Tag(name = "Action Item API", description = "SMART action item CRUD operations")
 public class ActionItemApiController {
 
     private final ActionItemService actionItemService;
+    private final RetroSyncVersionService retroSyncVersionService;
+
+    public ActionItemApiController(
+            ActionItemService actionItemService,
+            RetroSyncVersionService retroSyncVersionService) {
+        this.actionItemService = actionItemService;
+        this.retroSyncVersionService = retroSyncVersionService;
+    }
 
     @PostMapping
     @PreAuthorize("@participantService.canAccessRetro(#retroId)")
@@ -38,8 +46,10 @@ public class ActionItemApiController {
 
     @GetMapping
     @PreAuthorize("@participantService.canAccessRetro(#retroId)")
-    public ResponseEntity<List<ActionItemDto>> getActionItems(@PathVariable UUID retroId) {
-        return ResponseEntity.ok(actionItemService.getActionItems(retroId));
+    public ResponseEntity<SyncVersionedResponse<List<ActionItemDto>>> getActionItems(@PathVariable UUID retroId) {
+        List<ActionItemDto> actionItems = actionItemService.getActionItems(retroId);
+        long syncVersion = retroSyncVersionService.getSyncVersion(retroId);
+        return ResponseEntity.ok(new SyncVersionedResponse<>(syncVersion, actionItems));
     }
 
     @PatchMapping("/{actionId}")

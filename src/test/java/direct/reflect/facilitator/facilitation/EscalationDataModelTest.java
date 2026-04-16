@@ -10,6 +10,7 @@ import direct.reflect.facilitator.facilitation.escalation.EscalatedItemRepositor
 import direct.reflect.facilitator.facilitation.escalation.EscalatedItemVote;
 import direct.reflect.facilitator.facilitation.escalation.EscalatedItemVoteId;
 import direct.reflect.facilitator.facilitation.escalation.EscalatedItemVoteRepository;
+import direct.reflect.facilitator.facilitation.escalation.domain.EscalationThresholdPolicy;
 import direct.reflect.facilitator.organization.Organization;
 import direct.reflect.facilitator.organization.OrganizationRepository;
 import direct.reflect.facilitator.organization.Team;
@@ -67,6 +68,9 @@ class EscalationDataModelTest {
     private RetroSessionRepository sessionRepository;
 
     @Autowired
+    private TeamBackedRetroFixture teamBackedRetroFixture;
+
+    @Autowired
     private EntityManager entityManager;
 
     @AfterEach
@@ -80,14 +84,14 @@ class EscalationDataModelTest {
 
     @Test
     void saveAndFlush_persistsEscalationThresholdAndSessionTeamLinkage() {
-        Team team = saveTeam("Acme Corp", "acme-corp", "Platform");
-        RetroSession retroSession = saveSession("Platform Retro", team);
+        RetroSession retroSession = teamBackedRetroFixture.createTeamBackedSession("Platform");
+        Team team = retroSession.getTeam();
 
         EscalatedItem escalatedItem = escalatedItemRepository.saveAndFlush(buildEscalatedItem(
                 retroSession,
                 team,
                 "Cross-team API dependency is blocking releases",
-                EscalatedItem.calculateVoteThreshold(5),
+                EscalationThresholdPolicy.calculateVoteThreshold(5),
                 item -> {}));
         entityManager.clear();
 
@@ -104,8 +108,8 @@ class EscalationDataModelTest {
 
     @Test
     void saveAndFlush_rejectsInvalidEscalationContracts() {
-        Team team = saveTeam("Beta Corp", "beta-corp", "Delivery");
-        RetroSession retroSession = saveSession("Delivery Retro", team);
+        RetroSession retroSession = teamBackedRetroFixture.createTeamBackedSession("Delivery");
+        Team team = retroSession.getTeam();
 
         assertInvalid(buildEscalatedItem(retroSession, team, null, 2, item -> {}));
         assertInvalid(buildEscalatedItem(retroSession, team, "   ", 2, item -> {}));
@@ -115,22 +119,22 @@ class EscalationDataModelTest {
     }
 
     @Test
-    void calculateVoteThreshold_returnsSimpleMajority() {
-        assertThat(EscalatedItem.calculateVoteThreshold(1)).isEqualTo(1);
-        assertThat(EscalatedItem.calculateVoteThreshold(2)).isEqualTo(2);
-        assertThat(EscalatedItem.calculateVoteThreshold(3)).isEqualTo(2);
-        assertThat(EscalatedItem.calculateVoteThreshold(4)).isEqualTo(3);
-        assertThat(EscalatedItem.calculateVoteThreshold(5)).isEqualTo(3);
+    void thresholdPolicy_calculatesSimpleMajority() {
+        assertThat(EscalationThresholdPolicy.calculateVoteThreshold(1)).isEqualTo(1);
+        assertThat(EscalationThresholdPolicy.calculateVoteThreshold(2)).isEqualTo(2);
+        assertThat(EscalationThresholdPolicy.calculateVoteThreshold(3)).isEqualTo(2);
+        assertThat(EscalationThresholdPolicy.calculateVoteThreshold(4)).isEqualTo(3);
+        assertThat(EscalationThresholdPolicy.calculateVoteThreshold(5)).isEqualTo(3);
 
-        assertThatThrownBy(() -> EscalatedItem.calculateVoteThreshold(0))
+        assertThatThrownBy(() -> EscalationThresholdPolicy.calculateVoteThreshold(0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Participant count must be at least 1");
     }
 
     @Test
     void voteRepository_scopesLookupAndCountsByEscalatedItemCompositeKey() {
-        Team team = saveTeam("Gamma Corp", "gamma-corp", "Enablement");
-        RetroSession retroSession = saveSession("Enablement Retro", team);
+        RetroSession retroSession = teamBackedRetroFixture.createTeamBackedSession("Enablement");
+        Team team = retroSession.getTeam();
         UUID participantId = UUID.randomUUID();
         UUID otherParticipantId = UUID.randomUUID();
 
@@ -138,13 +142,13 @@ class EscalationDataModelTest {
                 retroSession,
                 team,
                 "Shared deployment process needs manager support",
-                EscalatedItem.calculateVoteThreshold(2),
+                EscalationThresholdPolicy.calculateVoteThreshold(2),
                 item -> {}));
         EscalatedItem secondEscalatedItem = escalatedItemRepository.saveAndFlush(buildEscalatedItem(
                 retroSession,
                 team,
                 "Cross-team release coordination needs escalation",
-                EscalatedItem.calculateVoteThreshold(2),
+                EscalationThresholdPolicy.calculateVoteThreshold(2),
                 item -> {}));
 
         escalatedItemVoteRepository.saveAndFlush(buildVote(firstEscalatedItem, participantId));
@@ -164,25 +168,6 @@ class EscalationDataModelTest {
         assertThat(matchingVote.orElseThrow().getVotedAt()).isNotNull();
         assertThat(escalatedItemVoteRepository.findByEscalatedItemIdAndParticipantId(firstEscalatedItem.getId(), UUID.randomUUID()))
                 .isEmpty();
-    }
-
-    private Team saveTeam(String organizationName, String organizationSlug, String teamName) {
-        Organization organization = new Organization();
-        organization.setName(organizationName);
-        organization.setSlug(organizationSlug);
-        organizationRepository.saveAndFlush(organization);
-
-        Team team = new Team();
-        team.setName(teamName);
-        team.setOrganization(organization);
-        return teamRepository.saveAndFlush(team);
-    }
-
-    private RetroSession saveSession(String name, Team team) {
-        RetroSession retroSession = new RetroSession();
-        retroSession.setName(name);
-        retroSession.setTeam(team);
-        return sessionRepository.saveAndFlush(retroSession);
     }
 
     private EscalatedItem buildEscalatedItem(

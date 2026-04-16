@@ -16,7 +16,6 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -31,11 +30,15 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles({"import"})
 @Testcontainers
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Slf4j
 class RetroTemplateContractTest {
 
     private static final Set<ComponentType> SUPPORTED_COMPONENT_TYPES =
-            EnumSet.of(ComponentType.MULTI_COLUMN_BOARD, ComponentType.RATING_SCALE, ComponentType.HISTOGRAM_CHART);
+            EnumSet.of(
+                    ComponentType.MULTI_COLUMN_BOARD,
+                    ComponentType.RATING_SCALE,
+                    ComponentType.HISTOGRAM_CHART,
+                    ComponentType.SMART_ACTION_BUILDER,
+                    ComponentType.ACTION_REVIEW);
 
     private static final Set<AdvancementTrigger> SUPPORTED_ADVANCEMENT_TRIGGERS =
             EnumSet.of(AdvancementTrigger.AUTO, AdvancementTrigger.FACILITATOR_CLICK,
@@ -93,7 +96,6 @@ class RetroTemplateContractTest {
                 }
             }
 
-            log.info("Loaded {} steps from Default template for contract validation", stepsHolder.size());
             return null;
         });
     }
@@ -158,8 +160,5 @@ class RetroTemplateContractTest {
             assertNotNull(config.get("min"), stepLabel + ": 'min' must not be null");
             assertNotNull(config.get("max"), stepLabel + ": 'max' must not be null");
         }
-
-        log.debug("✅ {} (type={}, trigger={}) passed contract",
-                stepLabel, step.getComponentType(), step.getAdvancementTrigger());
     }
 }

@@ -4,6 +4,7 @@ import com.fasterxml.uuid.Generators;
 import direct.reflect.facilitator.common.exception.ResourceNotFoundException;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
+import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
 import direct.reflect.facilitator.facilitation.dto.ColumnResponseDto;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponse;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponseRepository;
@@ -31,6 +32,7 @@ public class ClusteringService {
 
     private final ParticipantResponseRepository responseRepository;
     private final EventService eventService;
+    private final RetroSyncVersionService retroSyncVersionService;
 
     public UUID mergeResponses(UUID retroId, Long stepId, List<UUID> responseIds) {
         UUID clusterId = Generators.timeBasedEpochGenerator().generate();
@@ -45,6 +47,7 @@ public class ClusteringService {
         });
         responses.forEach(r -> r.setClusterId(clusterId));
         responseRepository.saveAll(responses);
+        retroSyncVersionService.bumpSyncVersion(retroId);
         try {
             eventService.publish(RetroEvent.responsesRevealed(retroId, "facilitator", stepId));
         } catch (Exception e) {
@@ -59,6 +62,7 @@ public class ClusteringService {
         response.setClusterId(null);
         response.setClusterName(null);
         responseRepository.save(response);
+        retroSyncVersionService.bumpSyncVersion(retroId);
         try {
             eventService.publish(RetroEvent.responsesRevealed(retroId, "facilitator", stepId));
         } catch (Exception e) {
@@ -73,6 +77,7 @@ public class ClusteringService {
         }
         responses.forEach(r -> r.setClusterName(newName));
         responseRepository.saveAll(responses);
+        retroSyncVersionService.bumpSyncVersion(retroId);
         try {
             eventService.publish(RetroEvent.responsesRevealed(retroId, "facilitator", stepId));
         } catch (Exception e) {
