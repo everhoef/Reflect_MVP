@@ -1,13 +1,14 @@
 import { Card } from "@/components/ui/card";
-import { usePreviousActions } from "@/hooks/api/usePreviousActions";
+import { useActionItems } from "@/hooks/api/useActionItems";
 import type { StepComponentProps } from "@/components/ComponentRouter";
 
 export function ActionReview({ retroId, componentConfig }: StepComponentProps) {
-  const { data: actionItems, isLoading, error } = usePreviousActions(retroId);
+  const { data: actionItems, isLoading, error } = useActionItems(retroId);
+  const reviewedActionItems = actionItems ?? [];
   
   // Component Config Contract
   const showStatus = componentConfig?.showStatus !== false;
-  const emptyStateMessage = (componentConfig?.emptyStateMessage as string) || "No open action items from previous retros.";
+  const emptyStateMessage = (componentConfig?.emptyStateMessage as string) || "No action items created in this retrospective yet.";
 
   if (isLoading) {
     return (
@@ -23,18 +24,18 @@ export function ActionReview({ retroId, componentConfig }: StepComponentProps) {
     return (
       <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto" data-testid="action-review-error">
         <div className="text-center p-8 bg-red-50 text-red-600 rounded-lg border border-red-200">
-          Failed to load previous action items.
+          Failed to load action items.
         </div>
       </div>
     );
   }
 
-  const hasItems = actionItems && actionItems.length > 0;
+  const hasItems = reviewedActionItems.length > 0;
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto" data-testid="action-review-container">
       <div className="flex justify-between items-center mb-2">
-        <h2 className="text-xl font-semibold text-gray-800">Previous Action Items</h2>
+        <h2 className="text-xl font-semibold text-gray-800">Action Review</h2>
       </div>
 
       {!hasItems && (
@@ -45,7 +46,7 @@ export function ActionReview({ retroId, componentConfig }: StepComponentProps) {
 
       {hasItems && (
         <div className="flex flex-col gap-3">
-          {actionItems.map((item) => {
+          {reviewedActionItems.map((item) => {
             const isDone = item.status === "DONE";
             
             return (

@@ -113,6 +113,7 @@ class TemplateImportIntegrationTest {
         Map<String, Object> config = step6.getComponentConfig();
         assertThat(config).containsKey("templates");
         assertThat(config).containsKey("categories");
+        assertThat(config.get("allowEscalation")).isEqualTo(true);
     }
 
     @Test

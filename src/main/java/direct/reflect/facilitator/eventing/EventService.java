@@ -203,11 +203,15 @@ public class EventService {
      * Thread-safe cleanup method to avoid double-decrements.
      */
     private void cleanupConnection(String connectionId, SseEmitter emitter, String participantInfo, UUID retroId) {
-        // Only cleanup if the emitter in the map matches the one we're cleaning up
-        // This prevents race conditions where multiple cleanup calls happen for the same connection
-        if (localEmitters.remove(connectionId, emitter)) {
-            activeConnections.decrementAndGet();
-            log.trace("Cleaned up SSE connection for participant {} in retro {} (active: {})", participantInfo, retroId, activeConnections.get());
+        EmitterConnection existingConnection = localEmitters.get(connectionId);
+
+        // Only cleanup if the stored connection still points at this emitter.
+        // localEmitters stores EmitterConnection wrappers, so remove using the wrapper value.
+        if (existingConnection != null
+                && existingConnection.emitter() == emitter
+                && localEmitters.remove(connectionId, existingConnection)) {
+            int remainingConnections = activeConnections.decrementAndGet();
+            log.trace("Cleaned up SSE connection for participant {} in retro {} (active: {})", participantInfo, retroId, remainingConnections);
             try {
                 emitter.complete();
             } catch (Exception e) {

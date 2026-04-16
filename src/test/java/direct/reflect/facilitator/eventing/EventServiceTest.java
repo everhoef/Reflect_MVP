@@ -12,7 +12,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -120,6 +122,65 @@ class EventServiceTest {
     }
 
     @Test
+    void shouldRemoveStoredEmitterConnectionAndDecrementActiveCountOnCleanup() {
+        UUID participantId = UUID.randomUUID();
+        String participantName = "Test User";
+        String connectionId = connectionId(testRetroId, participantId);
+
+        SseEmitter emitter = eventService.createSseEmitter(testRetroId, participantId, participantName);
+
+        assertThat(localEmitters().containsKey(connectionId)).isTrue();
+        assertThat(activeConnections()).isEqualTo(1);
+
+        ReflectionTestUtils.invokeMethod(
+                eventService,
+                "cleanupConnection",
+                connectionId,
+                emitter,
+                participantInfo(participantName, participantId),
+                testRetroId);
+
+        assertThat(localEmitters().containsKey(connectionId)).isFalse();
+        assertThat(activeConnections()).isZero();
+    }
+
+    @Test
+    void shouldKeepReplacementConnectionAndCountStableWhenStaleEmitterCleansUp() {
+        UUID participantId = UUID.randomUUID();
+        String participantName = "Test User";
+        String connectionId = connectionId(testRetroId, participantId);
+
+        SseEmitter originalEmitter = eventService.createSseEmitter(testRetroId, participantId, participantName);
+        SseEmitter replacementEmitter = eventService.createSseEmitter(testRetroId, participantId, participantName);
+
+        assertThat(replacementEmitter).isNotSameAs(originalEmitter);
+        assertThat(localEmitters().containsKey(connectionId)).isTrue();
+        assertThat(activeConnections()).isEqualTo(1);
+
+        ReflectionTestUtils.invokeMethod(
+                eventService,
+                "cleanupConnection",
+                connectionId,
+                originalEmitter,
+                participantInfo(participantName, participantId),
+                testRetroId);
+
+        assertThat(localEmitters().containsKey(connectionId)).isTrue();
+        assertThat(activeConnections()).isEqualTo(1);
+
+        ReflectionTestUtils.invokeMethod(
+                eventService,
+                "cleanupConnection",
+                connectionId,
+                replacementEmitter,
+                participantInfo(participantName, participantId),
+                testRetroId);
+
+        assertThat(localEmitters().containsKey(connectionId)).isFalse();
+        assertThat(activeConnections()).isZero();
+    }
+
+    @Test
     void shouldCreateValidRetroCreatedEvent() {
         // When
         RetroEvent<Void> event = RetroEvent.retroCreated(testRetroId, "system");
@@ -203,5 +264,29 @@ class EventServiceTest {
         verify(objectMapper).writeValueAsString(argThat(argument -> argument instanceof RetroSseEnvelope<?> envelope
                 && envelope.syncVersion() == 22L
                 && "Alice".equals(envelope.payload())));
+    }
+
+    private String connectionId(UUID retroId, UUID participantId) {
+        return retroId + ":" + participantId;
+    }
+
+    private String participantInfo(String participantName, UUID participantId) {
+        return participantName + " (" + participantId + ")";
+    }
+
+    private Map<?, ?> localEmitters() {
+        Object emitters = ReflectionTestUtils.getField(eventService, "localEmitters");
+        if (emitters instanceof Map<?, ?> emitterMap) {
+            return emitterMap;
+        }
+        throw new IllegalStateException("Expected localEmitters to be a Map");
+    }
+
+    private int activeConnections() {
+        Object connectionCount = ReflectionTestUtils.getField(eventService, "activeConnections");
+        if (connectionCount instanceof AtomicInteger activeConnectionCount) {
+            return activeConnectionCount.get();
+        }
+        throw new IllegalStateException("Expected activeConnections to be an AtomicInteger");
     }
 }

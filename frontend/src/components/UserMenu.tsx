@@ -21,15 +21,16 @@ export default function UserMenu() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/logout', {
+      const response = await fetch('/logout', {
         method: 'POST',
         headers: csrfHeaders(),
       })
-    } catch {
-      window.location.href = '/login'
-      return
+      if (response.ok) {
+        window.location.href = '/login'
+      }
+    } catch (error) {
+      console.error('Logout failed:', error)
     }
-    window.location.href = '/login'
   }
 
   if (isLoading || !currentUser || !currentUser.isAuthenticated) {
