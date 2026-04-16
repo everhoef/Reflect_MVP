@@ -35,13 +35,6 @@ public enum ComponentType {
     GUIDANCE_MESSAGE,
 
     /**
-     * Visual layout for media or static content.
-     * Configuration: layoutType, contentUrl
-     * Use cases: Video check-ins, image displays
-     */
-    VISUAL_LAYOUT,
-
-    /**
      * Guided UI for building SMART action points.
      * Configuration: maxLength, templates[], categories[]
      * Use cases: Decide Actions phase

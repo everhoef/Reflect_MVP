@@ -15,7 +15,6 @@ class ComponentTypeExtensionTest {
                         "RATING_SCALE",
                         "HISTOGRAM_CHART",
                         "GUIDANCE_MESSAGE",
-                        "VISUAL_LAYOUT",
                         "SMART_ACTION_BUILDER",
                         "ACTION_REVIEW");
     }
