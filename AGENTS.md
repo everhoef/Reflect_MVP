@@ -163,11 +163,25 @@ The application follows **function-oriented modular architecture** organized aro
 - **High Cohesion**: Group related functionality within the same module
 
 ### Module Organization (by business function)
-- **configurator**: Template/stage/step definitions, CSV import, participant responses
-- **facilitation**: Sessions, participants, retrospective flow control
-- **eventing**: Real-time SSE event streaming and notifications
-- **auth**: Authentication (OIDC + guest mode with CookieAuthenticationToken)
-- **common**: Shared utilities, exceptions, configurations
+- **Business domains**
+  - **facilitation**: Sessions, participants, retrospective flow control, action lifecycle, clustering, escalation
+  - **configurator**: Template, stage, and step definitions, CSV import, step configuration, component contracts
+  - **organization**: Organizations, teams, membership, manager relationships
+- **Support modules**
+  - **auth**: Authentication, identity resolution, guest mode, access and security helpers
+  - **eventing**: SSE transport, Redis pub/sub wiring, event delivery mechanics
+- **Shared kernel and app shell targets**
+  - **common**: Shrinking shared-kernel target for tiny, policy-free cross-module primitives. It is not a dumping ground.
+  - **web**: Minimal app-shell home for server-rendered auth, error, and other non-SPA routes when needed
+
+### Pragmatic Module and Layer Guardrails
+
+- Prefer `api`, `application`, `domain`, and `infrastructure` as the internal layer vocabulary when a module needs that split.
+- Modules only use the layers they actually need. Do not create empty layer packages just for symmetry.
+- Keep dependency direction clear: `api` calls owned `application` surfaces, `application` coordinates domain behavior, and `infrastructure` supports the owning module.
+- Business domains may call support modules only through narrow owned surfaces. Support modules carry transport, identity, and integration mechanics, not product rules.
+- Do not import another module's repositories or JPA entities directly. Prefer a small query or service surface owned by the source module.
+- `common` must stay tiny, generic, and dependency-light. Domain enums, module-specific exceptions, security policy, and event payload ownership do not belong there.
 
 ### Domain Model
 
@@ -412,6 +426,14 @@ Facilitators can ALWAYS advance - the system shows warnings but never blocks. Th
 - **Flaky tests are bugs**: A flaky test indicates a real problem — race condition, missing synchronization, incorrect assumptions. Treat flaky tests as P1 bugs and fix immediately.
 - **Test reliability is non-negotiable**: All tests must pass reliably on every run. If a test passes "most of the time", it is broken and must be fixed.
 
+#### Test Ownership and Multi-User Verification
+
+- Lower layers own non-UI correctness where possible. Validation, authorization matrices, persistence invariants, and service guards should stay below the browser layer unless the browser is the only truthful place to prove them.
+- Module-aligned tests should live under the owning top-level package. Extend an existing owner when the workflow or contract matches. Create a new test file only when ownership, runtime, or layer genuinely differs.
+- Browser regressions stay narrow and high-value. Use them for collaboration, SSE propagation, and DOM behavior that lower layers cannot prove honestly.
+- Isolated browser contexts or profiles are the canonical multi-user verification strategy. Shared tabs in one browser context are not valid multi-user evidence.
+- The only approved fallback is one browser actor plus isolated API actors, and only when true browser isolation is unavailable in the current tool or runtime. This fallback does not replace real browser-to-browser collaboration coverage when isolated contexts are available.
+
 #### Test Package Architecture
 
 The test package structure mirrors `src/main/java` as closely as practical:
@@ -419,9 +441,11 @@ The test package structure mirrors `src/main/java` as closely as practical:
 - **`integration/`** — Browser/E2E tests ONLY (enforced by `IntegrationPackageBrowserOnlyTest`). Any non-browser test in this package is a violation.
 - **`facilitation/`** — MockMvc/API and data tests for the facilitation module
 - **`configurator/`** — Import, template, and configurator tests
+- **`organization/`** — Organization, team, and membership tests
 - **`auth/`** — Authentication controller and service tests
 - **`eventing/`** — SSE event and contract tests
-- **`common/`** — Architecture enforcement tests (e.g., `IntegrationPackageBrowserOnlyTest`)
+- **`common/`** — Architecture enforcement tests and small shared-kernel or app-shell contract tests
+- **`web/`** — Server-rendered route/controller tests when present
 - **`config/`** — Test configuration classes (`TestSecurityOverride`, `TestRedisConfig`)
 
 #### Test Layer Taxonomy
@@ -688,6 +712,10 @@ lsof -i :8080
 # Process check
 ps aux | grep -i "[m]vn spring-boot:run"
 ```
+
+#### Manual Multi-User Browser QA
+- Do not use multiple tabs in the same browser to simulate different users. This is fundamentally not possible due to the cookie that is set locally, so you can only have 1 user and 1 session in that browser context.
+- Canonical multi-user QA uses isolated browser contexts or profiles. For manual checks, use two different browsers, two separate browser profiles, or one normal window plus one incognito window only when they are truly isolated.
 
 ### Task Management
 - Use the TodoWrite tool to track multi-step tasks
