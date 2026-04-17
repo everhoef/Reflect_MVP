@@ -73,7 +73,3 @@ spring:
   config:
     activate:
       on-profile: "import & !test"
-
-facilitator:
-  local-auth:
-    enabled: true
