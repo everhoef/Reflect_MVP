@@ -2,6 +2,7 @@ package direct.reflect.facilitator.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -15,13 +16,10 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
 public class AuthApiController {
 
     private final AuthService authService;
-
-    public AuthApiController(AuthService authService) {
-        this.authService = authService;
-    }
 
     @GetMapping("/me")
     public ResponseEntity<?> getCurrentUser(HttpServletRequest request) {
