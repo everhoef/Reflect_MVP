@@ -113,6 +113,7 @@ class StepAdvancementApiIntegrationTest {
     void advanceNext_FromInitialState_MovesToFirstStep() throws Exception {
         RetroSession initial = sessionRepository.findById(testSession.getId()).orElseThrow();
         assertThat(initial.getCurrentStepIndex()).isEqualTo(-1);
+        long initialSyncVersion = initial.getSyncVersion();
 
         mockMvc.perform(post("/api/retro/{retroId}/next", testSession.getId())
                         .with(csrf()))
@@ -120,6 +121,7 @@ class StepAdvancementApiIntegrationTest {
 
         RetroSession updated = sessionRepository.findById(testSession.getId()).orElseThrow();
         assertThat(updated.getCurrentStepIndex()).isEqualTo(0);
+        assertThat(updated.getSyncVersion()).isGreaterThan(initialSyncVersion);
     }
 
     @Test

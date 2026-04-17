@@ -46,6 +46,9 @@ public class RetroSession {
 
   private int currentStepIndex = -1;
 
+  @Column(nullable = false)
+  private Long syncVersion = 0L;
+
   @Enumerated(EnumType.STRING)
   private RetroPhase phase = RetroPhase.CREATED;
 

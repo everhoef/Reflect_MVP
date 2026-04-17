@@ -2,7 +2,6 @@ package direct.reflect.facilitator.eventing;
 
 import java.time.Instant;
 import java.util.UUID;
-import lombok.Getter;
 
 /**
  * Event message for retro-related events
@@ -36,11 +35,19 @@ public record RetroEvent<T>(
         ACTION_CREATED,
         ACTION_UPDATED,
         ACTION_DELETED,
+        ESCALATION_CREATED,
         ESCALATION_VOTE_UPDATED,
         TIMER_STARTED,
         TIMER_PAUSED,
         TIMER_FINISHED
     }
+
+    public record EscalationVoteData(
+        String escalationId,
+        long voteCount,
+        int threshold,
+        boolean thresholdMet
+    ) {}
 
     /**
      * Create a participant joined event
@@ -130,5 +137,31 @@ public record RetroEvent<T>(
      */
     public static RetroEvent<Void> timerStarted(UUID retroId) {
         return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.TIMER_STARTED, "system", Instant.now(), null);
+    }
+
+    public static RetroEvent<EscalationVoteData> escalationVoteUpdated(
+            UUID retroId,
+            String participantId,
+            EscalationVoteData payload) {
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId,
+            EventType.ESCALATION_VOTE_UPDATED,
+            participantId,
+            Instant.now(),
+            payload);
+    }
+
+    public static RetroEvent<String> escalationCreated(
+            UUID retroId,
+            String participantId,
+            String escalationId) {
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId,
+            EventType.ESCALATION_CREATED,
+            participantId,
+            Instant.now(),
+            escalationId);
     }
 }

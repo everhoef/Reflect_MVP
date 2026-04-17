@@ -1,14 +1,12 @@
 package direct.reflect.facilitator.eventing;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -19,9 +17,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.time.LocalDateTime;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.Map;
@@ -30,12 +30,14 @@ import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
+@RequiredArgsConstructor
 public class EventService {
+
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final RetroSyncVersionService retroSyncVersionService;
     private final AtomicInteger activeConnections = new AtomicInteger(0);
 
     @Value("${facilitator.sse.timeout-ms:3600000}")
@@ -191,11 +193,15 @@ public class EventService {
      * Thread-safe cleanup method to avoid double-decrements.
      */
     private void cleanupConnection(String connectionId, SseEmitter emitter, String participantInfo, UUID retroId) {
-        // Only cleanup if the emitter in the map matches the one we're cleaning up
-        // This prevents race conditions where multiple cleanup calls happen for the same connection
-        if (localEmitters.remove(connectionId, emitter)) {
-            activeConnections.decrementAndGet();
-            log.trace("Cleaned up SSE connection for participant {} in retro {} (active: {})", participantInfo, retroId, activeConnections.get());
+        EmitterConnection existingConnection = localEmitters.get(connectionId);
+
+        // Only cleanup if the stored connection still points at this emitter.
+        // localEmitters stores EmitterConnection wrappers, so remove using the wrapper value.
+        if (existingConnection != null
+                && existingConnection.emitter() == emitter
+                && localEmitters.remove(connectionId, existingConnection)) {
+            int remainingConnections = activeConnections.decrementAndGet();
+            log.trace("Cleaned up SSE connection for participant {} in retro {} (active: {})", participantInfo, retroId, remainingConnections);
             try {
                 emitter.complete();
             } catch (Exception e) {
@@ -226,7 +232,7 @@ public class EventService {
 
         String eventData;
         try {
-            eventData = event.payload() != null ? objectMapper.writeValueAsString(event.payload()) : "null";
+            eventData = objectMapper.writeValueAsString(toSseEnvelope(event));
         } catch (JacksonException e) {
             log.error("[{}] Failed to serialize payload for event type {}: {}",
                 event.correlationId(), event.type(), e.getMessage());
@@ -258,6 +264,11 @@ public class EventService {
 
         log.debug("[{}] Broadcast completed: {} succeeded, {} failed",
             event.correlationId(), successCount, failureCount);
+    }
+
+    RetroSseEnvelope<?> toSseEnvelope(RetroEvent<?> event) {
+        long syncVersion = retroSyncVersionService.getSyncVersion(event.retroId());
+        return new RetroSseEnvelope<>(syncVersion, event.payload());
     }
     
     /**

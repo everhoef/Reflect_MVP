@@ -1,6 +1,7 @@
 package direct.reflect.facilitator.auth;
 
 import direct.reflect.facilitator.organization.TeamMemberRepository;
+import direct.reflect.facilitator.organization.Team;
 import direct.reflect.facilitator.organization.TeamRole;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -11,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -135,6 +137,28 @@ public class AuthService {
 
         UUID userId = toOidcUserId(username);
         return teamMemberRepository.existsByUserIdAndRole(userId, TeamRole.MANAGER);
+    }
+
+    public Optional<Team> findSingleManagedTeam(HttpServletRequest request) {
+        if (teamMemberRepository == null) {
+            return Optional.empty();
+        }
+
+        String username = getUsername(request);
+        if (username == null || username.isBlank()) {
+            return Optional.empty();
+        }
+
+        UUID userId = toOidcUserId(username);
+        List<Team> managedTeams = teamMemberRepository.findByUserIdAndRole(userId, TeamRole.MANAGER).stream()
+                .map(teamMember -> teamMember.getTeam())
+                .toList();
+
+        if (managedTeams.size() != 1) {
+            return Optional.empty();
+        }
+
+        return Optional.ofNullable(managedTeams.getFirst());
     }
 
     public UUID toOidcUserId(String username) {

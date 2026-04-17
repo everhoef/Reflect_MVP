@@ -31,6 +31,7 @@ class ActionEventTypeTest {
                         "ACTION_CREATED",
                         "ACTION_UPDATED",
                         "ACTION_DELETED",
+                        "ESCALATION_CREATED",
                         "ESCALATION_VOTE_UPDATED",
                         "TIMER_STARTED",
                         "TIMER_PAUSED",

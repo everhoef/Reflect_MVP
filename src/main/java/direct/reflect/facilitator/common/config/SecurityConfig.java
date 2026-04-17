@@ -51,7 +51,10 @@ public class SecurityConfig {
                 .loginPage("/login")
                 .successHandler(oidcSuccessHandler)
             )
-            .csrf(csrf -> csrf.spa())
+            .csrf(csrf -> {
+                csrf.spa();
+                csrf.ignoringRequestMatchers("/auth/guest");
+            })
             // Authorization rules - permissive approach with service-level enforcement
             .authorizeHttpRequests(requests -> requests
                 // Public static resources

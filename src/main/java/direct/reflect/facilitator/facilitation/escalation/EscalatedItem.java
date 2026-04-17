@@ -17,8 +17,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
-import java.util.UUID;
 import lombok.Data;
+import java.util.UUID;
 
 @Entity
 @Table(
@@ -62,13 +62,5 @@ public class EscalatedItem {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }
-    }
-
-    public static int calculateVoteThreshold(int participantCount) {
-        if (participantCount < 1) {
-            throw new IllegalArgumentException("Participant count must be at least 1");
-        }
-
-        return (participantCount / 2) + 1;
     }
 }

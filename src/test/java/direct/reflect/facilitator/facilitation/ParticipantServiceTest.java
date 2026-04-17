@@ -43,6 +43,9 @@ class ParticipantServiceTest {
     @Mock
     private AuthService authHelper;
 
+    @Mock
+    private RetroSyncVersionService retroSyncVersionService;
+
     @InjectMocks
     private ParticipantService participantService;
 
@@ -82,6 +85,7 @@ class ParticipantServiceTest {
         assertEquals(ParticipantRole.PARTICIPANT, result.getRole());
         assertEquals(session, result.getSession());
         assertEquals(participantId, result.getParticipantId());
+        verify(retroSyncVersionService).bumpSyncVersion(session.getId());
         verify(eventService).publish(any()); // PARTICIPANT_JOINED event
     }
 
@@ -130,6 +134,7 @@ class ParticipantServiceTest {
         verify(participantRepository).save(argThat(p ->
             p.getStatus() != ParticipantStatus.LEFT
         ));
+        verify(retroSyncVersionService).bumpSyncVersion(sessionId);
         verify(eventService).publish(any()); // PARTICIPANT_JOINED event
     }
 
@@ -183,6 +188,8 @@ class ParticipantServiceTest {
             // Either LEFT status (old participant) or ACTIVE status (new participant)
             return p.getStatus() == ParticipantStatus.LEFT || p.getStatus() == ParticipantStatus.ACTIVE;
         }));
+        verify(retroSyncVersionService).bumpSyncVersion(oldSessionId);
+        verify(retroSyncVersionService).bumpSyncVersion(newSessionId);
         verify(eventService, times(2)).publish(any()); // PARTICIPANT_LEFT + PARTICIPANT_JOINED events
     }
 
@@ -232,6 +239,8 @@ class ParticipantServiceTest {
         verify(participantRepository, times(2)).save(argThat(p ->
             p.getStatus() == ParticipantStatus.LEFT
         ));
+        verify(retroSyncVersionService).bumpSyncVersion(session1.getId());
+        verify(retroSyncVersionService).bumpSyncVersion(session2.getId());
         verify(eventService, times(2)).publish(any()); // PARTICIPANT_LEFT events
 
         // Verify session attributes were cleared

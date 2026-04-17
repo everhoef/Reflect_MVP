@@ -75,6 +75,7 @@ logs/
 ### AI Agents ###
 .claude/
 .sisyphus/
+.playwright-mcp/
 
 ### Frontend ###
 frontend/node_modules/

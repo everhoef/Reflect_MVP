@@ -21,11 +21,14 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers = {AuthApiController.class})
+@WebMvcTest(controllers = {AuthApiController.class, AuthController.class})
 @Import({direct.reflect.facilitator.config.TestSecurityOverride.class})
 @EnableAutoConfiguration(exclude = {
         DataSourceAutoConfiguration.class,
@@ -84,6 +87,37 @@ public class AuthApiControllerTest {
     }
 
     @Test
+    void shouldRehydrateGuestAuthTypeFromAuthenticatedSession() throws Exception {
+        UUID participantId = UUID.randomUUID();
+        String displayName = "Alice";
+
+        when(authService.getParticipantId(any(jakarta.servlet.http.HttpServletRequest.class)))
+                .thenReturn(participantId);
+        when(authService.getDisplayName(any(jakarta.servlet.http.HttpServletRequest.class)))
+                .thenReturn(displayName);
+
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("authenticatedUser", UUID.randomUUID().toString());
+        session.setAttribute("userDisplayName", displayName);
+
+        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                UUID.randomUUID().toString(),
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_GUEST"))
+        );
+        SecurityContextImpl securityContext = new SecurityContextImpl(auth);
+        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, securityContext);
+
+        mockMvc.perform(get("/api/me").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isAuthenticated").value(true))
+                .andExpect(jsonPath("$.isGuest").value(true))
+                .andExpect(jsonPath("$.authType").value("GUEST"))
+                .andExpect(jsonPath("$.user.id").value(participantId.toString()))
+                .andExpect(jsonPath("$.user.displayName").value(displayName));
+    }
+
+    @Test
     void shouldReturn200ForOidcUser() throws Exception {
         UUID participantId = UUID.randomUUID();
         String displayName = "Bob Smith";
@@ -116,5 +150,15 @@ public class AuthApiControllerTest {
                 .andExpect(jsonPath("$.user.id").value(participantId.toString()))
                 .andExpect(jsonPath("$.user.displayName").value(displayName))
                 .andExpect(jsonPath("$.user.role").value("USER"));
+    }
+
+    @Test
+    void guestAuthWithoutCsrfToken_shouldRedirectHomeAndInitializeGuestSession() throws Exception {
+        mockMvc.perform(post("/auth/guest")
+                        .param("displayName", "Atlas QA"))
+                .andExpect(status().isFound())
+                .andExpect(redirectedUrl("/"));
+
+        verify(authService).initializeGuestSession(any(jakarta.servlet.http.HttpServletRequest.class), eq("Atlas QA"));
     }
 }

@@ -53,6 +53,9 @@ class RetroSessionServiceTest {
     private EventService eventService;
 
     @Mock
+    private RetroSyncVersionService retroSyncVersionService;
+
+    @Mock
     private ObjectMapper objectMapper;
 
     @InjectMocks
@@ -82,8 +85,10 @@ class RetroSessionServiceTest {
         assertEquals(RetroPhase.LOBBY, result.getPhase());
         assertEquals(template, result.getTemplate());
         assertNotNull(result.getCreatedAt());
+        assertThat(result.getSyncVersion()).isEqualTo(0L);
 
         verify(sessionRepository).save(any(RetroSession.class));
+        verify(retroSyncVersionService).bumpSyncVersion(result.getId());
         verify(eventService).publish(any(RetroEvent.class)); // RETRO_CREATED event
     }
 
@@ -119,6 +124,7 @@ class RetroSessionServiceTest {
         assertEquals(RetroPhase.SET_THE_STAGE, session.getPhase());
         assertEquals(0, session.getCurrentStepIndex());
         verify(sessionRepository, times(2)).save(any(RetroSession.class));
+        verify(retroSyncVersionService, times(2)).bumpSyncVersion(sessionId);
     }
 
     @Test
@@ -192,6 +198,7 @@ class RetroSessionServiceTest {
             s.getCurrentStepIndex() == 1 &&
             s.getPhase() == RetroPhase.SET_THE_STAGE
         ));
+        verify(retroSyncVersionService).bumpSyncVersion(sessionId);
     }
 
     @Test
@@ -230,6 +237,7 @@ class RetroSessionServiceTest {
             s.getPhase() == RetroPhase.GATHER_DATA &&
             s.getCurrentStepIndex() == 0
         ));
+        verify(retroSyncVersionService).bumpSyncVersion(sessionId);
     }
 
     @Test
@@ -350,6 +358,7 @@ class RetroSessionServiceTest {
         assertNotNull(saved.getTimerPausedAt());
         
         // Verify event was published
+        verify(retroSyncVersionService).bumpSyncVersion(sessionId);
         verify(eventService).publish(any(RetroEvent.class));
     }
 
@@ -373,5 +382,6 @@ class RetroSessionServiceTest {
         RetroSession saved = captor.getValue();
         assertNull(saved.getTimerPausedAt());
         assertThat(saved.getAccumulatedPauseSeconds()).isBetween(38L, 42L); // ~40s with tolerance
+        verify(retroSyncVersionService).bumpSyncVersion(sessionId);
     }
 }

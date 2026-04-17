@@ -232,6 +232,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/retro/{retroId}/escalations/{escalationId}/vote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["toggleVote_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retro/{retroId}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getActionItems"];
+        put?: never;
+        post: operations["createActionItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retro/{retroId}/actions/{actionId}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["updateActionItemStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retro/{retroId}/actions/{actionId}/escalate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["escalateAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/retro/leave-active-sessions": {
         parameters: {
             query?: never;
@@ -280,6 +344,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getOrganizations"];
+        put?: never;
+        post: operations["createOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{orgId}/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getTeams"];
+        put?: never;
+        post: operations["createTeam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{orgId}/teams/{teamId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMembers"];
+        put?: never;
+        post: operations["addMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retro/{retroId}/actions/{actionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteActionItem"];
+        options?: never;
+        head?: never;
+        patch: operations["updateActionItem"];
+        trace?: never;
+    };
     "/api/retro/{retroId}/timer": {
         parameters: {
             query?: never;
@@ -288,6 +416,26 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getTimerState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retro/{retroId}/step/{stepId}/response/rating/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get current user's rating response
+         * @description Returns the authenticated user's rating response for a given step, or 404 if not yet submitted
+         */
+        get: operations["getMyRatingResponse"];
         put?: never;
         post?: never;
         delete?: never;
@@ -328,6 +476,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/retro/{retroId}/previous-actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPreviousActions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/retro/{retroId}/participants": {
         parameters: {
             query?: never;
@@ -360,6 +524,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/retro/{retroId}/escalations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getEscalations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/retro/check-active-sessions": {
         parameters: {
             query?: never;
@@ -384,6 +564,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getCurrentUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/manager/escalations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getEscalations_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/manager/escalations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getEscalation"];
         put?: never;
         post?: never;
         delete?: never;
@@ -480,11 +692,136 @@ export interface components {
              */
             voteCount?: number;
         };
+        NextStepResult: {
+            /** Format: uuid */
+            retroId?: string;
+            advanced?: boolean;
+        };
+        EscalationVoteResultDto: {
+            /** Format: int64 */
+            syncVersion?: number;
+            /** Format: uuid */
+            escalationId?: string;
+            /** Format: int64 */
+            voteCount?: number;
+            /** Format: int32 */
+            threshold?: number;
+            thresholdMet?: boolean;
+            voted?: boolean;
+        };
+        CreateActionItemRequest: {
+            what: string;
+            who: string;
+            /** Format: date */
+            dueDate: string;
+            successCriteria?: string;
+        };
+        ActionItemDto: {
+            /** Format: int64 */
+            syncVersion?: number;
+            /** Format: uuid */
+            id?: string;
+            what?: string;
+            who?: string;
+            /** Format: date */
+            dueDate?: string;
+            successCriteria?: string;
+            escalated?: boolean;
+            /** @enum {string} */
+            status?: "OPEN" | "DONE";
+            /** Format: uuid */
+            createdByParticipantId?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        UpdateActionItemStatusRequest: {
+            /** @enum {string} */
+            status: "OPEN" | "DONE";
+        };
+        EscalateActionRequest: {
+            problemDescription: string;
+        };
+        EscalatedItemDto: {
+            /** Format: int64 */
+            syncVersion?: number;
+            /** Format: uuid */
+            id?: string;
+            problemDescription?: string;
+            /** Format: int64 */
+            voteCount?: number;
+            /** Format: int32 */
+            threshold?: number;
+            thresholdMet?: boolean;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        LeaveActiveSessionsResult: {
+            success?: boolean;
+        };
         JoinRetroRequest: {
             retroId: string;
         };
+        JoinRetroResponse: {
+            /** Format: uuid */
+            retroId?: string;
+            redirectUrl?: string;
+        };
         CreateRetroRequest: {
             sessionName: string;
+        };
+        CreateRetroResponse: {
+            /** Format: uuid */
+            retroId?: string;
+            redirectUrl?: string;
+            sessionName?: string;
+        };
+        CreateOrganizationRequest: {
+            name: string;
+            slug: string;
+        };
+        OrganizationDto: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            slug?: string;
+        };
+        CreateTeamRequest: {
+            name: string;
+        };
+        TeamDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            organizationId?: string;
+            name?: string;
+        };
+        AddMemberRequest: {
+            /** Format: uuid */
+            userId: string;
+            /** @enum {string} */
+            role: "MEMBER" | "MANAGER";
+        };
+        TeamMemberDto: {
+            /** Format: uuid */
+            teamId?: string;
+            /** Format: uuid */
+            userId?: string;
+            /** @enum {string} */
+            role?: "MEMBER" | "MANAGER";
+        };
+        UpdateActionItemRequest: {
+            what?: string;
+            who?: string;
+            /** Format: date */
+            dueDate?: string;
+            successCriteria?: string;
+        };
+        SyncVersionedResponseTimerStateDto: {
+            /** Format: int64 */
+            syncVersion?: number;
+            data?: components["schemas"]["TimerStateDto"];
         };
         TimerStateDto: {
             /** Format: int64 */
@@ -507,13 +844,15 @@ export interface components {
             publicText?: string;
         };
         AssistantStateDto: {
-            current?: components["schemas"]["AssistantMessageDto"] | null;
+            current?: components["schemas"]["AssistantMessageDto"];
             history?: components["schemas"]["AssistantMessageDto"][];
-            facilitatorCoachingNote?: string | null;
+            facilitatorCoachingNote?: string;
         };
         RetroStateDto: {
             /** Format: uuid */
             retroId?: string;
+            /** Format: int64 */
+            syncVersion?: number;
             phase?: string;
             /** Format: int64 */
             currentStepId?: number;
@@ -525,7 +864,7 @@ export interface components {
             isFacilitator?: boolean;
             /** Format: int32 */
             participantCount?: number;
-            assistantState?: components["schemas"]["AssistantStateDto"] | null;
+            assistantState?: components["schemas"]["AssistantStateDto"];
         };
         StepSummaryDto: {
             /** Format: int64 */
@@ -546,9 +885,24 @@ export interface components {
             displayName?: string;
             role?: string;
         };
+        SyncVersionedResponseListParticipantDto: {
+            /** Format: int64 */
+            syncVersion?: number;
+            data?: components["schemas"]["ParticipantDto"][];
+        };
         SseEmitter: {
             /** Format: int64 */
             timeout?: number;
+        };
+        SyncVersionedResponseListEscalatedItemDto: {
+            /** Format: int64 */
+            syncVersion?: number;
+            data?: components["schemas"]["EscalatedItemDto"][];
+        };
+        SyncVersionedResponseListActionItemDto: {
+            /** Format: int64 */
+            syncVersion?: number;
+            data?: components["schemas"]["ActionItemDto"][];
         };
         SessionInfo: {
             /** Format: uuid */
@@ -931,7 +1285,134 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": components["schemas"]["NextStepResult"];
+                };
+            };
+        };
+    };
+    toggleVote_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+                escalationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EscalationVoteResultDto"];
+                };
+            };
+        };
+    };
+    getActionItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SyncVersionedResponseListActionItemDto"];
+                };
+            };
+        };
+    };
+    createActionItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateActionItemRequest"];
+            };
+        };
+        responses: {
+            /** @description Action item created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ActionItemDto"];
+                };
+            };
+        };
+    };
+    updateActionItemStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+                actionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateActionItemStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ActionItemDto"];
+                };
+            };
+        };
+    };
+    escalateAction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+                actionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EscalateActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Action escalated successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EscalatedItemDto"];
+                };
             };
         };
     };
@@ -949,7 +1430,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": components["schemas"]["LeaveActiveSessionsResult"];
+                };
             };
         };
     };
@@ -971,7 +1454,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": components["schemas"]["JoinRetroResponse"];
+                };
             };
         };
     };
@@ -993,7 +1478,199 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "*/*": components["schemas"]["CreateRetroResponse"];
+                };
+            };
+        };
+    };
+    getOrganizations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["OrganizationDto"][];
+                };
+            };
+        };
+    };
+    createOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOrganizationRequest"];
+            };
+        };
+        responses: {
+            /** @description Organization created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["OrganizationDto"];
+                };
+            };
+        };
+    };
+    getTeams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TeamDto"][];
+                };
+            };
+        };
+    };
+    createTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTeamRequest"];
+            };
+        };
+        responses: {
+            /** @description Team created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TeamDto"];
+                };
+            };
+        };
+    };
+    getMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TeamMemberDto"][];
+                };
+            };
+        };
+    };
+    addMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddMemberRequest"];
+            };
+        };
+        responses: {
+            /** @description Team member added successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TeamMemberDto"];
+                };
+            };
+        };
+    };
+    deleteActionItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+                actionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Action item deleted successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content?: never;
+            };
+        };
+    };
+    updateActionItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+                actionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateActionItemRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ActionItemDto"];
+                };
             };
         };
     };
@@ -1014,7 +1691,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["TimerStateDto"];
+                    "*/*": components["schemas"]["SyncVersionedResponseTimerStateDto"];
+                };
+            };
+        };
+    };
+    getMyRatingResponse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+                stepId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rating response returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RatingResponseDto"];
+                };
+            };
+            /** @description No rating response found for this participant and step */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RatingResponseDto"];
                 };
             };
         };
@@ -1064,6 +1773,28 @@ export interface operations {
             };
         };
     };
+    getPreviousActions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ActionItemDto"][];
+                };
+            };
+        };
+    };
     getParticipants: {
         parameters: {
             query?: never;
@@ -1081,7 +1812,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ParticipantDto"][];
+                    "*/*": components["schemas"]["SyncVersionedResponseListParticipantDto"];
                 };
             };
         };
@@ -1104,6 +1835,28 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": components["schemas"]["SseEmitter"];
+                };
+            };
+        };
+    };
+    getEscalations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SyncVersionedResponseListEscalatedItemDto"];
                 };
             };
         };
@@ -1144,6 +1897,48 @@ export interface operations {
                 };
                 content: {
                     "*/*": Record<string, never>;
+                };
+            };
+        };
+    };
+    getEscalations_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EscalatedItemDto"][];
+                };
+            };
+        };
+    };
+    getEscalation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EscalatedItemDto"];
                 };
             };
         };

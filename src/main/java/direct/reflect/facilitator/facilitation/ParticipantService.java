@@ -7,14 +7,13 @@ import java.util.UUID;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.auth.AuthService;
@@ -33,15 +32,13 @@ import direct.reflect.facilitator.eventing.RetroEvent;
  * associating them with RetroSessions, and handling participant lifecycle.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
+@RequiredArgsConstructor
 public class ParticipantService {
     private final ParticipantRepository participantRepository;
     private final EventService eventService;
     private final AuthService authHelper;
-
-    
-
+    private final RetroSyncVersionService retroSyncVersionService;
 
     /**
      * Adds a user to an existing retro session.
@@ -61,6 +58,7 @@ public class ParticipantService {
 
         checkForActiveSession(participantId, session.getId());
         Participant participant = createParticipantForSession(session, role, request);
+        retroSyncVersionService.bumpSyncVersion(session.getId());
 
         // Publish PARTICIPANT_JOINED event
         try {
@@ -323,6 +321,7 @@ public class ParticipantService {
         participant.setStatus(ParticipantStatus.LEFT);
         participant.setLastSeen(LocalDateTime.now());
         participantRepository.save(participant);
+        retroSyncVersionService.bumpSyncVersion(participant.getSession().getId());
 
         log.info("Participant {} left session {}",
             participant.getDisplayName(), participant.getSession().getId());

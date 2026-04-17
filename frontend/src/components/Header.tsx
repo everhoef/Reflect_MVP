@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import UserMenu from './UserMenu'
 
 type StageStatus = 'complete' | 'in-progress' | 'to-do'
 
@@ -33,9 +34,9 @@ export default function Header({ currentStage }: HeaderProps) {
     location.pathname.includes('/retro/') && !location.pathname.endsWith('/lobby')
 
   return (
-    <header className="bg-white shadow-sm border-b border-amber-100">
+    <header className="bg-white shadow-sm border-b border-amber-100 relative z-40">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-14">
+        <div className="flex items-center justify-between h-14 relative">
           <Link
             to="/"
             className="text-xl font-semibold tracking-tight text-[#C49A1A]"
@@ -92,9 +93,10 @@ export default function Header({ currentStage }: HeaderProps) {
             </nav>
           )}
 
-          <div className="w-24" />
+          <UserMenu />
         </div>
       </div>
     </header>
   )
 }
+

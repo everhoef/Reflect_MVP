@@ -163,11 +163,25 @@ The application follows **function-oriented modular architecture** organized aro
 - **High Cohesion**: Group related functionality within the same module
 
 ### Module Organization (by business function)
-- **configurator**: Template/stage/step definitions, CSV import, participant responses
-- **facilitation**: Sessions, participants, retrospective flow control
-- **eventing**: Real-time SSE event streaming and notifications
-- **auth**: Authentication (OIDC + guest mode with CookieAuthenticationToken)
-- **common**: Shared utilities, exceptions, configurations
+- **Business domains**
+  - **facilitation**: Sessions, participants, retrospective flow control, action lifecycle, clustering, escalation
+  - **configurator**: Template, stage, and step definitions, CSV import, step configuration, component contracts
+  - **organization**: Organizations, teams, membership, manager relationships
+- **Support modules**
+  - **auth**: Authentication, identity resolution, guest mode, access and security helpers
+  - **eventing**: SSE transport, Redis pub/sub wiring, event delivery mechanics
+- **Shared kernel and app shell targets**
+  - **common**: Shrinking shared-kernel target for tiny, policy-free cross-module primitives. It is not a dumping ground.
+  - **web**: Minimal app-shell home for server-rendered auth, error, and other non-SPA routes when needed
+
+### Pragmatic Module and Layer Guardrails
+
+- Prefer `api`, `application`, `domain`, and `infrastructure` as the internal layer vocabulary when a module needs that split.
+- Modules only use the layers they actually need. Do not create empty layer packages just for symmetry.
+- Keep dependency direction clear: `api` calls owned `application` surfaces, `application` coordinates domain behavior, and `infrastructure` supports the owning module.
+- Business domains may call support modules only through narrow owned surfaces. Support modules carry transport, identity, and integration mechanics, not product rules.
+- Do not import another module's repositories or JPA entities directly. Prefer a small query or service surface owned by the source module.
+- `common` must stay tiny, generic, and dependency-light. Domain enums, module-specific exceptions, security policy, and event payload ownership do not belong there.
 
 ### Domain Model
 
@@ -384,8 +398,9 @@ Facilitators can ALWAYS advance - the system shows warnings but never blocks. Th
 ## Code Conventions
 
 ### Java Coding Standards
-- Use Lombok annotations (`@Data`, `@RequiredArgsConstructor`, `@Slf4j`) to reduce boilerplate
-- Use `@Slf4j` for logging in all classes
+- Use Lombok by default for Java boilerplate elimination when possible. Prefer Lombok annotations such as `@Getter`, `@Setter`, `@Data`, `@RequiredArgsConstructor`, `@AllArgsConstructor`, `@NoArgsConstructor`, `@Builder`, and `@Slf4j` unless custom behavior is required.
+- Do not hand-write getters, setters, constructors, or logger fields when Lombok can express the intent clearly.
+- Use `@Slf4j` for logging in all classes unless a class genuinely requires a different logger setup.
 - **Logging Policy**: DO NOT add INFO/WARN logs for debugging. Use DEBUG/TRACE level and adjust logging configuration. Only use INFO/WARN for genuinely important production events.
 - Prefer constructor injection over field injection
 - Use `@Service` for all business function implementations
@@ -412,6 +427,14 @@ Facilitators can ALWAYS advance - the system shows warnings but never blocks. Th
 - **Flaky tests are bugs**: A flaky test indicates a real problem — race condition, missing synchronization, incorrect assumptions. Treat flaky tests as P1 bugs and fix immediately.
 - **Test reliability is non-negotiable**: All tests must pass reliably on every run. If a test passes "most of the time", it is broken and must be fixed.
 
+#### Test Ownership and Multi-User Verification
+
+- Lower layers own non-UI correctness where possible. Validation, authorization matrices, persistence invariants, and service guards should stay below the browser layer unless the browser is the only truthful place to prove them.
+- Module-aligned tests should live under the owning top-level package. Extend an existing owner when the workflow or contract matches. Create a new test file only when ownership, runtime, or layer genuinely differs.
+- Browser regressions stay narrow and high-value. Use them for collaboration, SSE propagation, and DOM behavior that lower layers cannot prove honestly.
+- Isolated browser contexts or profiles are the canonical multi-user verification strategy. Shared tabs in one browser context are not valid multi-user evidence.
+- The only approved fallback is one browser actor plus isolated API actors, and only when true browser isolation is unavailable in the current tool or runtime. This fallback does not replace real browser-to-browser collaboration coverage when isolated contexts are available.
+
 #### Test Package Architecture
 
 The test package structure mirrors `src/main/java` as closely as practical:
@@ -419,9 +442,11 @@ The test package structure mirrors `src/main/java` as closely as practical:
 - **`integration/`** — Browser/E2E tests ONLY (enforced by `IntegrationPackageBrowserOnlyTest`). Any non-browser test in this package is a violation.
 - **`facilitation/`** — MockMvc/API and data tests for the facilitation module
 - **`configurator/`** — Import, template, and configurator tests
+- **`organization/`** — Organization, team, and membership tests
 - **`auth/`** — Authentication controller and service tests
 - **`eventing/`** — SSE event and contract tests
-- **`common/`** — Architecture enforcement tests (e.g., `IntegrationPackageBrowserOnlyTest`)
+- **`common/`** — Architecture enforcement tests and small shared-kernel or app-shell contract tests
+- **`web/`** — Server-rendered route/controller tests when present
 - **`config/`** — Test configuration classes (`TestSecurityOverride`, `TestRedisConfig`)
 
 #### Test Layer Taxonomy
@@ -512,7 +537,8 @@ A feature is READY FOR REVIEW when ALL of the following conditions are true:
 - [ ] No `@Disabled`, `@Ignore`, or `@Tag("flaky")` annotations added
 - [ ] No suppressed errors (`@SuppressWarnings`, empty catch blocks, `as any`)
 - [ ] Notion story status updated to `Needs review`
-- [ ] Code follows existing patterns in this AGENTS.md (GRASP, controller separation, Lombok, etc.)
+- [ ] Code follows existing patterns in this AGENTS.md (GRASP, controller separation, Lombok-first boilerplate reduction, etc.)
+- [ ] New Java code uses Lombok for boilerplate by default where appropriate, instead of manual getters, setters, constructors, or logger fields unless custom behavior is required
 
 ### Test Requirements
 
@@ -637,12 +663,12 @@ docker compose up -d
 
 ### Application Management
 
-**User runs the application in a separate iTerm2 terminal tab.**
+**Agent may manage the application directly.**
 
 #### How It Works
-- User runs: `./mvnw spring-boot:run -Dspring-boot.run.profiles=import` in dedicated terminal
-- Spring Boot logs to **both** console (for user) **and** `/tmp/facilitator.log` (for Claude)
-- User sees live logs in their terminal, Claude reads from log file
+- Start the application with `./mvnw spring-boot:run -Dspring-boot.run.profiles=import`
+- Check whether it is already running before starting another instance
+- Use `/tmp/facilitator.log` for log inspection when startup or runtime output is being written there
 
 #### Starting the Application
 1. **Check if running**:
@@ -650,13 +676,12 @@ docker compose up -d
    curl -s http://localhost:8080/ > /dev/null && echo "✅ Running" || echo "❌ Not running"
    ```
 
-2. **If not running**, tell the user:
-   > "Please start the application in a separate iTerm2 tab:
-   > ```bash
-   > ./mvnw spring-boot:run -Dspring-boot.run.profiles=import
-   > ```"
+2. **If not running, start it yourself**:
+   ```bash
+   ./mvnw spring-boot:run -Dspring-boot.run.profiles=import
+   ```
 
-3. Wait for user confirmation before proceeding
+3. Wait until the HTTP check succeeds or the logs show startup completed before proceeding
 
 #### Monitoring Logs (Claude)
 ```bash
@@ -690,6 +715,10 @@ lsof -i :8080
 ps aux | grep -i "[m]vn spring-boot:run"
 ```
 
+#### Manual Multi-User Browser QA
+- Do not use multiple tabs in the same browser to simulate different users. This is fundamentally not possible due to the cookie that is set locally, so you can only have 1 user and 1 session in that browser context.
+- Canonical multi-user QA uses isolated browser contexts or profiles. For manual checks, use two different browsers, two separate browser profiles, or one normal window plus one incognito window only when they are truly isolated.
+
 ### Task Management
 - Use the TodoWrite tool to track multi-step tasks
 - Mark tasks as completed immediately after finishing
@@ -697,7 +726,8 @@ ps aux | grep -i "[m]vn spring-boot:run"
 
 ### Code Generation Patterns
 - Follow Spring MVC patterns (not WebFlux - we use standard Spring MVC)
-- Use Lombok annotations consistently
+- Use Lombok annotations consistently, and default to Lombok for Java boilerplate when it expresses the intent clearly
+- Avoid generating manual getters, setters, constructors, or logger declarations unless the class needs custom behavior that Lombok should not hide
 - Implement proper error handling with custom exceptions
 - Use UUID v7 with `@GeneratedUuidV7` annotation for primary keys
 
