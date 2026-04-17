@@ -4,7 +4,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.security.access.prepost.PreAuthorize;
 
-import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.facilitation.ParticipantService;
 import direct.reflect.facilitator.facilitation.Participant;
 
@@ -16,21 +15,17 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/api/retro")
+@Slf4j
+@RequiredArgsConstructor
 public class RetroEventController {
-    private static final Logger log = LoggerFactory.getLogger(RetroEventController.class);
 
     private final EventService eventService;
     private final ParticipantService participantService;
-
-    public RetroEventController(EventService eventService, ParticipantService participantService) {
-        this.eventService = eventService;
-        this.participantService = participantService;
-    }
     
     @GetMapping(value = "/{retroId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")

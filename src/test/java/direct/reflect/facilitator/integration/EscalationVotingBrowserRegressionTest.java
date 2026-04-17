@@ -236,8 +236,8 @@ class EscalationVotingBrowserRegressionTest extends BaseIntegrationTest {
             ComponentType componentType = readField(step, "componentType", ComponentType.class);
             Map<String, Object> componentConfig = readRequiredMap(step, "componentConfig");
             if (componentType == ComponentType.SMART_ACTION_BUILDER) {
-                componentConfig.put("allowEscalation", true);
-                stepRepository.save(step);
+                assertEquals(Boolean.TRUE, componentConfig.get("allowEscalation"), "SMART_ACTION_BUILDER should have allowEscalation=true from retrospective_steps.csv import");
+                // no persistence needed; config is imported from retrospective_steps.csv
                 if (smartActionStepIndex < 0) {
                     smartActionStepIndex = index;
                 }

@@ -6,12 +6,10 @@ import direct.reflect.facilitator.configurator.RetroStage;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.configurator.RetroTemplateService;
-import direct.reflect.facilitator.configurator.AdvancementTrigger;
 import direct.reflect.facilitator.configurator.ComponentType;
 import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException;
 import direct.reflect.facilitator.configurator.RetroStepRepository;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponseRepository;
-import direct.reflect.facilitator.facilitation.dto.AssistantMessageDto;
 import direct.reflect.facilitator.facilitation.dto.TimerStateDto;
 import direct.reflect.facilitator.facilitation.dto.AssistantStateDto;
 import direct.reflect.facilitator.eventing.EventService;
@@ -19,22 +17,19 @@ import direct.reflect.facilitator.eventing.RetroEvent;
 
 import java.time.LocalDateTime;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import jakarta.servlet.http.HttpServletRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.JsonNode;
 
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class RetroSessionService {
-    private static final Logger log = LoggerFactory.getLogger(RetroSessionService.class);
-
     private final RetroSessionRepository sessionRepository;
     private final RetroTemplateService retroTemplateService;
     private final RetroStepRepository stepRepository;
@@ -43,28 +38,6 @@ public class RetroSessionService {
     private final AuthService authService;
     private final EventService eventService;
     private final RetroSyncVersionService retroSyncVersionService;
-    private final ObjectMapper objectMapper;
-
-    public RetroSessionService(
-            RetroSessionRepository sessionRepository,
-            RetroTemplateService retroTemplateService,
-            RetroStepRepository stepRepository,
-            ParticipantResponseRepository responseRepository,
-            ParticipantService participantService,
-            AuthService authService,
-            EventService eventService,
-            RetroSyncVersionService retroSyncVersionService,
-            ObjectMapper objectMapper) {
-        this.sessionRepository = sessionRepository;
-        this.retroTemplateService = retroTemplateService;
-        this.stepRepository = stepRepository;
-        this.responseRepository = responseRepository;
-        this.participantService = participantService;
-        this.authService = authService;
-        this.eventService = eventService;
-        this.retroSyncVersionService = retroSyncVersionService;
-        this.objectMapper = objectMapper;
-    }
 
     @Transactional
     public RetroSession createNewSession(String sessionName) {

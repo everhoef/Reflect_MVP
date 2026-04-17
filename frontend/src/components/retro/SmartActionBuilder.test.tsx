@@ -30,6 +30,7 @@ describe("SmartActionBuilder", () => {
   const mockToggleVote = vi.fn();
   const mockGetKnownVoteState = vi.fn();
   const mockInvalidateEscalations = vi.fn();
+  const mockApplyVoteUpdate = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -47,6 +48,7 @@ describe("SmartActionBuilder", () => {
       toggleVote: mockToggleVote,
       getKnownVoteState: mockGetKnownVoteState,
       invalidate: mockInvalidateEscalations,
+      applyVoteUpdate: mockApplyVoteUpdate,
       isVoting: false,
       isEscalating: false,
     });
@@ -66,7 +68,7 @@ describe("SmartActionBuilder", () => {
     ]));
 
     const getHandler = (eventType: EventType) =>
-      subscriptions.find(([type]) => type === eventType)?.[1] as (() => void) | undefined;
+      subscriptions.find(([type]) => type === eventType)?.[1] as ((rawData?: string) => void) | undefined;
 
     getHandler(EventType.ACTION_CREATED)?.();
     getHandler(EventType.ACTION_UPDATED)?.();
@@ -77,8 +79,14 @@ describe("SmartActionBuilder", () => {
     expect(mockInvalidate).toHaveBeenCalledTimes(4);
     expect(mockInvalidateEscalations).toHaveBeenCalledTimes(1);
 
-    getHandler(EventType.ESCALATION_VOTE_UPDATED)?.();
-    expect(mockInvalidateEscalations).toHaveBeenCalledTimes(2);
+    getHandler(EventType.ESCALATION_VOTE_UPDATED)?.('{"escalationId":"esc-1","voteCount":2,"threshold":2,"thresholdMet":true}');
+    expect(mockApplyVoteUpdate).toHaveBeenCalledWith({
+      escalationId: 'esc-1',
+      voteCount: 2,
+      threshold: 2,
+      thresholdMet: true,
+    });
+    expect(mockInvalidateEscalations).toHaveBeenCalledTimes(1);
   });
 
   it("does not introduce local version-mismatch logic props or reload-style recovery behavior", () => {
@@ -116,6 +124,29 @@ describe("SmartActionBuilder", () => {
         actionId: "new-action",
         problemDescription: "Blocked by org dependency",
       });
+    });
+  });
+
+  it("resets the create form when escalation fails after action creation", async () => {
+    mockCreateActionItem.mockResolvedValue({ id: "new-action" });
+    mockEscalateAction.mockRejectedValue(new Error("Escalation failed"));
+
+    render(<SmartActionBuilder retroId="test-retro" stepId={1} componentConfig={{ capabilities: { allowEscalation: true } }} />);
+
+    fireEvent.change(screen.getByTestId("what-input"), { target: { value: "Fix the thing" } });
+    fireEvent.change(screen.getByTestId("who-input"), { target: { value: "Alice" } });
+    fireEvent.change(screen.getByTestId("due-date-input"), { target: { value: "2026-12-31" } });
+    fireEvent.click(screen.getByTestId("escalation-toggle"));
+    fireEvent.change(screen.getByTestId("problem-description-input"), { target: { value: "Blocked by org dependency" } });
+    fireEvent.click(screen.getByTestId("create-action-btn"));
+
+    await waitFor(() => {
+      expect(mockCreateActionItem).toHaveBeenCalled();
+      expect(mockEscalateAction).toHaveBeenCalled();
+      expect(screen.getByTestId("what-input")).toHaveValue("");
+      expect(screen.getByTestId("who-input")).toHaveValue("");
+      expect(screen.getByTestId("due-date-input")).toHaveValue("");
+      expect(screen.getByTestId("escalation-toggle")).not.toBeChecked();
     });
   });
 
@@ -240,8 +271,54 @@ describe("SmartActionBuilder", () => {
           what: "Test editing updated",
           who: "Charlie",
           dueDate: "2026-11-20",
+          successCriteria: "",
         },
       });
+    });
+  });
+
+  it("closes edit mode when escalation fails after saving the action update", async () => {
+    const mockItem: ActionItemDto = {
+      id: "item-3",
+      what: "Needs escalation",
+      who: "Dana",
+      dueDate: "2026-11-21",
+      escalated: false,
+    };
+
+    (useActionItems as Mock).mockReturnValue({
+      data: [mockItem],
+      createActionItem: mockCreateActionItem,
+      updateActionItem: mockUpdateActionItem,
+      deleteActionItem: mockDeleteActionItem,
+      invalidate: mockInvalidate,
+    });
+    mockUpdateActionItem.mockResolvedValue({ ...mockItem, what: "Needs escalation updated" });
+    mockEscalateAction.mockRejectedValue(new Error("Escalation failed"));
+
+    render(<SmartActionBuilder retroId="test-retro" stepId={1} componentConfig={{ capabilities: { allowEscalation: true } }} />);
+
+    fireEvent.click(screen.getByTestId("edit-btn-item-3"));
+    fireEvent.change(screen.getByTestId("edit-what-input"), { target: { value: "Needs escalation updated" } });
+    fireEvent.click(screen.getByTestId("edit-escalation-toggle-item-3"));
+    fireEvent.change(screen.getByTestId("edit-problem-description-item-3"), { target: { value: "Needs management help" } });
+    fireEvent.click(screen.getByTestId("save-edit-btn"));
+
+    await waitFor(() => {
+      expect(mockUpdateActionItem).toHaveBeenCalledWith({
+        actionId: "item-3",
+        req: {
+          what: "Needs escalation updated",
+          who: "Dana",
+          dueDate: "2026-11-21",
+          successCriteria: "",
+        },
+      });
+      expect(mockEscalateAction).toHaveBeenCalledWith({
+        actionId: "item-3",
+        problemDescription: "Needs management help",
+      });
+      expect(screen.queryByTestId("edit-what-input")).not.toBeInTheDocument();
     });
   });
 });

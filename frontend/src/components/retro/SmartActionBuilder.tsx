@@ -47,7 +47,7 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
   const allowEscalation = Boolean(componentConfig?.allowEscalation || capabilities?.allowEscalation);
 
   const { data: actionItems, invalidate: invalidateActions, createActionItem, updateActionItem, deleteActionItem } = useActionItems(retroId);
-  const { escalations, escalateAction, toggleVote, isVoting, getKnownVoteState, invalidate: invalidateEscalations } = useEscalations(retroId);
+  const { escalations, escalateAction, toggleVote, isVoting, getKnownVoteState, invalidate: invalidateEscalations, applyVoteUpdate } = useEscalations(retroId);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const invalidateEscalationLiveState = () => {
@@ -82,7 +82,15 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
   useSSESubscription(EventType.ACTION_UPDATED, invalidateActions);
   useSSESubscription(EventType.ACTION_DELETED, invalidateActions);
   useSSESubscription(EventType.ESCALATION_CREATED, invalidateEscalationLiveState);
-  useSSESubscription(EventType.ESCALATION_VOTE_UPDATED, invalidateEscalations);
+  useSSESubscription(EventType.ESCALATION_VOTE_UPDATED, (rawData) => {
+    const parsed = JSON.parse(rawData) as {
+      escalationId?: string;
+      voteCount?: number;
+      threshold?: number;
+      thresholdMet?: boolean;
+    };
+    applyVoteUpdate(parsed);
+  });
 
   const onSubmit = async (values: ActionItemFormValues) => {
     try {
@@ -104,6 +112,7 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
             problemDescription: values.problemDescription
           });
         } catch (escalateErr: unknown) {
+          form.reset();
           toast.error(getErrorMessage(escalateErr, "Action created, but failed to escalate"));
           return;
         }
@@ -123,10 +132,8 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
         what: values.what,
         who: values.who,
         dueDate: values.dueDate,
+        successCriteria: values.successCriteria ?? "",
       };
-      if (values.successCriteria) {
-        payload.successCriteria = values.successCriteria;
-      }
       await updateActionItem({
         actionId: editingId,
         req: payload,
@@ -140,6 +147,8 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
             problemDescription: values.problemDescription
           });
         } catch (escalateErr: unknown) {
+          setEditingId(null);
+          editForm.reset();
           toast.error(getErrorMessage(escalateErr, "Action updated, but failed to escalate"));
           return;
         }

@@ -48,8 +48,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 
 import jakarta.validation.Valid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -59,12 +58,10 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/retro")
 @Tag(name = "Retro API", description = "Retrospective session management and participant responses")
+@Slf4j
 public class RetroApiController {
-    private static final Logger log = LoggerFactory.getLogger(RetroApiController.class);
-
     private final RetroSessionService retroService;
     private final ParticipantService participantService;
-    private final EventService eventService;
     private final ResponseService responseService;
     private final RetroStepRepository stepRepository;
     private final RetroSyncVersionService retroSyncVersionService;
@@ -72,13 +69,11 @@ public class RetroApiController {
     public RetroApiController(
             RetroSessionService retroService,
             ParticipantService participantService,
-            EventService eventService,
             ResponseService responseService,
             RetroStepRepository stepRepository,
             RetroSyncVersionService retroSyncVersionService) {
         this.retroService = retroService;
         this.participantService = participantService;
-        this.eventService = eventService;
         this.responseService = responseService;
         this.stepRepository = stepRepository;
         this.retroSyncVersionService = retroSyncVersionService;

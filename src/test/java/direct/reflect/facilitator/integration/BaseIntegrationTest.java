@@ -4,31 +4,21 @@ import com.microsoft.playwright.*;
 import com.microsoft.playwright.Tracing;
 import com.microsoft.playwright.ConsoleMessage;
 import com.microsoft.playwright.options.LoadState;
-import com.microsoft.playwright.options.WaitUntilState;
 import com.microsoft.playwright.options.WaitForSelectorState;
-import com.microsoft.playwright.options.SelectOption;
-import com.microsoft.playwright.options.RequestOptions;
-import com.microsoft.playwright.options.FormData;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.extension.ExtensionContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import com.redis.testcontainers.RedisContainer;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.UUID;
@@ -37,13 +27,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.nio.file.Path;
@@ -52,22 +35,19 @@ import java.nio.file.Files;
 import java.util.regex.Pattern;
 
 import direct.reflect.facilitator.configurator.RetroTemplateRepository;
+import direct.reflect.facilitator.auth.TestAuthConfiguration;
+import direct.reflect.facilitator.config.TestRedisConfig;
+import direct.reflect.facilitator.config.TestSecurityOverride;
 import direct.reflect.facilitator.configurator.RetroStageRepository;
-import direct.reflect.facilitator.configurator.RetroTemplate;
-import direct.reflect.facilitator.configurator.RetroStage;
 import direct.reflect.facilitator.facilitation.RetroSessionService;
 import direct.reflect.facilitator.facilitation.ParticipantRepository;
 import direct.reflect.facilitator.facilitation.RetroSessionRepository;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponseRepository;
-
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Collections;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
@@ -79,14 +59,13 @@ import java.util.stream.Collectors;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = "spring.profiles.active=test,import")
-@org.springframework.context.annotation.Import({
-    direct.reflect.facilitator.auth.TestAuthConfiguration.class, // Provides TestAuthController with /test/* endpoints
-    direct.reflect.facilitator.config.TestSecurityOverride.class, // Extends SecurityConfig to allow /test/* endpoints
-    direct.reflect.facilitator.config.TestRedisConfig.class // Caps Redis retry backoff to prevent infinite reconnect loops
+@Import({
+    TestAuthConfiguration.class, // Provides TestAuthController with /test/* endpoints
+    TestSecurityOverride.class, // Extends SecurityConfig to allow /test/* endpoints
+    TestRedisConfig.class // Caps Redis retry backoff to prevent infinite reconnect loops
 })
+@Slf4j
 public abstract class BaseIntegrationTest {
-
-    private static final Logger log = LoggerFactory.getLogger(BaseIntegrationTest.class);
 
     // ==================== PLAYWRIGHT CONFIGURATION ====================
 
@@ -136,7 +115,6 @@ public abstract class BaseIntegrationTest {
     protected String baseUrl;
 
     // Test failure reporting infrastructure
-    private TestInfo currentTestInfo;
     private List<ConsoleMessage> consoleErrors = new ArrayList<>();
     private List<String> networkFailures = new ArrayList<>();
 
@@ -607,8 +585,6 @@ public abstract class BaseIntegrationTest {
     }
     @BeforeEach
     void setUp(TestInfo testInfo) {
-        // Store test info for later use (tracing, error reporting)
-        currentTestInfo = testInfo;
         // Clear activity trail for clean state at start of each test
         clearActivityTrail();
         baseUrl = "http://localhost:" + port;

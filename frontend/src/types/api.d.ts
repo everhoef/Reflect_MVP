@@ -698,6 +698,8 @@ export interface components {
             advanced?: boolean;
         };
         EscalationVoteResultDto: {
+            /** Format: int64 */
+            syncVersion?: number;
             /** Format: uuid */
             escalationId?: string;
             /** Format: int64 */
@@ -715,6 +717,8 @@ export interface components {
             successCriteria?: string;
         };
         ActionItemDto: {
+            /** Format: int64 */
+            syncVersion?: number;
             /** Format: uuid */
             id?: string;
             what?: string;
@@ -740,6 +744,8 @@ export interface components {
             problemDescription: string;
         };
         EscalatedItemDto: {
+            /** Format: int64 */
+            syncVersion?: number;
             /** Format: uuid */
             id?: string;
             problemDescription?: string;
@@ -812,6 +818,11 @@ export interface components {
             dueDate?: string;
             successCriteria?: string;
         };
+        SyncVersionedResponseTimerStateDto: {
+            /** Format: int64 */
+            syncVersion?: number;
+            data?: components["schemas"]["TimerStateDto"];
+        };
         TimerStateDto: {
             /** Format: int64 */
             remainingSeconds?: number;
@@ -840,6 +851,8 @@ export interface components {
         RetroStateDto: {
             /** Format: uuid */
             retroId?: string;
+            /** Format: int64 */
+            syncVersion?: number;
             phase?: string;
             /** Format: int64 */
             currentStepId?: number;
@@ -872,9 +885,24 @@ export interface components {
             displayName?: string;
             role?: string;
         };
+        SyncVersionedResponseListParticipantDto: {
+            /** Format: int64 */
+            syncVersion?: number;
+            data?: components["schemas"]["ParticipantDto"][];
+        };
         SseEmitter: {
             /** Format: int64 */
             timeout?: number;
+        };
+        SyncVersionedResponseListEscalatedItemDto: {
+            /** Format: int64 */
+            syncVersion?: number;
+            data?: components["schemas"]["EscalatedItemDto"][];
+        };
+        SyncVersionedResponseListActionItemDto: {
+            /** Format: int64 */
+            syncVersion?: number;
+            data?: components["schemas"]["ActionItemDto"][];
         };
         SessionInfo: {
             /** Format: uuid */
@@ -1303,7 +1331,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ActionItemDto"][];
+                    "*/*": components["schemas"]["SyncVersionedResponseListActionItemDto"];
                 };
             };
         };
@@ -1323,8 +1351,8 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
-            200: {
+            /** @description Action item created successfully */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1377,8 +1405,8 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
-            200: {
+            /** @description Action escalated successfully */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1489,8 +1517,8 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
-            200: {
+            /** @description Organization created successfully */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1537,8 +1565,8 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
-            200: {
+            /** @description Team created successfully */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1587,8 +1615,8 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
-            200: {
+            /** @description Team member added successfully */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1610,8 +1638,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
-            200: {
+            /** @description Action item deleted successfully */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1663,7 +1691,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["TimerStateDto"];
+                    "*/*": components["schemas"]["SyncVersionedResponseTimerStateDto"];
                 };
             };
         };
@@ -1784,7 +1812,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ParticipantDto"][];
+                    "*/*": components["schemas"]["SyncVersionedResponseListParticipantDto"];
                 };
             };
         };
@@ -1828,7 +1856,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["EscalatedItemDto"][];
+                    "*/*": components["schemas"]["SyncVersionedResponseListEscalatedItemDto"];
                 };
             };
         };

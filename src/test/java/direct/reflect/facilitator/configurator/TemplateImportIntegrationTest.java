@@ -104,6 +104,9 @@ class TemplateImportIntegrationTest {
                 .orElseThrow(() -> new AssertionError("Stage with mastersheetID=29 (Start Stop Continue) not found"));
 
         List<RetroStep> steps = retroStepRepository.findByRetroStageOrderByOrderIndexAsc(stage29);
+        assertThat(steps)
+                .as("Stage 29 should expose at least 6 ordered steps before checking step 6")
+                .hasSizeGreaterThanOrEqualTo(6);
         RetroStep step6 = steps.get(5);
 
         assertThat(step6.getOrderIndex()).isEqualTo(6);

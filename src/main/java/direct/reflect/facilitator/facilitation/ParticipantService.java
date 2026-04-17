@@ -7,13 +7,13 @@ import java.util.UUID;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.auth.AuthService;
@@ -32,27 +32,13 @@ import direct.reflect.facilitator.eventing.RetroEvent;
  * associating them with RetroSessions, and handling participant lifecycle.
  */
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class ParticipantService {
-    private static final Logger log = LoggerFactory.getLogger(ParticipantService.class);
-
     private final ParticipantRepository participantRepository;
     private final EventService eventService;
     private final AuthService authHelper;
     private final RetroSyncVersionService retroSyncVersionService;
-
-    public ParticipantService(
-            ParticipantRepository participantRepository,
-            EventService eventService,
-            AuthService authHelper,
-            RetroSyncVersionService retroSyncVersionService) {
-        this.participantRepository = participantRepository;
-        this.eventService = eventService;
-        this.authHelper = authHelper;
-        this.retroSyncVersionService = retroSyncVersionService;
-    }
-
-    
-
 
     /**
      * Adds a user to an existing retro session.

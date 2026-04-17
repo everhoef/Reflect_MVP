@@ -14,6 +14,8 @@ import java.util.UUID;
 public interface ParticipantRepository extends JpaRepository<Participant, ParticipantId> {
     List<Participant> findBySession_Id(UUID sessionId);
 
+    List<Participant> findBySession_IdInAndStatus(Collection<UUID> sessionIds, ParticipantStatus status);
+
     /**
      * Find participants in a specific session filtered by status.
      * Use this to get ACTIVE participants (excludes LEFT/INACTIVE).

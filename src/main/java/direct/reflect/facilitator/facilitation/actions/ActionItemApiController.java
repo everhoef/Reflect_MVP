@@ -1,5 +1,6 @@
 package direct.reflect.facilitator.facilitation.actions;
 
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
 import direct.reflect.facilitator.facilitation.dto.SyncVersionedResponse;
@@ -36,6 +37,7 @@ public class ActionItemApiController {
 
     @PostMapping
     @PreAuthorize("@participantService.canAccessRetro(#retroId)")
+    @ApiResponse(responseCode = "201", description = "Action item created successfully")
     public ResponseEntity<ActionItemDto> createActionItem(
             @PathVariable UUID retroId,
             @Valid @RequestBody CreateActionItemRequest request,
@@ -64,6 +66,7 @@ public class ActionItemApiController {
 
     @DeleteMapping("/{actionId}")
     @PreAuthorize("@participantService.canAccessRetro(#retroId)")
+    @ApiResponse(responseCode = "204", description = "Action item deleted successfully")
     public ResponseEntity<Void> deleteActionItem(
             @PathVariable UUID retroId,
             @PathVariable UUID actionId,

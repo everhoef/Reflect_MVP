@@ -21,46 +21,27 @@ import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
 import direct.reflect.facilitator.common.exception.VoteLimitExceededException;
 import direct.reflect.facilitator.common.exception.InputLimitExceededException;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.Set;
-import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Service
 @Transactional
+@Slf4j
+@RequiredArgsConstructor
 public class ResponseService {
-
-    private static final Logger log = LoggerFactory.getLogger(ResponseService.class);
-
     private final ParticipantResponseRepository responseRepository;
     private final RetroStepRepository retroStepRepository;
     private final EventService eventService;
     private final RetroSessionService retroSessionService;
     private final ParticipantService participantService;
     private final RetroSyncVersionService retroSyncVersionService;
-
-    public ResponseService(
-            ParticipantResponseRepository responseRepository,
-            RetroStepRepository retroStepRepository,
-            EventService eventService,
-            RetroSessionService retroSessionService,
-            ParticipantService participantService,
-            RetroSyncVersionService retroSyncVersionService) {
-        this.responseRepository = responseRepository;
-        this.retroStepRepository = retroStepRepository;
-        this.eventService = eventService;
-        this.retroSessionService = retroSessionService;
-        this.participantService = participantService;
-        this.retroSyncVersionService = retroSyncVersionService;
-    }
 
     /**
      * Polymorphic method accepting ComponentResponseDto.

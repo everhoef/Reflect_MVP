@@ -5,7 +5,9 @@ import direct.reflect.facilitator.common.exception.ResourceNotFoundException;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
 import direct.reflect.facilitator.facilitation.Participant;
+import direct.reflect.facilitator.facilitation.ParticipantRepository;
 import direct.reflect.facilitator.facilitation.ParticipantRole;
+import direct.reflect.facilitator.facilitation.ParticipantStatus;
 import direct.reflect.facilitator.facilitation.ParticipantService;
 import direct.reflect.facilitator.facilitation.RetroSession;
 import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
@@ -15,7 +17,12 @@ import direct.reflect.facilitator.facilitation.escalation.domain.EscalationThres
 import direct.reflect.facilitator.organization.TeamMemberRepository;
 import direct.reflect.facilitator.organization.TeamRole;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -31,6 +38,7 @@ public class EscalationService {
     private final EscalatedItemRepository escalatedItemRepository;
     private final EscalatedItemVoteRepository escalatedItemVoteRepository;
     private final ParticipantService participantService;
+    private final ParticipantRepository participantRepository;
     private final EventService eventService;
     private final RetroSyncVersionService retroSyncVersionService;
     private final TeamMemberRepository teamMemberRepository;
@@ -123,9 +131,9 @@ public class EscalationService {
         participantService.getParticipantForSession(request, retroId);
 
         long syncVersion = retroSyncVersionService.getSyncVersion(retroId);
+        List<EscalatedItem> escalatedItems = escalatedItemRepository.findByRetroSession_IdOrderByCreatedAtAsc(retroId);
 
-        return escalatedItemRepository.findByRetroSession_IdOrderByCreatedAtAsc(retroId).stream()
-                .map(this::toEscalatedItemDto)
+        return toEscalatedItemDtos(escalatedItems).stream()
                 .map(escalatedItemDto -> escalatedItemDto.withSyncVersion(syncVersion))
                 .toList();
     }
@@ -137,8 +145,9 @@ public class EscalationService {
             return List.of();
         }
 
-        return escalatedItemRepository.findByTeam_IdInOrderByCreatedAtAsc(managedTeamIds).stream()
-                .map(this::toEscalatedItemDto)
+        List<EscalatedItem> escalatedItems = escalatedItemRepository.findByTeam_IdInOrderByCreatedAtAsc(managedTeamIds);
+
+        return toEscalatedItemDtos(escalatedItems).stream()
                 .filter(EscalatedItemDto::thresholdMet)
                 .toList();
     }
@@ -166,6 +175,28 @@ public class EscalationService {
         return EscalatedItemDto.from(escalatedItem, voteCount, isThresholdMet(escalatedItem, voteCount));
     }
 
+    private List<EscalatedItemDto> toEscalatedItemDtos(List<EscalatedItem> escalatedItems) {
+        if (escalatedItems.isEmpty()) {
+            return List.of();
+        }
+
+        Map<UUID, Long> voteCountsByEscalationId = getVoteCountsByEscalationId(escalatedItems);
+        Map<UUID, List<Participant>> participantsBySessionId = getParticipantsBySessionIdForTieBreaks(escalatedItems, voteCountsByEscalationId);
+
+        return escalatedItems.stream()
+                .map(escalatedItem -> {
+                    long voteCount = voteCountsByEscalationId.getOrDefault(escalatedItem.getId(), 0L);
+                    List<Participant> participants = participantsBySessionId.getOrDefault(
+                            escalatedItem.getRetroSession().getId(),
+                            List.of());
+                    return EscalatedItemDto.from(
+                            escalatedItem,
+                            voteCount,
+                            isThresholdMet(voteCount, participants, escalatedItem.getId()));
+                })
+                .toList();
+    }
+
     private boolean isThresholdMet(EscalatedItem escalatedItem, long voteCount) {
         int threshold = escalatedItem.getVoteThreshold();
         if (EscalationThresholdPolicy.hasReachedThreshold(voteCount, threshold)) {
@@ -177,9 +208,51 @@ public class EscalationService {
         }
 
         List<Participant> participants = participantService.getSessionParticipants(escalatedItem.getRetroSession().getId());
-        boolean facilitatorVoted = facilitatorHasVoted(escalatedItem.getId(), participants);
+        return isThresholdMet(voteCount, participants, escalatedItem.getId());
+    }
+
+    private boolean isThresholdMet(long voteCount, List<Participant> participants, UUID escalationId) {
+        boolean facilitatorVoted = facilitatorHasVoted(escalationId, participants);
 
         return EscalationThresholdPolicy.facilitatorTieBreakApplies(participants.size(), facilitatorVoted);
+    }
+
+    private Map<UUID, Long> getVoteCountsByEscalationId(List<EscalatedItem> escalatedItems) {
+        List<UUID> escalationIds = escalatedItems.stream()
+                .map(EscalatedItem::getId)
+                .toList();
+
+        return escalatedItemVoteRepository.countByEscalatedItemIdIn(escalationIds).stream()
+                .collect(HashMap::new, (counts, row) -> counts.put((UUID) row[0], (Long) row[1]), HashMap::putAll);
+    }
+
+    private Map<UUID, List<Participant>> getParticipantsBySessionIdForTieBreaks(
+            List<EscalatedItem> escalatedItems,
+            Map<UUID, Long> voteCountsByEscalationId) {
+        List<UUID> sessionIdsRequiringTieBreakCheck = escalatedItems.stream()
+                .filter(escalatedItem -> EscalationThresholdPolicy.isTieBreakScenario(
+                        voteCountsByEscalationId.getOrDefault(escalatedItem.getId(), 0L),
+                        escalatedItem.getVoteThreshold()))
+                .map(escalatedItem -> escalatedItem.getRetroSession().getId())
+                .distinct()
+                .toList();
+
+        if (sessionIdsRequiringTieBreakCheck.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        return groupParticipantsBySessionId(
+                participantRepository.findBySession_IdInAndStatus(sessionIdsRequiringTieBreakCheck, ParticipantStatus.ACTIVE));
+    }
+
+    private Map<UUID, List<Participant>> groupParticipantsBySessionId(Collection<Participant> participants) {
+        Map<UUID, List<Participant>> participantsBySessionId = new HashMap<>();
+        for (Participant participant : participants) {
+            participantsBySessionId
+                    .computeIfAbsent(participant.getSession().getId(), ignored -> new ArrayList<>())
+                    .add(participant);
+        }
+        return participantsBySessionId;
     }
 
     private boolean facilitatorHasVoted(UUID escalationId, List<Participant> participants) {

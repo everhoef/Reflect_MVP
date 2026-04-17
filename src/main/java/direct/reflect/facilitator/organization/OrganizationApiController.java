@@ -1,5 +1,6 @@
 package direct.reflect.facilitator.organization;
 
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -27,6 +28,7 @@ public class OrganizationApiController {
     }
 
     @PostMapping
+    @ApiResponse(responseCode = "201", description = "Organization created successfully")
     public ResponseEntity<OrganizationDto> createOrganization(@Valid @RequestBody CreateOrganizationRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(organizationService.createOrganization(request));
@@ -38,6 +40,7 @@ public class OrganizationApiController {
     }
 
     @PostMapping("/{orgId}/teams")
+    @ApiResponse(responseCode = "201", description = "Team created successfully")
     public ResponseEntity<TeamDto> createTeam(
             @PathVariable UUID orgId,
             @Valid @RequestBody CreateTeamRequest request) {
@@ -51,6 +54,7 @@ public class OrganizationApiController {
     }
 
     @PostMapping("/{orgId}/teams/{teamId}/members")
+    @ApiResponse(responseCode = "201", description = "Team member added successfully")
     public ResponseEntity<TeamMemberDto> addMember(
             @PathVariable UUID orgId,
             @PathVariable UUID teamId,

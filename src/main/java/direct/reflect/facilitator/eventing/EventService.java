@@ -6,8 +6,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
 
 import tools.jackson.core.JacksonException;
@@ -19,9 +17,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.time.LocalDateTime;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.Map;
@@ -30,25 +30,15 @@ import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class EventService {
-    private static final Logger log = LoggerFactory.getLogger(EventService.class);
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final RetroSyncVersionService retroSyncVersionService;
     private final AtomicInteger activeConnections = new AtomicInteger(0);
-
-    public EventService(
-            RedisTemplate<String, Object> redisTemplate,
-            ObjectMapper objectMapper,
-            ApplicationEventPublisher applicationEventPublisher,
-            RetroSyncVersionService retroSyncVersionService) {
-        this.redisTemplate = redisTemplate;
-        this.objectMapper = objectMapper;
-        this.applicationEventPublisher = applicationEventPublisher;
-        this.retroSyncVersionService = retroSyncVersionService;
-    }
 
     @Value("${facilitator.sse.timeout-ms:3600000}")
     private long sseTimeoutMs;

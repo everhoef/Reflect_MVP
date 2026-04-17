@@ -186,8 +186,8 @@ public class SmartActionBuilderBrowserRegressionTest extends BaseIntegrationTest
         steps.stream()
                 .filter(step -> step.getComponentType() == ComponentType.SMART_ACTION_BUILDER)
                 .forEach(step -> {
-                    step.getComponentConfig().put("allowEscalation", true);
-                    stepRepository.save(step);
+                    // allowEscalation is enabled by default in retrospective_steps.csv
+                    // no persistence needed; allowEscalation comes from retrospective_steps.csv import
                 });
 
         RetroTemplate sscTemplate = new RetroTemplate();

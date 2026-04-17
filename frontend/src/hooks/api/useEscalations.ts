@@ -6,6 +6,12 @@ import { useAppliedVersionStore } from './useRetro';
 
 export type EscalatedItemDto = components["schemas"]["EscalatedItemDto"];
 export type EscalationVoteResultDto = components["schemas"]["EscalationVoteResultDto"];
+type EscalationVoteData = {
+  escalationId?: string | undefined;
+  voteCount?: number | undefined;
+  threshold?: number | undefined;
+  thresholdMet?: boolean | undefined;
+};
 type SyncVersionedResponse<T> = { syncVersion?: number | null; data?: T | null };
 
 export async function fetchEscalations(retroId?: string): Promise<EscalatedItemDto[]> {
@@ -38,6 +44,33 @@ export const useVoteStore = create<{
 export function useEscalations(retroId?: string) {
   const queryClient = useQueryClient();
   const setVote = useVoteStore((state) => state.setVote);
+
+  const applyVoteUpdate = (payload: EscalationVoteData) => {
+    if (!retroId || !payload.escalationId) {
+      return;
+    }
+
+    queryClient.setQueryData<EscalatedItemDto[] | undefined>(['escalations', retroId], (current) => {
+      if (!current) {
+        return current;
+      }
+
+      return current.map((escalation) => {
+        if (escalation.id !== payload.escalationId) {
+          return escalation;
+        }
+
+        const nextEscalation: EscalatedItemDto = {
+          ...escalation,
+          ...(payload.voteCount !== undefined ? { voteCount: payload.voteCount } : {}),
+          ...(payload.threshold !== undefined ? { threshold: payload.threshold } : {}),
+          ...(payload.thresholdMet !== undefined ? { thresholdMet: payload.thresholdMet } : {}),
+        };
+
+        return nextEscalation;
+      });
+    });
+  };
 
   const query = useQuery<EscalatedItemDto[]>({
     queryKey: ['escalations', retroId],
@@ -108,5 +141,6 @@ export function useEscalations(retroId?: string) {
     isVoting: voteMutation.isPending,
     getKnownVoteState,
     invalidate,
+    applyVoteUpdate,
   };
 }

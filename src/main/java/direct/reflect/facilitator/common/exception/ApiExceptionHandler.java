@@ -9,22 +9,12 @@ import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import tools.jackson.databind.exc.InvalidFormatException;
 
-import direct.reflect.facilitator.common.exception.NotAuthenticatedException;
-import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
-import direct.reflect.facilitator.common.exception.ResourceNotFoundException;
-import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException;
-import direct.reflect.facilitator.common.exception.RetroTemplateNotFoundException;
-import direct.reflect.facilitator.common.exception.InvalidSessionStateException;
-import direct.reflect.facilitator.common.exception.InvalidStepException;
-import direct.reflect.facilitator.common.exception.VoteLimitExceededException;
 import direct.reflect.facilitator.organization.DuplicateOrganizationSlugException;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Exception handler for API controllers.
@@ -32,9 +22,8 @@ import direct.reflect.facilitator.organization.DuplicateOrganizationSlugExceptio
  */
 @ControllerAdvice(basePackages = {"direct.reflect.facilitator.eventing", "direct.reflect.facilitator.facilitation", "direct.reflect.facilitator.organization"})
 @Order(1)
+@Slf4j
 public class ApiExceptionHandler {
-
-    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<String> handleResponseStatusException(ResponseStatusException ex) {

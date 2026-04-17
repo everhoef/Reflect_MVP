@@ -1,5 +1,6 @@
 package direct.reflect.facilitator.facilitation.escalation;
 
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
 import direct.reflect.facilitator.facilitation.dto.SyncVersionedResponse;
@@ -7,7 +8,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,15 +20,22 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/retro/{retroId}")
-@RequiredArgsConstructor
 @Tag(name = "Escalation API", description = "Participant escalation flagging and voting")
 public class EscalationApiController {
 
     private final EscalationService escalationService;
     private final RetroSyncVersionService retroSyncVersionService;
 
+    public EscalationApiController(
+            EscalationService escalationService,
+            RetroSyncVersionService retroSyncVersionService) {
+        this.escalationService = escalationService;
+        this.retroSyncVersionService = retroSyncVersionService;
+    }
+
     @PostMapping("/actions/{actionId}/escalate")
     @PreAuthorize("@participantService.canAccessRetro(#retroId)")
+    @ApiResponse(responseCode = "201", description = "Action escalated successfully")
     public ResponseEntity<EscalatedItemDto> escalateAction(
             @PathVariable UUID retroId,
             @PathVariable UUID actionId,
