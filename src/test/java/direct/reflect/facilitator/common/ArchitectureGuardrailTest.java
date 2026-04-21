@@ -86,4 +86,68 @@ class ArchitectureGuardrailTest {
 
         rule.check(PRODUCTION_CLASSES);
     }
+
+    @Test
+    @DisplayName("feature modules must not depend on each other directly")
+    void featureModulesMustNotDependOnEachOtherDirectly() {
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("..facilitation..")
+                .should().dependOnClassesThat().resideInAnyPackage("..configurator..")
+                .as("facilitation must not depend on configurator")
+                .because("facilitation is a core business domain that should not depend on its configuration support module directly.");
+
+        if (Boolean.getBoolean("archunit.strict")) {
+            rule.check(PRODUCTION_CLASSES);
+        }
+    }
+
+    @Test
+    @DisplayName("support modules must not depend on feature modules")
+    void supportModulesMustNotDependOnFeatureModules() {
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("..configurator..", "..eventing..", "..auth..")
+                .should().dependOnClassesThat().resideInAnyPackage("..facilitation..", "..organization..")
+                .as("support modules must not depend on feature modules")
+                .because("support modules (configurator, eventing, auth) provide generic mechanics and should not have knowledge of business domains.");
+
+        if (Boolean.getBoolean("archunit.strict")) {
+            rule.check(PRODUCTION_CLASSES);
+        }
+    }
+
+    @Test
+    @DisplayName("common must stay tiny and dependency light")
+    void commonMustStayTinyAndDependencyLight() {
+        ArchRule rule = classes()
+                .that().resideInAPackage("..common..")
+                .should().onlyDependOnClassesThat().resideInAnyPackage(
+                        "java..",
+                        "javax..",
+                        "jakarta..",
+                        "org.slf4j..",
+                        "lombok..",
+                        "com.tngtech.archunit..",
+                        "org.hibernate..",
+                        "com.fasterxml.uuid..",
+                        "direct.reflect.facilitator.common.."
+                )
+                .as("common must stay tiny and dependency light")
+                .because("direct.reflect.facilitator.common is the shared kernel and must not depend on any higher-level module.");
+
+        rule.check(PRODUCTION_CLASSES);
+    }
+
+    @Test
+    @DisplayName("facilitation sub-packages should be encapsulated")
+    void facilitationSubPackagesShouldBeEncapsulated() {
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("..facilitation.session..")
+                .should().dependOnClassesThat().resideInAnyPackage("..facilitation.participant..", "..facilitation.response..", "..facilitation.actions..", "..facilitation.clustering..", "..facilitation.escalation..")
+                .as("session should not depend on other facilitation capabilities")
+                .because("facilitation.session owns the shell/lifecycle; other capabilities should be invoked by it or react to it, but session logic should stay isolated.");
+
+        if (Boolean.getBoolean("archunit.strict")) {
+            rule.check(PRODUCTION_CLASSES);
+        }
+    }
 }

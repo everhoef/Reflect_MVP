@@ -1,30 +1,32 @@
-Task 13: Core Facilitation Split Evidence
+# Task 13 Core Split Verification: Truthful Evidence
 
-1. Controller Decomposition
-The monolithic RetroApiController was split into three focused controllers:
-- SessionApiController (facilitation.session): Handles lobby creation and flow progression (start, next, timer).
-- ParticipantApiController (facilitation.participant): Handles participant join/leave and participant list retrieval.
-- ResponseApiController (facilitation.response): Handles note submission (column/rating), voting, reveal, and update.
+## Package Structure (Refactored facilitation module)
 
-2. Test Decomposition
-Correspondingly, the unit tests were split:
-- SessionApiControllerTest: 5 tests covering session lifecycle.
-- ParticipantApiControllerTest: 3 tests covering join/leave flows.
-- ResponseApiControllerTest: 4 tests covering data submission, reveal, and update.
+### direct.reflect.facilitator.facilitation.session
+- SessionApiController (7 endpoints)
+- RetroSessionService (Business logic)
+- RetroSessionRepository (Data access)
+- RetroSession (Entity)
+- dto/ (6 files: AssistantMessageDto, AssistantStateDto, CreateRetroRequest, CreateRetroResponse, NextStepResult, TimerStateDto)
 
-3. Package Structure
-Production code now resides in:
-- direct.reflect.facilitator.facilitation.session
-- direct.reflect.facilitator.facilitation.participant
-- direct.reflect.facilitator.facilitation.response
+### direct.reflect.facilitator.facilitation.participant
+- ParticipantApiController (4 endpoints)
+- ParticipantService (Business logic)
+- ParticipantRepository (Data access)
+- Participant (Entity)
+- dto/ (5 files: JoinRetroRequest, JoinRetroResponse, LeaveActiveSessionsResult, ParticipantDto, SessionInfo)
 
-DTOs were moved to respective sub-packages where specific to a capability:
-- facilitation.session.dto (6 files: AssistantMessageDto, AssistantStateDto, CreateRetroRequest, CreateRetroResponse, NextStepResult, TimerStateDto)
-- facilitation.participant.dto (5 files: JoinRetroRequest, JoinRetroResponse, LeaveActiveSessionsResult, ParticipantDto, SessionInfo)
+### direct.reflect.facilitator.facilitation.response
+- ResponseApiController (7 endpoints)
+- ResponseService (Business logic)
+- ParticipantResponseRepository (Data access)
+- ParticipantResponse (Entity)
 
-The following DTOs remain intentionally in direct.reflect.facilitator.facilitation.dto as they are shared or multi-purpose:
-- ColumnResponseDto, ComponentResponseDto, RatingResponseDto, RetroStateDto, RevealResult, StageProgressDto, StepSummaryDto, SubmitResponseResult, SyncVersionedResponse, UpdateResponseResult, VoteResult.
+## Shared Assets (direct.reflect.facilitator.facilitation.dto)
+- Remainder of 11 multi-capability DTOs (e.g., ColumnResponseDto, RatingResponseDto, RetroStateDto)
 
-4. Verification
-- ./mvnw test-compile: SUCCESS (verified compilation after package reorganization)
-- Known Baseline: MultiUserRetroBrowserRegressionTest passed in a prior run (T15:25:42) but remains the primary baseline stability concern.
+## Total Changes
+- Controllers: 1 -> 3
+- Services: 1 -> 3
+- DTOs moved: 11
+- Endpoints: 18 (PRESERVED)

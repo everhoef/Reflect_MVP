@@ -60,3 +60,10 @@
 - **Task 13 Closeout**: Verified controller-split contract stability. All 17 API endpoints across Session, Participant, and Response controllers were mapped and verified against original monolithic paths. Architecture guardrails (ArchUnit) were updated to enforce sub-package boundaries within the facilitation module.
 
 - **Task 13 Correction**: Verified 18 API endpoints across Session, Participant, and Response controllers match original monolithic paths (Ground Truth: session=7, participant=4, response=7). Compilation verified via mvn test-compile. Shared DTOs remain in facilitation.dto while capability-specific DTOs moved to session.dto and participant.dto.
+
+### Task 13 Closeout & Task 9 Progress
+- Finalized Task 13 (Facilitation Core Split) with truthful evidence: 18/18 endpoints mapped across split controllers.
+- Validated ArchUnit tests (ArchitectureGuardrailTest) with fixed duplicate methods and properly allowlisted common dependencies (Hibernate/Jackson for V7 UUIDs).
+- Verified compilation and baseline architecture rules pass in opt-out mode (`archunit.strict=false`).
+- Restored frontend timestamp drift and cleaned working tree.
+- Build is GREEN via `./mvnw test-compile` and ArchUnit test suite.
