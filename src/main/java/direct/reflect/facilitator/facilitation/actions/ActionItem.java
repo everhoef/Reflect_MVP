@@ -1,7 +1,7 @@
 package direct.reflect.facilitator.facilitation.actions;
 
-import direct.reflect.facilitator.common.entity.GeneratedUuidV7;
-import direct.reflect.facilitator.facilitation.RetroSession;
+import direct.reflect.facilitator.common.ids.GeneratedUuidV7;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

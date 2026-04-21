@@ -12,7 +12,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.SimpleUrlLogoutSuccessHandler;
 
-import direct.reflect.facilitator.common.config.SecurityConfig;
+import direct.reflect.facilitator.auth.infrastructure.security.SecurityConfig;
 
 @TestConfiguration
 @EnableWebSecurity

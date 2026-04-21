@@ -26,6 +26,13 @@ import direct.reflect.facilitator.facilitation.escalation.EscalatedItemRepositor
 import direct.reflect.facilitator.facilitation.escalation.EscalatedItemVote;
 import direct.reflect.facilitator.facilitation.escalation.EscalatedItemVoteId;
 import direct.reflect.facilitator.facilitation.escalation.EscalatedItemVoteRepository;
+import direct.reflect.facilitator.facilitation.participant.Participant;
+import direct.reflect.facilitator.facilitation.participant.ParticipantRepository;
+import direct.reflect.facilitator.facilitation.participant.ParticipantRole;
+import direct.reflect.facilitator.facilitation.participant.ParticipantStatus;
+import direct.reflect.facilitator.facilitation.session.RetroPhase;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
+import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
 import direct.reflect.facilitator.organization.Organization;
 import direct.reflect.facilitator.organization.OrganizationRepository;
 import direct.reflect.facilitator.organization.Team;

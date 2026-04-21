@@ -1,5 +1,8 @@
 package direct.reflect.facilitator.facilitation;
 
+import direct.reflect.facilitator.facilitation.session.RetroPhase;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
+import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
 import direct.reflect.facilitator.organization.Organization;
 import direct.reflect.facilitator.organization.OrganizationRepository;
 import direct.reflect.facilitator.organization.Team;

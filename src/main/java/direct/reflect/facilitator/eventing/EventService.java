@@ -1,12 +1,13 @@
 package direct.reflect.facilitator.eventing;
 
+import direct.reflect.facilitator.eventing.infrastructure.redis.RedisPubSubConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
+import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -359,7 +360,7 @@ public class EventService {
      * Most code should call publish() instead, which provides transaction awareness.
      */
     private void broadcastToRedis(RetroEvent<?> event) {
-        String channel = "retro:" + event.retroId();
+        String channel = RedisPubSubConfig.getChannelForRetro(event.retroId().toString());
 
         // Broadcast to Redis Pub/Sub (all pods will receive)
         // RedisTemplate handles JSON serialization automatically

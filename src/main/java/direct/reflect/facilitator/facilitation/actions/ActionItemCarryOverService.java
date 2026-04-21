@@ -1,9 +1,9 @@
 package direct.reflect.facilitator.facilitation.actions;
 
-import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException;
-import direct.reflect.facilitator.facilitation.RetroPhase;
-import direct.reflect.facilitator.facilitation.RetroSession;
-import direct.reflect.facilitator.facilitation.RetroSessionRepository;
+import direct.reflect.facilitator.facilitation.session.RetroPhase;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
+import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
+import direct.reflect.facilitator.facilitation.session.RetroSessionNotFoundException;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

@@ -2,9 +2,9 @@ package direct.reflect.facilitator.integration;
 
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
-import direct.reflect.facilitator.facilitation.RetroPhase;
-import direct.reflect.facilitator.facilitation.RetroSession;
-import direct.reflect.facilitator.facilitation.RetroSessionService;
+import direct.reflect.facilitator.facilitation.session.RetroPhase;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
+import direct.reflect.facilitator.facilitation.session.RetroSessionService;
 import direct.reflect.facilitator.facilitation.actions.ActionItem;
 import direct.reflect.facilitator.facilitation.actions.ActionItemRepository;
 import direct.reflect.facilitator.facilitation.actions.ActionItemStatus;

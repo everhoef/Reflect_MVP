@@ -1,12 +1,15 @@
 package direct.reflect.facilitator.facilitation;
 
-import direct.reflect.facilitator.facilitation.Participant;
-import direct.reflect.facilitator.facilitation.RetroSession;
+import direct.reflect.facilitator.facilitation.participant.Participant;
+import direct.reflect.facilitator.facilitation.participant.ParticipantId;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
 import direct.reflect.facilitator.configurator.RetroTemplate;
-import direct.reflect.facilitator.facilitation.ParticipantRole;
-import direct.reflect.facilitator.facilitation.ParticipantRepository;
-import direct.reflect.facilitator.facilitation.ParticipantService;
-import direct.reflect.facilitator.facilitation.RetroPhase;
+import direct.reflect.facilitator.facilitation.participant.ParticipantRole;
+import direct.reflect.facilitator.facilitation.participant.ParticipantRepository;
+import direct.reflect.facilitator.facilitation.participant.ParticipantService;
+import direct.reflect.facilitator.facilitation.participant.ParticipantStatus;
+import direct.reflect.facilitator.facilitation.session.RetroPhase;
+import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
 import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.eventing.EventService;
 import org.junit.jupiter.api.AfterEach;

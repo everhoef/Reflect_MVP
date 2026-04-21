@@ -1,7 +1,7 @@
 package direct.reflect.facilitator.facilitation.escalation;
 
-import direct.reflect.facilitator.common.entity.GeneratedUuidV7;
-import direct.reflect.facilitator.facilitation.RetroSession;
+import direct.reflect.facilitator.common.ids.GeneratedUuidV7;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
 import direct.reflect.facilitator.organization.Team;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

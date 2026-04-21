@@ -1,7 +1,7 @@
 package direct.reflect.facilitator.facilitation.dto;
 
-import direct.reflect.facilitator.facilitation.RetroPhase;
-import direct.reflect.facilitator.facilitation.RetroSession;
+import direct.reflect.facilitator.facilitation.session.RetroPhase;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
 
 import java.util.List;
 

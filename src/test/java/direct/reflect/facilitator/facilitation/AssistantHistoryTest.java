@@ -1,7 +1,8 @@
 package direct.reflect.facilitator.facilitation;
 
-import direct.reflect.facilitator.facilitation.dto.AssistantMessageDto;
-import direct.reflect.facilitator.facilitation.dto.AssistantStateDto;
+import direct.reflect.facilitator.facilitation.session.AssistantHistory;
+import direct.reflect.facilitator.facilitation.session.dto.AssistantMessageDto;
+import direct.reflect.facilitator.facilitation.session.dto.AssistantStateDto;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;

@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.config.TestRedisConfig;
-import direct.reflect.facilitator.facilitation.RetroSession;
-import direct.reflect.facilitator.facilitation.RetroSessionRepository;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
+import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.UUID;
@@ -51,6 +51,9 @@ class OrganizationDataModelTest {
 
     @Autowired
     private TeamMemberRepository teamMemberRepository;
+
+    @Autowired
+    private TeamMembershipService teamMembershipService;
 
     @Autowired
     private RetroSessionRepository sessionRepository;
@@ -127,6 +130,40 @@ class OrganizationDataModelTest {
                 userId,
                 TeamRole.MEMBER.name()))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void teamMembershipService_preservesManagerRoleAndSingleManagedTeamSelection() {
+        Organization organization = saveOrganization("Gamma Corp", "gamma-corp");
+        Team platform = saveTeam(organization, "Platform");
+        Team delivery = saveTeam(organization, "Delivery");
+        UUID userId = UUID.randomUUID();
+
+        TeamMember memberOnly = new TeamMember();
+        memberOnly.setTeam(platform);
+        memberOnly.setUserId(userId);
+        memberOnly.setRole(TeamRole.MEMBER);
+        teamMemberRepository.saveAndFlush(memberOnly);
+
+        assertThat(teamMembershipService.hasManagerRole(userId)).isFalse();
+        assertThat(teamMembershipService.findSingleManagedTeam(userId)).isEmpty();
+
+        memberOnly.setRole(TeamRole.MANAGER);
+        teamMemberRepository.saveAndFlush(memberOnly);
+
+        assertThat(teamMembershipService.hasManagerRole(userId)).isTrue();
+        assertThat(teamMembershipService.findSingleManagedTeam(userId))
+                .map(Team::getId)
+                .contains(platform.getId());
+
+        TeamMember secondManagedTeam = new TeamMember();
+        secondManagedTeam.setTeam(delivery);
+        secondManagedTeam.setUserId(userId);
+        secondManagedTeam.setRole(TeamRole.MANAGER);
+        teamMemberRepository.saveAndFlush(secondManagedTeam);
+
+        assertThat(teamMembershipService.hasManagerRole(userId)).isTrue();
+        assertThat(teamMembershipService.findSingleManagedTeam(userId)).isEmpty();
     }
 
     @Test

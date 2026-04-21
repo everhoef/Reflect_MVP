@@ -9,6 +9,8 @@ import direct.reflect.facilitator.config.TestRedisConfig;
 import direct.reflect.facilitator.facilitation.actions.ActionItem;
 import direct.reflect.facilitator.facilitation.actions.ActionItemRepository;
 import direct.reflect.facilitator.facilitation.actions.ActionItemStatus;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
+import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.validation.ConstraintViolationException;
 import java.time.LocalDate;

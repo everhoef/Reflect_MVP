@@ -1,0 +1,83 @@
+## Task 13: Final Documentation Stale-Reference Sweep
+## Date: 2026-03-16
+## Working directory: /Users/micheljansen/reflect.direct/facilitator
+
+---
+
+## 1. README stale GitLab/boilerplate references
+
+### Command
+grep -c "GitLab\|Add your files\|Integrate with your tools" README.md
+
+### Output
+0
+EXIT=1 (grep returns 1 when no matches found — this is the passing case)
+
+### Result: PASS — zero stale GitLab/CI-boilerplate lines in README.md
+
+---
+
+## 2. AGENTS.md HTMX/Thymeleaf operational references
+
+### Command
+grep -n "hx-\|th:" AGENTS.md
+
+### Output
+(no output)
+GREP_EXIT=1 (grep returns 1 when no matches found — this is the passing case)
+
+### Result: PASS — zero hx-* or th: references in AGENTS.md
+
+---
+
+## 3. Deleted-path references in docs (system-ui, frontend/README)
+
+### Command
+grep -rn "system-ui\|frontend/README" README.md AGENTS.md .opencode/skills/partner-dev-assistant/SKILL.md
+
+### Output
+(no output)
+EXIT=1 (grep returns 1 when no matches found — this is the passing case)
+
+### Result: PASS — zero references to deleted paths in any doc file
+
+---
+
+## 4. Git tracking state — protected and cleaned-up paths
+
+### Command
+git ls-files src/main/resources/static/ frontend/src/types/generated/ frontend/README.md system-ui/ scripts/verify-contracts.sh
+
+### Output
+scripts/verify-contracts.sh
+EXIT=0
+
+### Analysis
+Path                                     | Tracked? | Expected?   | Status
+-----------------------------------------|----------|-------------|--------
+src/main/resources/static/               | NO       | Untracked   | PASS
+frontend/src/types/generated/            | NO       | Untracked   | PASS
+frontend/README.md                       | NO       | Deleted/gone| PASS
+system-ui/                               | NO       | Deleted/gone| PASS
+scripts/verify-contracts.sh              | YES      | Must remain | PASS
+
+### Result: PASS
+- Build artifacts correctly untracked (static/ and generated/ removed from git index in T10)
+- Deleted directories absent from git index (system-ui/, frontend/README.md removed in T9)
+- Load-bearing script scripts/verify-contracts.sh still tracked (protected in T1 and T10)
+
+---
+
+## OVERALL VERDICT: ALL CHECKS PASS
+
+| Gate                                    | Result |
+|-----------------------------------------|--------|
+| Maven tests (200 total)                 | PASS   |
+| README GitLab/boilerplate sweep         | PASS   |
+| AGENTS.md HTMX/Thymeleaf sweep          | PASS   |
+| Deleted-path references in docs         | PASS   |
+| src/main/resources/static/ untracked    | PASS   |
+| frontend/src/types/generated/ untracked | PASS   |
+| frontend/README.md absent from index    | PASS   |
+| system-ui/ absent from index            | PASS   |
+| scripts/verify-contracts.sh tracked     | PASS   |

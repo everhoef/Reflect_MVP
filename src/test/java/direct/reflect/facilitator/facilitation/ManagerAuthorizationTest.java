@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.auth.AuthService;
-import direct.reflect.facilitator.common.config.SecurityConfig;
+import direct.reflect.facilitator.auth.infrastructure.security.SecurityConfig;
 import direct.reflect.facilitator.config.TestRedisConfig;
 import direct.reflect.facilitator.config.TestSecurityOverride;
 import direct.reflect.facilitator.organization.Organization;
@@ -23,6 +23,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -149,7 +150,40 @@ class ManagerAuthorizationTest {
             .doesNotContain("ROLE_MANAGER", "ROLE_USER");
     }
 
+    @Test
+    void oidcSessionContractsAndSingleManagedTeamResolutionStayStable() throws Exception {
+        Team team = saveTeam("Managers");
+        saveTeamMember(team, "manager-user", TeamRole.MANAGER);
+
+        MockHttpServletRequest request = authenticateOidcRequest("manager-user", "Manager User", "manager@example.com");
+        HttpSession session = request.getSession(false);
+
+        assertThat(session).isNotNull();
+        assertThat(session.getAttribute("authType")).isEqualTo("OIDC");
+        assertThat(session.getAttribute("authenticatedUser")).isEqualTo("manager-user");
+        assertThat(session.getAttribute("userDisplayName")).isEqualTo("Manager User");
+        assertThat(session.getAttribute("userEmail")).isEqualTo("manager@example.com");
+        assertThat(authService.findSingleManagedTeam(request))
+            .map(Team::getId)
+            .contains(team.getId());
+    }
+
+    @Test
+    void oidcUserManagingMultipleTeamsDoesNotResolveSingleManagedTeam() throws Exception {
+        saveTeamMember(saveTeam("Managers One"), "manager-user", TeamRole.MANAGER);
+        saveTeamMember(saveTeam("Managers Two"), "manager-user", TeamRole.MANAGER);
+
+        MockHttpServletRequest request = authenticateOidcRequest("manager-user", "Manager User", "manager@example.com");
+
+        assertThat(authService.findSingleManagedTeam(request)).isEmpty();
+    }
+
     private Authentication authenticateOidcUser(String username, String displayName, String email) throws Exception {
+        authenticateOidcRequest(username, displayName, email);
+        return SecurityContextHolder.getContext().getAuthentication();
+    }
+
+    private MockHttpServletRequest authenticateOidcRequest(String username, String displayName, String email) throws Exception {
         SecurityContextHolder.clearContext();
 
         Map<String, Object> attributes = Map.of(
@@ -162,9 +196,10 @@ class ManagerAuthorizationTest {
         OAuth2User principal = new DefaultOAuth2User(List.of(), attributes, "login");
         OAuth2AuthenticationToken authentication = new OAuth2AuthenticationToken(principal, List.of(), "github");
 
-        oidcSuccessHandler.onAuthenticationSuccess(new MockHttpServletRequest(), new MockHttpServletResponse(), authentication);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        oidcSuccessHandler.onAuthenticationSuccess(request, new MockHttpServletResponse(), authentication);
 
-        return SecurityContextHolder.getContext().getAuthentication();
+        return request;
     }
 
     private Team saveTeam(String teamName) {

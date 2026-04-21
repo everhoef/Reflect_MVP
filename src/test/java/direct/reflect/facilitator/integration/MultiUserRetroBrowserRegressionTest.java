@@ -14,8 +14,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.List;
 import java.util.UUID;
 
-import direct.reflect.facilitator.facilitation.RetroPhase;
-import direct.reflect.facilitator.facilitation.RetroSession;
+import direct.reflect.facilitator.facilitation.session.RetroPhase;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
 import lombok.extern.slf4j.Slf4j;
 
 /**

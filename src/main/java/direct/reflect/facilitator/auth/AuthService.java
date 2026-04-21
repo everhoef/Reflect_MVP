@@ -1,8 +1,7 @@
 package direct.reflect.facilitator.auth;
 
-import direct.reflect.facilitator.organization.TeamMemberRepository;
 import direct.reflect.facilitator.organization.Team;
-import direct.reflect.facilitator.organization.TeamRole;
+import direct.reflect.facilitator.organization.TeamMembershipService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -11,10 +10,10 @@ import lombok.extern.slf4j.Slf4j;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.List;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -45,7 +44,7 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
 public class AuthService {
     private static final UUID OIDC_USER_ID_NAMESPACE = UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
 
-    private final TeamMemberRepository teamMemberRepository;
+    private final TeamMembershipService teamMembershipService;
     
     /**
      * Get participant ID (subject identifier) for current user.
@@ -131,34 +130,18 @@ public class AuthService {
     }
 
     public boolean hasManagerRole(String username) {
-        if (teamMemberRepository == null) {
-            return false;
-        }
-
         UUID userId = toOidcUserId(username);
-        return teamMemberRepository.existsByUserIdAndRole(userId, TeamRole.MANAGER);
+        return teamMembershipService.hasManagerRole(userId);
     }
 
     public Optional<Team> findSingleManagedTeam(HttpServletRequest request) {
-        if (teamMemberRepository == null) {
-            return Optional.empty();
-        }
-
         String username = getUsername(request);
         if (username == null || username.isBlank()) {
             return Optional.empty();
         }
 
         UUID userId = toOidcUserId(username);
-        List<Team> managedTeams = teamMemberRepository.findByUserIdAndRole(userId, TeamRole.MANAGER).stream()
-                .map(teamMember -> teamMember.getTeam())
-                .toList();
-
-        if (managedTeams.size() != 1) {
-            return Optional.empty();
-        }
-
-        return Optional.ofNullable(managedTeams.getFirst());
+        return teamMembershipService.findSingleManagedTeam(userId);
     }
 
     public UUID toOidcUserId(String username) {

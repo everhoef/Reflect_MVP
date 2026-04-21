@@ -1,0 +1,36 @@
+Task 13: Contract Stability Verification
+
+1. Endpoint Contract Preservation
+All 18 RequestMapping paths and HTTP methods were preserved exactly as defined in the original monolithic controller.
+
+Path Family: /api/retro (Ground Truth from split controllers)
+
+SessionApiController:
+- POST /api/retro/create
+- POST /api/retro/{retroId}/start
+- POST /api/retro/{retroId}/next
+- POST /api/retro/{retroId}/timer/pause
+- POST /api/retro/{retroId}/timer/resume
+- GET /api/retro/{retroId}/timer
+- GET /api/retro/{retroId}/state
+
+ParticipantApiController:
+- POST /api/retro/join
+- POST /api/retro/leave-active-sessions
+- GET /api/retro/check-active-sessions
+- GET /api/retro/{retroId}/participants
+
+ResponseApiController:
+- POST /api/retro/{retroId}/step/{stepId}/response/column
+- POST /api/retro/{retroId}/step/{stepId}/response/rating
+- GET /api/retro/{retroId}/step/{stepId}/response/rating/me
+- GET /api/retro/{retroId}/step/{stepId}/response/rating
+- POST /api/retro/{retroId}/response/{responseId}/vote
+- POST /api/retro/{retroId}/step/{stepId}/reveal
+- PUT /api/retro/{retroId}/response/{responseId}
+
+2. SSE Event Contract
+The RetroEvent.java class remained unchanged. No changes were made to EventType enum or payload structures.
+
+3. Frontend Type Stability
+TypeScript generation (typescript-generator) was re-run. No schema changes were detected in the generated retro-event.ts; timestamp drift was restored to preserve clean git history.

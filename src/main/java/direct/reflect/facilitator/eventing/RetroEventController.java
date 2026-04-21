@@ -4,8 +4,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.security.access.prepost.PreAuthorize;
 
-import direct.reflect.facilitator.facilitation.ParticipantService;
-import direct.reflect.facilitator.facilitation.Participant;
+import direct.reflect.facilitator.facilitation.participant.ParticipantService;
+import direct.reflect.facilitator.facilitation.participant.Participant;
 
 import java.util.UUID;
 

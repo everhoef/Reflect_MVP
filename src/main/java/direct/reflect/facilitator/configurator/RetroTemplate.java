@@ -2,7 +2,7 @@ package direct.reflect.facilitator.configurator;
 
 import jakarta.persistence.*;
 
-import direct.reflect.facilitator.facilitation.RetroPhase;
+import direct.reflect.facilitator.facilitation.session.RetroPhase;
 import lombok.Data;
 
 @Entity

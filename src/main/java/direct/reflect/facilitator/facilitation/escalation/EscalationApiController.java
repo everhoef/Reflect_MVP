@@ -2,7 +2,7 @@ package direct.reflect.facilitator.facilitation.escalation;
 
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
+import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
 import direct.reflect.facilitator.facilitation.dto.SyncVersionedResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;

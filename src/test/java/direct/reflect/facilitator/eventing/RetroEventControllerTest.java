@@ -2,10 +2,10 @@ package direct.reflect.facilitator.eventing;
 
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
-import direct.reflect.facilitator.facilitation.ParticipantService;
-import direct.reflect.facilitator.facilitation.Participant;
-import direct.reflect.facilitator.facilitation.ParticipantRole;
-import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
+import direct.reflect.facilitator.facilitation.participant.ParticipantService;
+import direct.reflect.facilitator.facilitation.participant.Participant;
+import direct.reflect.facilitator.facilitation.participant.ParticipantRole;
+import direct.reflect.facilitator.facilitation.participant.ParticipantNotFoundException;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

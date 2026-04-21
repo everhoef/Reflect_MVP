@@ -1,10 +1,9 @@
 package direct.reflect.facilitator.facilitation.clustering;
 
 import com.fasterxml.uuid.Generators;
-import direct.reflect.facilitator.common.exception.ResourceNotFoundException;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
-import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
+import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
 import direct.reflect.facilitator.facilitation.dto.ColumnResponseDto;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponse;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponseRepository;
@@ -58,7 +57,7 @@ public class ClusteringService {
 
     public void unmergeResponse(UUID retroId, Long stepId, UUID responseId) {
         ParticipantResponse response = responseRepository.findById(responseId)
-                .orElseThrow(() -> new ResourceNotFoundException("Response not found: " + responseId));
+                .orElseThrow(() -> new ClusterResponseNotFoundException(responseId));
         response.setClusterId(null);
         response.setClusterName(null);
         responseRepository.save(response);
@@ -73,7 +72,7 @@ public class ClusteringService {
     public void renameCluster(UUID retroId, Long stepId, UUID clusterId, String newName) {
         List<ParticipantResponse> responses = responseRepository.findByRetroIdAndClusterId(retroId, clusterId);
         if (responses.isEmpty()) {
-            throw new ResourceNotFoundException("Cluster not found: " + clusterId);
+            throw new ClusterNotFoundException(clusterId);
         }
         responses.forEach(r -> r.setClusterName(newName));
         responseRepository.saveAll(responses);

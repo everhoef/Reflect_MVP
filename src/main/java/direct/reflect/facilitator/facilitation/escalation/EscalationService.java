@@ -1,17 +1,17 @@
 package direct.reflect.facilitator.facilitation.escalation;
 
 import direct.reflect.facilitator.auth.AuthService;
-import direct.reflect.facilitator.common.exception.ResourceNotFoundException;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
-import direct.reflect.facilitator.facilitation.Participant;
-import direct.reflect.facilitator.facilitation.ParticipantRepository;
-import direct.reflect.facilitator.facilitation.ParticipantRole;
-import direct.reflect.facilitator.facilitation.ParticipantStatus;
-import direct.reflect.facilitator.facilitation.ParticipantService;
-import direct.reflect.facilitator.facilitation.RetroSession;
-import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
+import direct.reflect.facilitator.facilitation.participant.Participant;
+import direct.reflect.facilitator.facilitation.participant.ParticipantRepository;
+import direct.reflect.facilitator.facilitation.participant.ParticipantRole;
+import direct.reflect.facilitator.facilitation.participant.ParticipantStatus;
+import direct.reflect.facilitator.facilitation.participant.ParticipantService;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
+import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
 import direct.reflect.facilitator.facilitation.actions.ActionItem;
+import direct.reflect.facilitator.facilitation.actions.ActionItemNotFoundException;
 import direct.reflect.facilitator.facilitation.actions.ActionItemRepository;
 import direct.reflect.facilitator.facilitation.escalation.domain.EscalationThresholdPolicy;
 import direct.reflect.facilitator.organization.TeamMemberRepository;
@@ -52,7 +52,7 @@ public class EscalationService {
         participantService.getParticipantForSession(request, retroId);
 
         ActionItem actionItem = actionItemRepository.findByIdAndRetroSessionId(actionId, retroId)
-                .orElseThrow(() -> new ResourceNotFoundException("Action item not found"));
+                .orElseThrow(() -> new ActionItemNotFoundException(actionId));
 
         if (Boolean.TRUE.equals(actionItem.getEscalated())) {
             throw new IllegalArgumentException("Action item already escalated");
@@ -88,7 +88,7 @@ public class EscalationService {
     public EscalationVoteResultDto toggleVote(UUID retroId, UUID escalationId, HttpServletRequest request) {
         Participant participant = participantService.getParticipantForSession(request, retroId);
         EscalatedItem escalatedItem = escalatedItemRepository.findByIdAndRetroSession_Id(escalationId, retroId)
-                .orElseThrow(() -> new ResourceNotFoundException("Escalated item not found"));
+                .orElseThrow(() -> new EscalatedItemNotFoundException(escalationId));
 
         EscalatedItemVote existingVote = escalatedItemVoteRepository
                 .findByEscalatedItemIdAndParticipantId(escalationId, participant.getParticipantId())
@@ -156,15 +156,15 @@ public class EscalationService {
     public EscalatedItemDto getManagerEscalation(UUID escalationId, Authentication authentication) {
         List<UUID> managedTeamIds = getManagedTeamIds(authentication);
         if (managedTeamIds.isEmpty()) {
-            throw new ResourceNotFoundException("Escalated item not found");
+            throw new EscalatedItemNotFoundException(escalationId);
         }
 
         EscalatedItem escalatedItem = escalatedItemRepository.findByIdAndTeam_IdIn(escalationId, managedTeamIds)
-                .orElseThrow(() -> new ResourceNotFoundException("Escalated item not found"));
+                .orElseThrow(() -> new EscalatedItemNotFoundException(escalationId));
 
         EscalatedItemDto dto = toEscalatedItemDto(escalatedItem);
         if (!dto.thresholdMet()) {
-            throw new ResourceNotFoundException("Escalated item not found");
+            throw new EscalatedItemNotFoundException(escalationId);
         }
 
         return dto;

@@ -1,6 +1,6 @@
 package direct.reflect.facilitator.organization;
 
-import direct.reflect.facilitator.common.entity.GeneratedUuidV7;
+import direct.reflect.facilitator.common.ids.GeneratedUuidV7;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;

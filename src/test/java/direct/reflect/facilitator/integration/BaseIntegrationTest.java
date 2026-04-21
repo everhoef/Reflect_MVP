@@ -39,9 +39,9 @@ import direct.reflect.facilitator.auth.TestAuthConfiguration;
 import direct.reflect.facilitator.config.TestRedisConfig;
 import direct.reflect.facilitator.config.TestSecurityOverride;
 import direct.reflect.facilitator.configurator.RetroStageRepository;
-import direct.reflect.facilitator.facilitation.RetroSessionService;
-import direct.reflect.facilitator.facilitation.ParticipantRepository;
-import direct.reflect.facilitator.facilitation.RetroSessionRepository;
+import direct.reflect.facilitator.facilitation.session.RetroSessionService;
+import direct.reflect.facilitator.facilitation.participant.ParticipantRepository;
+import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponseRepository;
 import lombok.extern.slf4j.Slf4j;
 
@@ -952,7 +952,7 @@ public abstract class BaseIntegrationTest {
             log.warn("UI did not transition out of lobby (POST aborted, confirmed={}). Using service fallback.", startConfirmed[0]);
             java.util.UUID retroId = java.util.UUID.fromString(sessionId);
             if (retroSessionRepository.findById(retroId)
-                    .map(s -> s.getPhase() == direct.reflect.facilitator.facilitation.RetroPhase.LOBBY)
+                    .map(s -> s.getPhase() == direct.reflect.facilitator.facilitation.session.RetroPhase.LOBBY)
                     .orElse(false)) {
                 sessionService.startSession(retroId);
             }
@@ -1182,7 +1182,7 @@ public abstract class BaseIntegrationTest {
             log.warn("POST to /start may have been aborted (confirmed={}). Using service fallback.", startConfirmed[0]);
             java.util.UUID retroId = java.util.UUID.fromString(sessionId);
             if (retroSessionRepository.findById(retroId)
-                    .map(s -> s.getPhase() == direct.reflect.facilitator.facilitation.RetroPhase.LOBBY)
+                    .map(s -> s.getPhase() == direct.reflect.facilitator.facilitation.session.RetroPhase.LOBBY)
                     .orElse(false)) {
                 sessionService.startSession(retroId);
             }
