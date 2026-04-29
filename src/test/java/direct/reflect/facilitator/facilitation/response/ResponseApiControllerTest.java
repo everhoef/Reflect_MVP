@@ -6,6 +6,9 @@ import direct.reflect.facilitator.facilitation.session.RetroSessionService;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
 import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.configurator.RetroStep;
+import direct.reflect.facilitator.configurator.RetroStage;
+import direct.reflect.facilitator.configurator.RetroStepQueryService;
+import direct.reflect.facilitator.facilitation.response.InputLimitExceededException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +28,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -61,7 +65,7 @@ public class ResponseApiControllerTest {
     private AuthService authHelper;
 
     @MockitoBean
-    private direct.reflect.facilitator.configurator.RetroStepRepository stepRepository;
+    private RetroStepQueryService retroStepQueryService;
 
     @MockitoBean
     private direct.reflect.facilitator.facilitation.session.RetroSyncVersionService retroSyncVersionService;
@@ -95,6 +99,263 @@ public class ResponseApiControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "GUEST")
+    void submitColumnResponse_GuestUser_ShouldReturnOk() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(csrf())
+                .param("columnId", "Glad")
+                .param("content", "Great collaboration"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("HX-Trigger", "responseSubmitted"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitColumnResponse_EmptyContent_ShouldReturnBadRequest() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(csrf())
+                .param("columnId", "Mad")
+                .param("content", ""))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Validation failed")));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitColumnResponse_ContentTooLong_ShouldReturnBadRequest() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+        String tooLongContent = "a".repeat(501);
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(csrf())
+                .param("columnId", "Mad")
+                .param("content", tooLongContent))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Validation failed")));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitColumnResponse_MissingColumnId_ShouldReturnBadRequest() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(csrf())
+                .param("content", "Some content"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitRatingResponse_ValidInput_ShouldReturnOk() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+                .with(csrf())
+                .param("rating", "8")
+                .param("comment", "Good sprint overall"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("HX-Trigger", "responseSubmitted"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitRatingResponse_WithoutComment_ShouldReturnOk() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+                .with(csrf())
+                .param("rating", "7"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("HX-Trigger", "responseSubmitted"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitRatingResponse_RatingTooLow_ShouldReturnBadRequest() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+                .with(csrf())
+                .param("rating", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Validation failed")));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitRatingResponse_RatingTooHigh_ShouldReturnBadRequest() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+                .with(csrf())
+                .param("rating", "11"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Validation failed")));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitRatingResponse_MissingRating_ShouldReturnBadRequest() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+                .with(csrf())
+                .param("comment", "Some comment"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void submitColumnResponse_Unauthenticated_ShouldReturnUnauthorized() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(anonymous())
+                .with(csrf())
+                .param("columnId", "Mad")
+                .param("content", "Should not work"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void submitRatingResponse_Unauthenticated_ShouldReturnUnauthorized() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+                .with(anonymous())
+                .with(csrf())
+                .param("rating", "8"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitColumnResponse_WithoutCSRF_ShouldReturnForbidden() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .param("columnId", "Mad")
+                .param("content", "Should not work"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitRatingResponse_WithoutCSRF_ShouldReturnForbidden() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+                .param("rating", "8"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitColumnResponse_InputLimitExceeded_ShouldReturnBadRequest() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        when(responseService.submitResponse(eq(retroId), eq(stepId), any(), any(HttpServletRequest.class)))
+            .thenThrow(new InputLimitExceededException(10, 10));
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(csrf())
+                .param("columnId", "Mad")
+                .param("content", "This is my 11th input"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitColumnResponse_UnderInputLimit_ShouldReturnOk() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+        ParticipantResponse mockResponse = new ParticipantResponse();
+        mockResponse.setId(UUID.randomUUID());
+        RetroStep mockStep = new RetroStep();
+        mockStep.setId(stepId);
+        mockResponse.setRetroStep(mockStep);
+
+        when(responseService.submitResponse(eq(retroId), eq(stepId), any(), any(HttpServletRequest.class)))
+            .thenReturn(mockResponse);
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(csrf())
+                .param("columnId", "Mad")
+                .param("content", "Valid input under limit"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("HX-Trigger", "responseSubmitted"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitColumnResponse_ShouldReturnJsonWithResponseId() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+        UUID responseId = UUID.randomUUID();
+
+        ParticipantResponse mockResponse = new ParticipantResponse();
+        mockResponse.setId(responseId);
+        RetroStep mockStep = new RetroStep();
+        mockStep.setId(stepId);
+        mockResponse.setRetroStep(mockStep);
+
+        when(responseService.submitResponse(eq(retroId), eq(stepId), any(), any(HttpServletRequest.class)))
+            .thenReturn(mockResponse);
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+                .with(csrf())
+                .param("columnId", "Mad")
+                .param("content", "Valid response"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("HX-Trigger", "responseSubmitted"))
+                .andExpect(jsonPath("$.responseId").value(responseId.toString()))
+                .andExpect(jsonPath("$.stepId").value(stepId));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void submitRatingResponse_ShouldReturnJsonWithResponseId() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+        UUID responseId = UUID.randomUUID();
+
+        ParticipantResponse mockResponse = new ParticipantResponse();
+        mockResponse.setId(responseId);
+        RetroStep mockStep = new RetroStep();
+        mockStep.setId(stepId);
+        mockResponse.setRetroStep(mockStep);
+
+        when(responseService.submitResponse(eq(retroId), eq(stepId), any(), any(HttpServletRequest.class)))
+            .thenReturn(mockResponse);
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+                .with(csrf())
+                .param("rating", "7"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("HX-Trigger", "responseSubmitted"))
+                .andExpect(jsonPath("$.responseId").value(responseId.toString()))
+                .andExpect(jsonPath("$.stepId").value(stepId));
+    }
+
+    @Test
     @WithMockUser(roles = "USER")
     void toggleVote_ShouldReturnJsonWithVoteCount() throws Exception {
         UUID retroId = UUID.randomUUID();
@@ -111,6 +372,7 @@ public class ResponseApiControllerTest {
                 .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("HX-Trigger", "voteToggled"))
+                .andExpect(jsonPath("$.responseId").value(responseId.toString()))
                 .andExpect(jsonPath("$.voteCount").value(2));
     }
 
@@ -157,6 +419,47 @@ public class ResponseApiControllerTest {
                 .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("HX-Trigger", "responsesRevealed"))
+                .andExpect(jsonPath("$.stepId").value(stepId))
                 .andExpect(jsonPath("$.revealed").value(true));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void revealResponses_NonFacilitator_ShouldReturnForbidden() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
+            .thenReturn(false);
+
+        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/reveal", retroId, stepId)
+                .with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void getRatingResponses_UsesStepQuerySurface() throws Exception {
+        UUID retroId = UUID.randomUUID();
+        Long stepId = 1L;
+
+        Participant participant = new Participant();
+        RetroSession session = new RetroSession();
+        RetroStage stage = new RetroStage();
+        RetroStep step = new RetroStep();
+        step.setId(stepId);
+        step.setRetroStage(stage);
+
+        when(participantService.getParticipantForSession(any(HttpServletRequest.class), eq(retroId)))
+            .thenReturn(participant);
+        when(retroSessionService.getSessionById(retroId)).thenReturn(session);
+        when(retroStepQueryService.getStepById(stepId)).thenReturn(step);
+        when(responseService.getResponsesForStageComponentType(session, stage, direct.reflect.facilitator.configurator.ComponentType.RATING_SCALE))
+            .thenReturn(java.util.List.of());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                "/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId))
+            .andExpect(status().isOk())
+            .andExpect(content().json("[]"));
     }
 }
