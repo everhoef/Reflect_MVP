@@ -1,4 +1,4 @@
-package direct.reflect.facilitator.facilitation;
+package direct.reflect.facilitator.facilitation.escalation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,6 +33,7 @@ import direct.reflect.facilitator.facilitation.participant.ParticipantStatus;
 import direct.reflect.facilitator.facilitation.session.RetroPhase;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
 import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
+import direct.reflect.facilitator.facilitation.session.TeamBackedRetroFixture;
 import direct.reflect.facilitator.organization.Organization;
 import direct.reflect.facilitator.organization.OrganizationRepository;
 import direct.reflect.facilitator.organization.Team;
@@ -145,7 +146,7 @@ class EscalationApiIntegrationTest {
 
         managerUserId = UUID.randomUUID();
         when(authService.toOidcUserId("manager-user")).thenReturn(managerUserId);
-        when(authService.findSingleManagedTeam(any(HttpServletRequest.class))).thenReturn(Optional.empty());
+        when(authService.findSingleManagedTeamId(any(HttpServletRequest.class))).thenReturn(Optional.empty());
     }
 
     @AfterEach
@@ -163,7 +164,7 @@ class EscalationApiIntegrationTest {
     @Test
     void escalateAction_createsEscalatedItemAndCalculatesThreshold() throws Exception {
         RetroSession retroSession = teamBackedRetroFixture.createTeamBackedSession("Platform");
-        Team team = retroSession.getTeam();
+        UUID teamId = retroSession.getTeamId();
         Participant facilitator = saveParticipant(retroSession, "Facilitator", ParticipantRole.FACILITATOR);
         saveParticipant(retroSession, "Alice", ParticipantRole.PARTICIPANT);
         saveParticipant(retroSession, "Bob", ParticipantRole.PARTICIPANT);
@@ -188,7 +189,7 @@ class EscalationApiIntegrationTest {
 
         EscalatedItem escalatedItem = escalatedItemRepository.findAll().getFirst();
         assertThat(escalatedItem.getRetroSession().getId()).isEqualTo(retroSession.getId());
-        assertThat(escalatedItem.getTeam().getId()).isEqualTo(team.getId());
+        assertThat(escalatedItem.getTeamId()).isEqualTo(teamId);
         assertThat(escalatedItem.getVoteThreshold()).isEqualTo(3);
         assertThat(escalatedItem.getProblemDescription()).isEqualTo("Cross-team API dependency blocking releases");
 
@@ -270,7 +271,7 @@ class EscalationApiIntegrationTest {
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(participantId);
         when(authService.getDisplayName(any(HttpServletRequest.class))).thenReturn("Manager Facilitator");
         when(authService.getUsername(any(HttpServletRequest.class))).thenReturn("manager-user");
-        when(authService.findSingleManagedTeam(any(HttpServletRequest.class))).thenReturn(Optional.of(team));
+        when(authService.findSingleManagedTeamId(any(HttpServletRequest.class))).thenReturn(Optional.of(team.getId()));
 
         mockMvc.perform(post("/api/retro/create")
                         .with(authentication(managerAuth))
@@ -285,8 +286,7 @@ class EscalationApiIntegrationTest {
         Participant facilitator = participantRepository.findByParticipantId(participantId).getFirst();
         RetroSession retroSession = sessionRepository.findById(facilitator.getSession().getId()).orElseThrow();
 
-        assertThat(retroSession.getTeam()).isNotNull();
-        assertThat(retroSession.getTeam().getId()).isEqualTo(team.getId());
+        assertThat(retroSession.getTeamId()).isEqualTo(team.getId());
 
         ActionItem actionItem = saveActionItem(retroSession, "Stabilize release ownership");
         setCurrentParticipant(facilitator);
@@ -305,7 +305,7 @@ class EscalationApiIntegrationTest {
         UUID teamId = team.getId();
         assertThat(escalatedItemRepository.findAll())
                 .singleElement()
-                .satisfies(escalatedItem -> assertThat(escalatedItem.getTeam().getId()).isEqualTo(teamId));
+                .satisfies(escalatedItem -> assertThat(escalatedItem.getTeamId()).isEqualTo(teamId));
     }
 
     @Test
@@ -447,6 +447,34 @@ class EscalationApiIntegrationTest {
     }
 
     @Test
+    void getEscalations_returnsThresholdMetWhenVotesReachStoredThreshold() throws Exception {
+        RetroSession retroSession = teamBackedRetroFixture.createTeamBackedSession("Release Coordination");
+        retroSession.setSyncVersion(6L);
+        sessionRepository.saveAndFlush(retroSession);
+        saveParticipant(retroSession, "Facilitator", ParticipantRole.FACILITATOR);
+        Participant participantOne = saveParticipant(retroSession, "Alice", ParticipantRole.PARTICIPANT);
+        Participant participantTwo = saveParticipant(retroSession, "Bob", ParticipantRole.PARTICIPANT);
+        setCurrentParticipant(participantOne);
+
+        EscalatedItem thresholdReached = saveEscalation(
+                retroSession,
+                "Release handoff is blocked by another team",
+                2,
+                LocalDateTime.of(2026, 4, 7, 9, 0));
+        saveVote(thresholdReached, participantOne);
+        saveVote(thresholdReached, participantTwo);
+
+        mockMvc.perform(get("/api/retro/{retroId}/escalations", retroSession.getId())
+                        .with(authentication(participantAuth)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.syncVersion").value(6))
+                .andExpect(jsonPath("$.data[0].problemDescription").value("Release handoff is blocked by another team"))
+                .andExpect(jsonPath("$.data[0].voteCount").value(2))
+                .andExpect(jsonPath("$.data[0].threshold").value(2))
+                .andExpect(jsonPath("$.data[0].thresholdMet").value(true));
+    }
+
+    @Test
     void getEscalations_returnsAuthoritativeSyncVersionWhenListIsEmpty() throws Exception {
         RetroSession retroSession = teamBackedRetroFixture.createTeamBackedSession("Empty Escalations");
         Participant participant = saveParticipant(retroSession, "Alice", ParticipantRole.PARTICIPANT);
@@ -481,10 +509,10 @@ class EscalationApiIntegrationTest {
     @Test
     void managerEscalations_managerSeesOnlyThresholdMetItemsForManagedTeams() throws Exception {
         RetroSession managedRetro = teamBackedRetroFixture.createTeamBackedSession("Managed");
-        Team managedTeam = managedRetro.getTeam();
+        UUID managedTeamId = managedRetro.getTeamId();
         RetroSession otherRetro = teamBackedRetroFixture.createTeamBackedSession("Other");
 
-        saveManagerMembership(managedTeam, managerUserId);
+        saveManagerMembership(teamRepository.getReferenceById(managedTeamId), managerUserId);
 
         Participant facilitator = saveParticipant(managedRetro, "Facilitator", ParticipantRole.FACILITATOR);
         Participant participantOne = saveParticipant(managedRetro, "Alice", ParticipantRole.PARTICIPANT);
@@ -554,7 +582,7 @@ class EscalationApiIntegrationTest {
             LocalDateTime createdAt) {
         EscalatedItem escalatedItem = new EscalatedItem();
         escalatedItem.setRetroSession(retroSession);
-        escalatedItem.setTeam(retroSession.getTeam());
+        escalatedItem.setTeamId(retroSession.getTeamId());
         escalatedItem.setProblemDescription(problemDescription);
         escalatedItem.setVoteThreshold(threshold);
         escalatedItem.setCreatedAt(createdAt);
