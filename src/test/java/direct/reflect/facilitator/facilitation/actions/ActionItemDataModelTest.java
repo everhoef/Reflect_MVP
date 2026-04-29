@@ -1,4 +1,4 @@
-package direct.reflect.facilitator.facilitation;
+package direct.reflect.facilitator.facilitation.actions;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
