@@ -14,7 +14,7 @@ public interface EscalatedItemRepository extends JpaRepository<EscalatedItem, UU
 
     List<EscalatedItem> findByRetroSession_IdOrderByCreatedAtAsc(UUID retroSessionId);
 
-    List<EscalatedItem> findByTeam_IdInOrderByCreatedAtAsc(Collection<UUID> teamIds);
+    List<EscalatedItem> findByTeamIdInOrderByCreatedAtAsc(Collection<UUID> teamIds);
 
-    Optional<EscalatedItem> findByIdAndTeam_IdIn(UUID id, Collection<UUID> teamIds);
+    Optional<EscalatedItem> findByIdAndTeamIdIn(UUID id, Collection<UUID> teamIds);
 }

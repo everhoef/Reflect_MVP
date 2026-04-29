@@ -2,10 +2,8 @@ package direct.reflect.facilitator.eventing;
 
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
-import direct.reflect.facilitator.facilitation.ParticipantService;
-import direct.reflect.facilitator.facilitation.Participant;
-import direct.reflect.facilitator.facilitation.ParticipantRole;
-import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
+import direct.reflect.facilitator.facilitation.participant.SseParticipantAccess;
+import direct.reflect.facilitator.facilitation.participant.ParticipantNotFoundException;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,23 +44,21 @@ class RetroEventControllerTest {
     private EventService eventService;
 
     @MockitoBean  
-    private ParticipantService participantService;
+    private SseParticipantAccess sseParticipantAccess;
 
     @Test
     @WithMockUser(roles = {"USER"})
     void shouldEstablishSseConnectionWithAuthentication() throws Exception {
         // Given
         UUID retroId = UUID.randomUUID();
-        Participant mockParticipant = new Participant();
-        mockParticipant.setParticipantId(UUID.randomUUID());
-        mockParticipant.setDisplayName("TestUser");
-        mockParticipant.setRole(ParticipantRole.FACILITATOR);
+        SseParticipantAccess.SseParticipantConnection mockParticipant =
+                new SseParticipantAccess.SseParticipantConnection(UUID.randomUUID(), "TestUser");
         
-        when(participantService.getParticipantForSession(any(HttpServletRequest.class), eq(retroId)))
+        when(sseParticipantAccess.authorizeSseConnection(any(HttpServletRequest.class), eq(retroId)))
             .thenReturn(mockParticipant);
 
         SseEmitter testEmitter = new SseEmitter(30000L);
-        when(eventService.createSseEmitter(eq(retroId), eq(mockParticipant.getParticipantId()), eq("TestUser")))
+        when(eventService.createSseEmitter(eq(retroId), eq(mockParticipant.participantId()), eq("TestUser")))
             .thenReturn(testEmitter);
 
         // When & Then
@@ -72,9 +68,8 @@ class RetroEventControllerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM));
                 
         // Verify service methods were called
-        verify(participantService).getParticipantForSession(any(HttpServletRequest.class), eq(retroId));
-        verify(participantService).updateLastSeen(any(HttpServletRequest.class), eq(retroId));
-        verify(eventService).createSseEmitter(eq(retroId), eq(mockParticipant.getParticipantId()), eq("TestUser"));
+        verify(sseParticipantAccess).authorizeSseConnection(any(HttpServletRequest.class), eq(retroId));
+        verify(eventService).createSseEmitter(eq(retroId), eq(mockParticipant.participantId()), eq("TestUser"));
     }
 
     @Test  
@@ -117,7 +112,7 @@ class RetroEventControllerTest {
         UUID retroId = UUID.randomUUID();
         
         // Mock participant service to throw ParticipantNotFoundException (not authorized for this session)
-        when(participantService.getParticipantForSession(any(HttpServletRequest.class), eq(retroId)))
+        when(sseParticipantAccess.authorizeSseConnection(any(HttpServletRequest.class), eq(retroId)))
             .thenThrow(new ParticipantNotFoundException("Not authorized for session: " + retroId));
 
         // When & Then
@@ -126,7 +121,7 @@ class RetroEventControllerTest {
                 .andExpect(status().isNotFound()); // ParticipantNotFoundException maps to 404
                 
         // Verify participant validation was attempted
-        verify(participantService).getParticipantForSession(any(HttpServletRequest.class), eq(retroId));
+        verify(sseParticipantAccess).authorizeSseConnection(any(HttpServletRequest.class), eq(retroId));
         // Verify no SSE emitter was created for unauthorized access
         verify(eventService, org.mockito.Mockito.never()).createSseEmitter(any(UUID.class), any(UUID.class), any(String.class));
     }
@@ -136,16 +131,14 @@ class RetroEventControllerTest {
     void shouldAllowSseConnectionForAuthorizedGuestParticipant() throws Exception {
         // Given
         UUID retroId = UUID.randomUUID();
-        Participant guestParticipant = new Participant();
-        guestParticipant.setParticipantId(UUID.randomUUID());
-        guestParticipant.setDisplayName("Guest User");
-        guestParticipant.setRole(ParticipantRole.PARTICIPANT);
+        SseParticipantAccess.SseParticipantConnection guestParticipant =
+                new SseParticipantAccess.SseParticipantConnection(UUID.randomUUID(), "Guest User");
         
-        when(participantService.getParticipantForSession(any(HttpServletRequest.class), eq(retroId)))
+        when(sseParticipantAccess.authorizeSseConnection(any(HttpServletRequest.class), eq(retroId)))
             .thenReturn(guestParticipant);
 
         SseEmitter testEmitter = new SseEmitter(30000L);
-        when(eventService.createSseEmitter(eq(retroId), eq(guestParticipant.getParticipantId()), eq("Guest User")))
+        when(eventService.createSseEmitter(eq(retroId), eq(guestParticipant.participantId()), eq("Guest User")))
             .thenReturn(testEmitter);
 
         // When & Then
@@ -155,9 +148,8 @@ class RetroEventControllerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM));
                 
         // Verify guest participant was validated and SSE connection established
-        verify(participantService).getParticipantForSession(any(HttpServletRequest.class), eq(retroId));
-        verify(participantService).updateLastSeen(any(HttpServletRequest.class), eq(retroId));
-        verify(eventService).createSseEmitter(eq(retroId), eq(guestParticipant.getParticipantId()), eq("Guest User"));
+        verify(sseParticipantAccess).authorizeSseConnection(any(HttpServletRequest.class), eq(retroId));
+        verify(eventService).createSseEmitter(eq(retroId), eq(guestParticipant.participantId()), eq("Guest User"));
     }
 
     @Test
@@ -171,7 +163,7 @@ class RetroEventControllerTest {
                 .andExpect(status().is3xxRedirection()); // WebMvcTest redirects to login for unauthenticated requests
                 
         // Verify no service methods were called due to authentication failure
-        verify(participantService, org.mockito.Mockito.never()).getParticipantForSession(any(HttpServletRequest.class), any(UUID.class));
+        verify(sseParticipantAccess, org.mockito.Mockito.never()).authorizeSseConnection(any(HttpServletRequest.class), any(UUID.class));
         verify(eventService, org.mockito.Mockito.never()).createSseEmitter(any(UUID.class), any(UUID.class), any(String.class));
     }
 }

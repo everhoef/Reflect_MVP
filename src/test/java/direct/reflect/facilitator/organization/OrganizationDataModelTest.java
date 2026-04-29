@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.config.TestRedisConfig;
-import direct.reflect.facilitator.facilitation.RetroSession;
-import direct.reflect.facilitator.facilitation.RetroSessionRepository;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
+import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.UUID;
@@ -51,6 +51,9 @@ class OrganizationDataModelTest {
 
     @Autowired
     private TeamMemberRepository teamMemberRepository;
+
+    @Autowired
+    private TeamMembershipService teamMembershipService;
 
     @Autowired
     private RetroSessionRepository sessionRepository;
@@ -130,6 +133,39 @@ class OrganizationDataModelTest {
     }
 
     @Test
+    void teamMembershipService_preservesManagerRoleAndSingleManagedTeamSelection() {
+        Organization organization = saveOrganization("Gamma Corp", "gamma-corp");
+        Team platform = saveTeam(organization, "Platform");
+        Team delivery = saveTeam(organization, "Delivery");
+        UUID userId = UUID.randomUUID();
+
+        TeamMember memberOnly = new TeamMember();
+        memberOnly.setTeam(platform);
+        memberOnly.setUserId(userId);
+        memberOnly.setRole(TeamRole.MEMBER);
+        teamMemberRepository.saveAndFlush(memberOnly);
+
+        assertThat(teamMembershipService.hasManagerRole(userId)).isFalse();
+        assertThat(teamMembershipService.findSingleManagedTeamId(userId)).isEmpty();
+
+        memberOnly.setRole(TeamRole.MANAGER);
+        teamMemberRepository.saveAndFlush(memberOnly);
+
+        assertThat(teamMembershipService.hasManagerRole(userId)).isTrue();
+        assertThat(teamMembershipService.findSingleManagedTeamId(userId))
+                .contains(platform.getId());
+
+        TeamMember secondManagedTeam = new TeamMember();
+        secondManagedTeam.setTeam(delivery);
+        secondManagedTeam.setUserId(userId);
+        secondManagedTeam.setRole(TeamRole.MANAGER);
+        teamMemberRepository.saveAndFlush(secondManagedTeam);
+
+        assertThat(teamMembershipService.hasManagerRole(userId)).isTrue();
+        assertThat(teamMembershipService.findSingleManagedTeamId(userId)).isEmpty();
+    }
+
+    @Test
     void retroSession_allowsNullAndNonNullTeamAssociations() {
         RetroSession sessionWithoutTeam = new RetroSession();
         sessionWithoutTeam.setName("Company Retro");
@@ -140,7 +176,7 @@ class OrganizationDataModelTest {
 
         RetroSession sessionWithTeam = new RetroSession();
         sessionWithTeam.setName("Delivery Retro");
-        sessionWithTeam.setTeam(team);
+        sessionWithTeam.setTeamId(team.getId());
         sessionRepository.saveAndFlush(sessionWithTeam);
 
         entityManager.clear();
@@ -148,9 +184,8 @@ class OrganizationDataModelTest {
         RetroSession loadedWithoutTeam = sessionRepository.findById(sessionWithoutTeam.getId()).orElseThrow();
         RetroSession loadedWithTeam = sessionRepository.findById(sessionWithTeam.getId()).orElseThrow();
 
-        assertThat(loadedWithoutTeam.getTeam()).isNull();
-        assertThat(loadedWithTeam.getTeam()).isNotNull();
-        assertThat(loadedWithTeam.getTeam().getId()).isEqualTo(team.getId());
+        assertThat(loadedWithoutTeam.getTeamId()).isNull();
+        assertThat(loadedWithTeam.getTeamId()).isEqualTo(team.getId());
     }
 
     private Organization saveOrganization(String name, String slug) {

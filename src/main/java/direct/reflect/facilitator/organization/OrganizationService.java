@@ -1,6 +1,5 @@
 package direct.reflect.facilitator.organization;
 
-import direct.reflect.facilitator.common.exception.ResourceNotFoundException;
 import jakarta.transaction.Transactional;
 import java.util.Comparator;
 import java.util.List;
@@ -97,17 +96,17 @@ public class OrganizationService {
 
     private Organization getOrganizationOrThrow(UUID organizationId) {
         return organizationRepository.findById(organizationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Organization not found"));
+                .orElseThrow(OrganizationNotFoundException::new);
     }
 
     private Team getTeamForOrganizationOrThrow(UUID organizationId, UUID teamId) {
         getOrganizationOrThrow(organizationId);
 
         Team team = teamRepository.findById(teamId)
-                .orElseThrow(() -> new ResourceNotFoundException("Team not found"));
+                .orElseThrow(TeamNotFoundException::new);
 
         if (!team.getOrganization().getId().equals(organizationId)) {
-            throw new ResourceNotFoundException("Team not found");
+            throw new TeamNotFoundException();
         }
 
         return team;

@@ -33,6 +33,10 @@
 		<org.projectlombok.version>1.18.42</org.projectlombok.version>
 		<org.mapstruct.version>1.6.2</org.mapstruct.version>
 		<testcontainers.version>2.0.2</testcontainers.version>
+		<pmd.maxAllowedViolations>18</pmd.maxAllowedViolations>
+		<checkstyle.maxAllowedViolations>2297</checkstyle.maxAllowedViolations>
+		<spotbugs.skip>true</spotbugs.skip>
+		<spotbugs.failOnError>false</spotbugs.failOnError>
 	</properties>
 	
 	<dependencies>
@@ -339,6 +343,46 @@
 						</path>
 					</annotationProcessorPaths>
 				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-pmd-plugin</artifactId>
+				<version>3.28.0</version>
+				<configuration>
+					<failOnViolation>true</failOnViolation>
+					<failurePriority>5</failurePriority>
+					<maxAllowedViolations>${pmd.maxAllowedViolations}</maxAllowedViolations>
+					<printFailingErrors>true</printFailingErrors>
+					<verbose>true</verbose>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-checkstyle-plugin</artifactId>
+				<version>3.6.0</version>
+				<configuration>
+					<failOnViolation>true</failOnViolation>
+					<consoleOutput>true</consoleOutput>
+					<maxAllowedViolations>${checkstyle.maxAllowedViolations}</maxAllowedViolations>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>com.github.spotbugs</groupId>
+				<artifactId>spotbugs-maven-plugin</artifactId>
+				<version>4.9.2.0</version>
+				<configuration>
+					<effort>Max</effort>
+					<threshold>Low</threshold>
+					<skip>${spotbugs.skip}</skip>
+					<failOnError>${spotbugs.failOnError}</failOnError>
+				</configuration>
+				<dependencies>
+					<dependency>
+						<groupId>com.h3xstream.findsecbugs</groupId>
+						<artifactId>findsecbugs-plugin</artifactId>
+						<version>1.13.0</version>
+					</dependency>
+				</dependencies>
 			</plugin>
 		</plugins>
 	</build>

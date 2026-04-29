@@ -2,24 +2,22 @@ package direct.reflect.facilitator.facilitation.response;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import direct.reflect.facilitator.facilitation.RetroSession;
-import direct.reflect.facilitator.facilitation.Participant;
-import direct.reflect.facilitator.facilitation.ParticipantService;
-import direct.reflect.facilitator.facilitation.RetroSessionService;
-import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
+import direct.reflect.facilitator.facilitation.participant.Participant;
+import direct.reflect.facilitator.facilitation.participant.ParticipantService;
+import direct.reflect.facilitator.facilitation.session.RetroSessionService;
+import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
+import direct.reflect.facilitator.facilitation.participant.ParticipantNotFoundException;
+import direct.reflect.facilitator.facilitation.session.InvalidSessionStateException;
+import direct.reflect.facilitator.facilitation.session.InvalidStepException;
+import direct.reflect.facilitator.facilitation.session.RetroSessionNotFoundException;
 import direct.reflect.facilitator.facilitation.dto.ComponentResponseDto;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.RetroStage;
 import direct.reflect.facilitator.configurator.ComponentType;
-import direct.reflect.facilitator.configurator.RetroStepRepository;
+import direct.reflect.facilitator.configurator.RetroStepQueryService;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
-import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException;
-import direct.reflect.facilitator.common.exception.InvalidSessionStateException;
-import direct.reflect.facilitator.common.exception.InvalidStepException;
-import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
-import direct.reflect.facilitator.common.exception.VoteLimitExceededException;
-import direct.reflect.facilitator.common.exception.InputLimitExceededException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +35,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ResponseService {
     private final ParticipantResponseRepository responseRepository;
-    private final RetroStepRepository retroStepRepository;
+    private final RetroStepQueryService retroStepQueryService;
     private final EventService eventService;
     private final RetroSessionService retroSessionService;
     private final ParticipantService participantService;
@@ -301,8 +299,7 @@ public class ResponseService {
     }
 
     private RetroStep getRetroStepById(Long stepId) {
-        return retroStepRepository.findById(stepId)
-            .orElseThrow(() -> new IllegalArgumentException("RetroStep not found with ID: " + stepId));
+        return retroStepQueryService.getStepById(stepId);
     }
 
     private void publishResponseSubmittedEvent(UUID retroId, ParticipantResponse response) {

@@ -1,5 +1,6 @@
 package direct.reflect.facilitator.facilitation.dto;
 
+import direct.reflect.facilitator.facilitation.session.dto.AssistantStateDto;
 import java.util.List;
 import java.util.UUID;
 

@@ -5,8 +5,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import direct.reflect.facilitator.facilitation.RetroSession;
-import direct.reflect.facilitator.facilitation.Participant;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
+import direct.reflect.facilitator.facilitation.participant.Participant;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.RetroStage;
 import direct.reflect.facilitator.configurator.ComponentType;
