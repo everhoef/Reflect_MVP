@@ -2,7 +2,6 @@ package direct.reflect.facilitator.facilitation.escalation;
 
 import direct.reflect.facilitator.common.ids.GeneratedUuidV7;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
-import direct.reflect.facilitator.organization.Team;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -46,9 +45,12 @@ public class EscalatedItem {
     private RetroSession retroSession;
 
     @NotNull(message = "Escalated item must belong to a team")
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "team_id", nullable = false)
-    private Team team;
+    @Column(name = "team_id", nullable = false)
+    private UUID teamId;
+
+    public UUID getTeamId() {
+        return teamId;
+    }
 
     @Min(value = 1, message = "Vote threshold must be at least 1")
     @Column(name = "vote_threshold", nullable = false)

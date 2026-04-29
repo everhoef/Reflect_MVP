@@ -22,13 +22,14 @@ public class ActionItemCarryOverService {
     RetroSession currentSession = sessionRepository.findById(retroId)
         .orElseThrow(() -> new RetroSessionNotFoundException(retroId));
 
-    if (currentSession.getTeam() == null || currentSession.getCreatedAt() == null) {
+    UUID teamId = currentSession.getTeamId();
+    if (teamId == null || currentSession.getCreatedAt() == null) {
       return List.of();
     }
 
     return sessionRepository
-        .findFirstByTeam_IdAndPhaseAndIdNotAndCreatedAtBeforeOrderByFinishedAtDescCreatedAtDesc(
-            currentSession.getTeam().getId(),
+        .findFirstByTeamIdAndPhaseAndIdNotAndCreatedAtBeforeOrderByFinishedAtDescCreatedAtDesc(
+            teamId,
             RetroPhase.COMPLETED,
             currentSession.getId(),
             currentSession.getCreatedAt())
