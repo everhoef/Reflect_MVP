@@ -1,4 +1,4 @@
-package direct.reflect.facilitator.facilitation;
+package direct.reflect.facilitator.facilitation.session;
 
 import direct.reflect.facilitator.facilitation.session.RetroPhase;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
@@ -47,7 +47,7 @@ public class TeamBackedRetroFixture {
 
         RetroSession retroSession = new RetroSession();
         retroSession.setName(teamName + " Retro");
-        retroSession.setTeam(savedTeam);
+        retroSession.setTeamId(savedTeam.getId());
         retroSession.setPhase(RetroPhase.CREATED);
         retroSession.setCreatedAt(LocalDateTime.now());
         return sessionRepository.saveAndFlush(retroSession);
