@@ -1,4 +1,4 @@
-package direct.reflect.facilitator.facilitation;
+package direct.reflect.facilitator.facilitation.participant;
 
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.auth.AuthService;
