@@ -12,42 +12,42 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Architectural enforcement test: the integration/ package must contain ONLY browser/E2E tests.
+ * Architectural enforcement test: the e2e/ package must contain ONLY browser/E2E tests.
  *
- * <p>Any test class in src/test/java/.../integration/ that does NOT import Playwright
+ * <p>Any test class in src/test/java/.../e2e/ that does NOT import Playwright
  * (com.microsoft.playwright) is a violation of the browser-only rule.
  *
  * <p>If this test fails, move the offending class to the appropriate module-aligned package
  * (facilitation/, configurator/, auth/, etc.) and update its package declaration.
  */
-class IntegrationPackageBrowserOnlyTest {
+class E2ePackageBrowserOnlyTest {
 
     private static final String PLAYWRIGHT_IMPORT = "com.microsoft.playwright";
 
     @Test
-    void integrationPackageShouldContainOnlyBrowserTests() throws IOException {
-        Path integrationDir = findIntegrationDir();
-        if (integrationDir == null || !Files.exists(integrationDir)) {
+    void e2ePackageShouldContainOnlyBrowserTests() throws IOException {
+        Path e2eDir = findE2eDir();
+        if (e2eDir == null || !Files.exists(e2eDir)) {
             return;
         }
 
-        List<Path> violations = Files.walk(integrationDir)
+        List<Path> violations = Files.walk(e2eDir)
                 .filter(p -> p.toString().endsWith(".java"))
-                .filter(p -> !p.getFileName().toString().equals("BaseIntegrationTest.java"))
+                .filter(p -> !p.getFileName().toString().equals("BaseEndToEndTest.java"))
                 .filter(p -> !containsPlaywrightImport(p))
                 .collect(Collectors.toList());
 
         assertThat(violations)
-                .as("The following files in integration/ do not import Playwright and must be moved " +
+                .as("The following files in e2e/ do not import Playwright and must be moved " +
                     "to a module-aligned test package (facilitation/, configurator/, auth/, etc.):\n%s",
                     violations.stream().map(Path::getFileName).map(Path::toString).collect(Collectors.joining("\n")))
                 .isEmpty();
     }
 
-    private Path findIntegrationDir() {
+    private Path findE2eDir() {
         String[] candidates = {
-            "src/test/java/direct/reflect/facilitator/integration",
-            "../src/test/java/direct/reflect/facilitator/integration"
+            "src/test/java/direct/reflect/facilitator/e2e",
+            "../src/test/java/direct/reflect/facilitator/e2e"
         };
         for (String candidate : candidates) {
             Path p = Paths.get(candidate);
@@ -56,7 +56,7 @@ class IntegrationPackageBrowserOnlyTest {
             }
         }
         Path workDir = Paths.get(System.getProperty("user.dir"));
-        Path candidate = workDir.resolve("src/test/java/direct/reflect/facilitator/integration");
+        Path candidate = workDir.resolve("src/test/java/direct/reflect/facilitator/e2e");
         if (Files.exists(candidate)) {
             return candidate;
         }
