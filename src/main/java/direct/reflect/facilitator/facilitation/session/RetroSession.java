@@ -1,20 +1,18 @@
 package direct.reflect.facilitator.facilitation.session;
 
 import direct.reflect.facilitator.common.ids.GeneratedUuidV7;
-import java.time.LocalDateTime;
-import java.util.UUID;
-import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.configurator.RetroStage;
-import direct.reflect.facilitator.organization.Team;
+import direct.reflect.facilitator.configurator.RetroTemplate;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.Data;
 
 @Entity
@@ -40,9 +38,8 @@ public class RetroSession {
   @ManyToOne(fetch = FetchType.LAZY)
   private RetroTemplate template;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "team_id")
-  private Team team;
+  @Column(name = "team_id")
+  private UUID teamId;
 
   private int currentStepIndex = -1;
 
@@ -53,7 +50,26 @@ public class RetroSession {
   private RetroPhase phase = RetroPhase.CREATED;
 
   public RetroStage getCurrentStage() {
-    return template.getStageForPhase(phase);
+    return getStageForPhase(phase);
+  }
+
+  public RetroStage getStageForPhase(RetroPhase targetPhase) {
+    if (template == null || targetPhase == null) {
+      return null;
+    }
+
+    return switch (targetPhase) {
+      case SET_THE_STAGE -> template.getSetTheStage();
+      case GATHER_DATA -> template.getGatherData();
+      case GENERATE_INSIGHTS -> template.getGenerateInsights();
+      case DECIDE_ACTIONS -> template.getDecideActions();
+      case CLOSE_RETRO -> template.getCloseRetro();
+      case LOBBY, CREATED, PAUSED, COMPLETED, ABANDONED -> null;
+    };
+  }
+
+  public UUID getTeamId() {
+    return teamId;
   }
 
   public boolean isFinished() {

@@ -7,7 +7,7 @@ import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.RetroTemplate;
 import direct.reflect.facilitator.configurator.RetroTemplateService;
 import direct.reflect.facilitator.configurator.ComponentType;
-import direct.reflect.facilitator.configurator.RetroStepRepository;
+import direct.reflect.facilitator.configurator.RetroStepQueryService;
 import direct.reflect.facilitator.facilitation.participant.ParticipantRole;
 import direct.reflect.facilitator.facilitation.participant.ParticipantService;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponseRepository;
@@ -20,7 +20,6 @@ import java.time.LocalDateTime;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +32,7 @@ import jakarta.servlet.http.HttpServletRequest;
 public class RetroSessionService {
     private final RetroSessionRepository sessionRepository;
     private final RetroTemplateService retroTemplateService;
-    private final RetroStepRepository stepRepository;
+    private final RetroStepQueryService retroStepQueryService;
     private final ParticipantResponseRepository responseRepository;
     private final ParticipantService participantService;
     private final AuthService authService;
@@ -73,9 +72,7 @@ public class RetroSessionService {
 
         // Step 2: Create the retro session (publishes RETRO_CREATED event)
         RetroSession session = createNewSession(sessionName);
-        Optional.ofNullable(authService.findSingleManagedTeam(request))
-                .orElseGet(Optional::empty)
-                .ifPresent(session::setTeam);
+        authService.findSingleManagedTeamId(request).ifPresent(session::setTeamId);
         log.info("Created new retro session: {} (id: {})", session.getName(), session.getId());
 
         // Step 3: Add creator as facilitator (publishes PARTICIPANT_JOINED event)
@@ -138,7 +135,7 @@ public class RetroSessionService {
             return null; // Session hasn't started steps yet
         }
 
-        List<RetroStep> stepsForStage = stepRepository.findByRetroStageOrderByOrderIndexAsc(currentStage);
+        List<RetroStep> stepsForStage = retroStepQueryService.findStepsByStage(currentStage);
         if (stepIndex >= stepsForStage.size()) {
             return null; // Invalid step index
         }
@@ -150,7 +147,9 @@ public class RetroSessionService {
      * Find a step with the specified componentType in the given stage
      */
     public RetroStep findStepByComponentType(RetroStage stage, ComponentType componentType) {
-        List<RetroStep> steps = stepRepository.findByRetroStageAndComponentType(stage, componentType);
+        List<RetroStep> steps = retroStepQueryService.findStepsByStageAndComponentType(
+            stage,
+            componentType);
         return steps.isEmpty() ? null : steps.get(0); // Return first match
     }
 
@@ -164,7 +163,7 @@ public class RetroSessionService {
             return false;
         }
 
-        List<RetroStep> stepsForStage = stepRepository.findByRetroStageOrderByOrderIndexAsc(currentStage);
+        List<RetroStep> stepsForStage = retroStepQueryService.findStepsByStage(currentStage);
         return (session.getCurrentStepIndex() + 1) < stepsForStage.size();
     }
 
@@ -188,7 +187,12 @@ public class RetroSessionService {
 
     private boolean allParticipantsResponded(UUID sessionId, Long stepId) {
         RetroSession session = getSessionById(sessionId);
-        RetroStep step = stepRepository.findById(stepId).orElse(null);
+        RetroStep step;
+        try {
+            step = retroStepQueryService.getStepById(stepId);
+        } catch (IllegalArgumentException exception) {
+            step = null;
+        }
         if (step == null) {
             return false;
         }
@@ -286,7 +290,7 @@ public class RetroSessionService {
             return AssistantHistory.empty(sessionId).toPublicDto();
         }
 
-        List<RetroStep> stepsInStage = stepRepository.findByRetroStageOrderByOrderIndexAsc(currentStage);
+        List<RetroStep> stepsInStage = retroStepQueryService.findStepsByStage(currentStage);
         int currentIndex = session.getCurrentStepIndex();
 
         // Build history by pushing messages for steps 0..currentIndex in order.
@@ -333,7 +337,7 @@ public class RetroSessionService {
             return List.of();
         }
 
-        List<RetroStep> stepsInStage = stepRepository.findByRetroStageOrderByOrderIndexAsc(currentStage);
+        List<RetroStep> stepsInStage = retroStepQueryService.findStepsByStage(currentStage);
 
         return stepsInStage.stream()
             .limit(session.getCurrentStepIndex() + 1)

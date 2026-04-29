@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface RetroSessionRepository extends JpaRepository<RetroSession, UUID> {
 
-  Optional<RetroSession> findFirstByTeam_IdAndPhaseAndIdNotAndCreatedAtBeforeOrderByFinishedAtDescCreatedAtDesc(
+  Optional<RetroSession> findFirstByTeamIdAndPhaseAndIdNotAndCreatedAtBeforeOrderByFinishedAtDescCreatedAtDesc(
       UUID teamId,
       RetroPhase phase,
       UUID currentSessionId,
