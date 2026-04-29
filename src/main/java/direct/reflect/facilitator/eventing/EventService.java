@@ -1,34 +1,31 @@
 package direct.reflect.facilitator.eventing;
 
 import direct.reflect.facilitator.eventing.infrastructure.redis.RedisPubSubConfig;
+import direct.reflect.facilitator.facilitation.session.RetroSyncVersionQuery;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
-
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
-
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import java.io.IOException;
-import java.util.Map;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -38,7 +35,7 @@ public class EventService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher applicationEventPublisher;
-    private final RetroSyncVersionService retroSyncVersionService;
+    private final RetroSyncVersionQuery retroSyncVersionQuery;
     private final AtomicInteger activeConnections = new AtomicInteger(0);
 
     @Value("${facilitator.sse.timeout-ms:3600000}")
@@ -268,7 +265,7 @@ public class EventService {
     }
 
     RetroSseEnvelope<?> toSseEnvelope(RetroEvent<?> event) {
-        long syncVersion = retroSyncVersionService.getSyncVersion(event.retroId());
+        long syncVersion = retroSyncVersionQuery.getSyncVersion(event.retroId());
         return new RetroSseEnvelope<>(syncVersion, event.payload());
     }
     
