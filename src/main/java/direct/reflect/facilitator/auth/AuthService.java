@@ -1,19 +1,17 @@
 package direct.reflect.facilitator.auth;
 
-import direct.reflect.facilitator.organization.Team;
-import direct.reflect.facilitator.organization.TeamMembershipService;
+import direct.reflect.facilitator.organization.ManagerTeamAccess;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.List;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -44,7 +42,7 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
 public class AuthService {
     private static final UUID OIDC_USER_ID_NAMESPACE = UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
 
-    private final TeamMembershipService teamMembershipService;
+    private final ManagerTeamAccess managerTeamAccess;
     
     /**
      * Get participant ID (subject identifier) for current user.
@@ -131,17 +129,17 @@ public class AuthService {
 
     public boolean hasManagerRole(String username) {
         UUID userId = toOidcUserId(username);
-        return teamMembershipService.hasManagerRole(userId);
+        return managerTeamAccess.hasManagerRole(userId);
     }
 
-    public Optional<Team> findSingleManagedTeam(HttpServletRequest request) {
+    public Optional<UUID> findSingleManagedTeamId(HttpServletRequest request) {
         String username = getUsername(request);
         if (username == null || username.isBlank()) {
             return Optional.empty();
         }
 
         UUID userId = toOidcUserId(username);
-        return teamMembershipService.findSingleManagedTeam(userId);
+        return managerTeamAccess.findSingleManagedTeamId(userId);
     }
 
     public UUID toOidcUserId(String username) {
