@@ -1,4 +1,4 @@
-package direct.reflect.facilitator.facilitation;
+package direct.reflect.facilitator.facilitation.clustering;
 
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.config.TestSecurityOverride;
