@@ -35,7 +35,7 @@ import direct.reflect.facilitator.eventing.RetroEvent;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class ParticipantService {
+public class ParticipantService implements SseParticipantAccess {
     private final ParticipantRepository participantRepository;
     private final EventService eventService;
     private final AuthService authHelper;
@@ -110,6 +110,21 @@ public class ParticipantService {
 
         log.debug("Participant found: displayName={}, role={}", result.get().getDisplayName(), result.get().getRole());
         return result.get();
+    }
+
+    @Override
+    @Transactional
+    public SseParticipantAccess.SseParticipantConnection authorizeSseConnection(HttpServletRequest request, UUID sessionId) {
+        Participant participant = getParticipantForSession(request, sessionId);
+        participant.setLastSeen(LocalDateTime.now());
+        participantRepository.save(participant);
+
+        log.debug("Updated lastSeen for participant '{}' (ID: {}) in session {}",
+                participant.getDisplayName(), participant.getParticipantId(), sessionId);
+
+        return new SseParticipantAccess.SseParticipantConnection(
+                participant.getParticipantId(),
+                participant.getDisplayName());
     }
     
     /**

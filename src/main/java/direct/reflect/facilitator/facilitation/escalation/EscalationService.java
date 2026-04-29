@@ -14,8 +14,7 @@ import direct.reflect.facilitator.facilitation.actions.ActionItem;
 import direct.reflect.facilitator.facilitation.actions.ActionItemNotFoundException;
 import direct.reflect.facilitator.facilitation.actions.ActionItemRepository;
 import direct.reflect.facilitator.facilitation.escalation.domain.EscalationThresholdPolicy;
-import direct.reflect.facilitator.organization.TeamMemberRepository;
-import direct.reflect.facilitator.organization.TeamRole;
+import direct.reflect.facilitator.organization.ManagerTeamAccess;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -41,7 +40,7 @@ public class EscalationService {
     private final ParticipantRepository participantRepository;
     private final EventService eventService;
     private final RetroSyncVersionService retroSyncVersionService;
-    private final TeamMemberRepository teamMemberRepository;
+    private final ManagerTeamAccess managerTeamAccess;
     private final AuthService authService;
 
     public EscalatedItemDto escalateAction(
@@ -59,14 +58,14 @@ public class EscalationService {
         }
 
         RetroSession retroSession = actionItem.getRetroSession();
-        if (retroSession.getTeam() == null) {
+        if (retroSession.getTeamId() == null) {
             throw new IllegalArgumentException("Retro session must belong to a team before escalation");
         }
 
         int participantCount = participantService.getSessionParticipants(retroId).size();
         EscalatedItem escalatedItem = new EscalatedItem();
         escalatedItem.setRetroSession(retroSession);
-        escalatedItem.setTeam(retroSession.getTeam());
+        escalatedItem.setTeamId(retroSession.getTeamId());
         escalatedItem.setProblemDescription(problemDescription);
         escalatedItem.setVoteThreshold(EscalationThresholdPolicy.calculateVoteThreshold(participantCount));
 
@@ -145,7 +144,7 @@ public class EscalationService {
             return List.of();
         }
 
-        List<EscalatedItem> escalatedItems = escalatedItemRepository.findByTeam_IdInOrderByCreatedAtAsc(managedTeamIds);
+        List<EscalatedItem> escalatedItems = escalatedItemRepository.findByTeamIdInOrderByCreatedAtAsc(managedTeamIds);
 
         return toEscalatedItemDtos(escalatedItems).stream()
                 .filter(EscalatedItemDto::thresholdMet)
@@ -159,7 +158,7 @@ public class EscalationService {
             throw new EscalatedItemNotFoundException(escalationId);
         }
 
-        EscalatedItem escalatedItem = escalatedItemRepository.findByIdAndTeam_IdIn(escalationId, managedTeamIds)
+        EscalatedItem escalatedItem = escalatedItemRepository.findByIdAndTeamIdIn(escalationId, managedTeamIds)
                 .orElseThrow(() -> new EscalatedItemNotFoundException(escalationId));
 
         EscalatedItemDto dto = toEscalatedItemDto(escalatedItem);
@@ -192,9 +191,22 @@ public class EscalationService {
                     return EscalatedItemDto.from(
                             escalatedItem,
                             voteCount,
-                            isThresholdMet(voteCount, participants, escalatedItem.getId()));
+                            isThresholdMet(escalatedItem, voteCount, participants));
                 })
                 .toList();
+    }
+
+    private boolean isThresholdMet(EscalatedItem escalatedItem, long voteCount, List<Participant> participants) {
+        int threshold = escalatedItem.getVoteThreshold();
+        if (EscalationThresholdPolicy.hasReachedThreshold(voteCount, threshold)) {
+            return true;
+        }
+
+        if (!EscalationThresholdPolicy.isTieBreakScenario(voteCount, threshold)) {
+            return false;
+        }
+
+        return isThresholdMet(voteCount, participants, escalatedItem.getId());
     }
 
     private boolean isThresholdMet(EscalatedItem escalatedItem, long voteCount) {
@@ -272,8 +284,6 @@ public class EscalationService {
         }
 
         UUID userId = authService.toOidcUserId(authentication.getName());
-        return teamMemberRepository.findByUserIdAndRole(userId, TeamRole.MANAGER).stream()
-                .map(teamMember -> teamMember.getTeam().getId())
-                .toList();
+        return managerTeamAccess.findManagedTeamIds(userId);
     }
 }
