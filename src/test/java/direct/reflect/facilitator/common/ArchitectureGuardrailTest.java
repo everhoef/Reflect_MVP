@@ -3,7 +3,6 @@ package direct.reflect.facilitator.common;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
-import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchRule;
@@ -35,13 +34,13 @@ class ArchitectureGuardrailTest {
             };
 
     @Test
-    @DisplayName("browser tests stay in integration package only")
-    void browserTestsStayInIntegrationPackageOnly() {
+    @DisplayName("browser tests stay in e2e package only")
+    void browserTestsStayInE2ePackageOnly() {
         ArchRule rule = noClasses()
-                .that().resideOutsideOfPackage("..integration..")
+                .that().resideOutsideOfPackage("..e2e..")
                 .should().dependOnClassesThat().resideInAnyPackage("com.microsoft.playwright..")
-                .as("browser tests stay in integration package only")
-                .because("Playwright-dependent test code belongs in direct.reflect.facilitator.integration so module packages stay focused on non-UI correctness.");
+                .as("browser tests stay in e2e package only")
+                .because("Playwright-dependent test code belongs in direct.reflect.facilitator.e2e so module packages stay focused on non-UI correctness.");
 
         rule.check(TEST_CLASSES);
     }
@@ -88,31 +87,32 @@ class ArchitectureGuardrailTest {
     }
 
     @Test
-    @DisplayName("feature modules must not depend on each other directly")
-    void featureModulesMustNotDependOnEachOtherDirectly() {
+    @DisplayName("configurator must stay out of facilitation runtime collaboration internals")
+    void configuratorMustStayOutOfFacilitationRuntimeCollaborationInternals() {
         ArchRule rule = noClasses()
-                .that().resideInAnyPackage("..facilitation..")
-                .should().dependOnClassesThat().resideInAnyPackage("..configurator..")
-                .as("facilitation must not depend on configurator")
-                .because("facilitation is a core business domain that should not depend on its configuration support module directly.");
+                .that().resideInAnyPackage("..configurator..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "..facilitation.participant..",
+                        "..facilitation.response..",
+                        "..facilitation.actions..",
+                        "..facilitation.clustering..",
+                        "..facilitation.escalation..")
+                .as("configurator must stay out of facilitation runtime collaboration internals")
+                .because("configurator owns templates and import mechanics, not participant, response, voting, clustering, or escalation runtime behavior.");
 
-        if (Boolean.getBoolean("archunit.strict")) {
-            rule.check(PRODUCTION_CLASSES);
-        }
+        rule.check(PRODUCTION_CLASSES);
     }
 
     @Test
-    @DisplayName("support modules must not depend on feature modules")
-    void supportModulesMustNotDependOnFeatureModules() {
+    @DisplayName("eventing must stay out of configurator and organization internals")
+    void eventingMustStayOutOfConfiguratorAndOrganizationInternals() {
         ArchRule rule = noClasses()
-                .that().resideInAnyPackage("..configurator..", "..eventing..", "..auth..")
-                .should().dependOnClassesThat().resideInAnyPackage("..facilitation..", "..organization..")
-                .as("support modules must not depend on feature modules")
-                .because("support modules (configurator, eventing, auth) provide generic mechanics and should not have knowledge of business domains.");
+                .that().resideInAnyPackage("..eventing..")
+                .should().dependOnClassesThat().resideInAnyPackage("..configurator..", "..organization..")
+                .as("eventing must stay out of configurator and organization internals")
+                .because("eventing owns SSE transport and should not couple itself to template import concerns or organization management internals.");
 
-        if (Boolean.getBoolean("archunit.strict")) {
-            rule.check(PRODUCTION_CLASSES);
-        }
+        rule.check(PRODUCTION_CLASSES);
     }
 
     @Test
@@ -138,16 +138,18 @@ class ArchitectureGuardrailTest {
     }
 
     @Test
-    @DisplayName("facilitation sub-packages should be encapsulated")
-    void facilitationSubPackagesShouldBeEncapsulated() {
+    @DisplayName("session shell must stay out of downstream facilitation capabilities")
+    void sessionShellMustStayOutOfDownstreamFacilitationCapabilities() {
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("..facilitation.session..")
-                .should().dependOnClassesThat().resideInAnyPackage("..facilitation.participant..", "..facilitation.response..", "..facilitation.actions..", "..facilitation.clustering..", "..facilitation.escalation..")
-                .as("session should not depend on other facilitation capabilities")
-                .because("facilitation.session owns the shell/lifecycle; other capabilities should be invoked by it or react to it, but session logic should stay isolated.");
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "..facilitation.actions..",
+                        "..facilitation.clustering..",
+                        "..facilitation.escalation..")
+                .as("session shell must stay out of downstream facilitation capabilities")
+                .because("session owns flow and lifecycle, while action tracking, clustering, and escalation stay in their own facilitation capabilities.");
 
-        if (Boolean.getBoolean("archunit.strict")) {
-            rule.check(PRODUCTION_CLASSES);
-        }
+        rule.check(PRODUCTION_CLASSES);
     }
+
 }

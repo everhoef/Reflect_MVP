@@ -10,23 +10,34 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-public class TeamMembershipService {
+public class TeamMembershipService implements ManagerTeamAccess {
 
+    /** Repository for manager membership lookups. */
     private final TeamMemberRepository teamMemberRepository;
 
-    public boolean hasManagerRole(UUID userId) {
+    @Override
+    public boolean hasManagerRole(final UUID userId) {
         return teamMemberRepository.existsByUserIdAndRole(userId, TeamRole.MANAGER);
     }
 
-    public Optional<Team> findSingleManagedTeam(UUID userId) {
-        List<Team> managedTeams = teamMemberRepository.findByUserIdAndRole(userId, TeamRole.MANAGER).stream()
-                .map(TeamMember::getTeam)
-                .toList();
+    @Override
+    public Optional<UUID> findSingleManagedTeamId(final UUID userId) {
+        List<UUID> managedTeamIds = findManagedTeamIds(userId);
 
-        if (managedTeams.size() != 1) {
+        if (managedTeamIds.size() != 1) {
             return Optional.empty();
         }
 
-        return Optional.ofNullable(managedTeams.getFirst());
+        return Optional.ofNullable(managedTeamIds.getFirst());
+    }
+
+    @Override
+    public List<UUID> findManagedTeamIds(final UUID userId) {
+        return teamMemberRepository
+                .findByUserIdAndRole(userId, TeamRole.MANAGER)
+                .stream()
+                .map(TeamMember::getTeam)
+                .map(Team::getId)
+                .toList();
     }
 }
