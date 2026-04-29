@@ -146,14 +146,13 @@ class OrganizationDataModelTest {
         teamMemberRepository.saveAndFlush(memberOnly);
 
         assertThat(teamMembershipService.hasManagerRole(userId)).isFalse();
-        assertThat(teamMembershipService.findSingleManagedTeam(userId)).isEmpty();
+        assertThat(teamMembershipService.findSingleManagedTeamId(userId)).isEmpty();
 
         memberOnly.setRole(TeamRole.MANAGER);
         teamMemberRepository.saveAndFlush(memberOnly);
 
         assertThat(teamMembershipService.hasManagerRole(userId)).isTrue();
-        assertThat(teamMembershipService.findSingleManagedTeam(userId))
-                .map(Team::getId)
+        assertThat(teamMembershipService.findSingleManagedTeamId(userId))
                 .contains(platform.getId());
 
         TeamMember secondManagedTeam = new TeamMember();
@@ -163,7 +162,7 @@ class OrganizationDataModelTest {
         teamMemberRepository.saveAndFlush(secondManagedTeam);
 
         assertThat(teamMembershipService.hasManagerRole(userId)).isTrue();
-        assertThat(teamMembershipService.findSingleManagedTeam(userId)).isEmpty();
+        assertThat(teamMembershipService.findSingleManagedTeamId(userId)).isEmpty();
     }
 
     @Test
@@ -177,7 +176,7 @@ class OrganizationDataModelTest {
 
         RetroSession sessionWithTeam = new RetroSession();
         sessionWithTeam.setName("Delivery Retro");
-        sessionWithTeam.setTeam(team);
+        sessionWithTeam.setTeamId(team.getId());
         sessionRepository.saveAndFlush(sessionWithTeam);
 
         entityManager.clear();
@@ -185,9 +184,8 @@ class OrganizationDataModelTest {
         RetroSession loadedWithoutTeam = sessionRepository.findById(sessionWithoutTeam.getId()).orElseThrow();
         RetroSession loadedWithTeam = sessionRepository.findById(sessionWithTeam.getId()).orElseThrow();
 
-        assertThat(loadedWithoutTeam.getTeam()).isNull();
-        assertThat(loadedWithTeam.getTeam()).isNotNull();
-        assertThat(loadedWithTeam.getTeam().getId()).isEqualTo(team.getId());
+        assertThat(loadedWithoutTeam.getTeamId()).isNull();
+        assertThat(loadedWithTeam.getTeamId()).isEqualTo(team.getId());
     }
 
     private Organization saveOrganization(String name, String slug) {
