@@ -15,7 +15,7 @@ import direct.reflect.facilitator.facilitation.dto.ComponentResponseDto;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.RetroStage;
 import direct.reflect.facilitator.configurator.ComponentType;
-import direct.reflect.facilitator.configurator.RetroStepRepository;
+import direct.reflect.facilitator.configurator.RetroStepQueryService;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,7 +35,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ResponseService {
     private final ParticipantResponseRepository responseRepository;
-    private final RetroStepRepository retroStepRepository;
+    private final RetroStepQueryService retroStepQueryService;
     private final EventService eventService;
     private final RetroSessionService retroSessionService;
     private final ParticipantService participantService;
@@ -299,8 +299,7 @@ public class ResponseService {
     }
 
     private RetroStep getRetroStepById(Long stepId) {
-        return retroStepRepository.findById(stepId)
-            .orElseThrow(() -> new IllegalArgumentException("RetroStep not found with ID: " + stepId));
+        return retroStepQueryService.getStepById(stepId);
     }
 
     private void publishResponseSubmittedEvent(UUID retroId, ParticipantResponse response) {

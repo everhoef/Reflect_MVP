@@ -14,8 +14,8 @@ import direct.reflect.facilitator.facilitation.session.RetroSessionService;
 import direct.reflect.facilitator.facilitation.session.RetroSessionNotFoundException;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.RetroStage;
-import direct.reflect.facilitator.configurator.RetroStepRepository;
 import direct.reflect.facilitator.configurator.ComponentType;
+import direct.reflect.facilitator.configurator.RetroStepQueryService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -39,17 +39,17 @@ public class ResponseApiController {
     private final RetroSessionService retroService;
     private final ParticipantService participantService;
     private final ResponseService responseService;
-    private final RetroStepRepository stepRepository;
+    private final RetroStepQueryService retroStepQueryService;
 
     public ResponseApiController(
             RetroSessionService retroService,
             ParticipantService participantService,
             ResponseService responseService,
-            RetroStepRepository stepRepository) {
+            RetroStepQueryService retroStepQueryService) {
         this.retroService = retroService;
         this.participantService = participantService;
         this.responseService = responseService;
-        this.stepRepository = stepRepository;
+        this.retroStepQueryService = retroStepQueryService;
     }
 
     @PostMapping("/{retroId}/step/{stepId}/response/column")
@@ -157,8 +157,7 @@ public class ResponseApiController {
             participantService.getParticipantForSession(httpRequest, retroId);
             RetroSession session = retroService.getSessionById(retroId);
 
-            RetroStep step = stepRepository.findById(stepId)
-                .orElseThrow(() -> new IllegalArgumentException("Step not found: " + stepId));
+            RetroStep step = retroStepQueryService.getStepById(stepId);
             RetroStage stage = step.getRetroStage();
 
             List<RatingResponseDto> dtos = responseService
