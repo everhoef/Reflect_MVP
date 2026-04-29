@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class RetroSyncVersionService {
+public class RetroSyncVersionService implements RetroSyncVersionQuery {
 
     private final RetroSessionRepository retroSessionRepository;
 
@@ -25,6 +25,7 @@ public class RetroSyncVersionService {
     }
 
     @Transactional(readOnly = true)
+    @Override
     public long getSyncVersion(UUID retroId) {
         RetroSession retroSession = retroSessionRepository.findById(retroId)
                 .orElseThrow(() -> new IllegalArgumentException("Retro session not found: " + retroId));

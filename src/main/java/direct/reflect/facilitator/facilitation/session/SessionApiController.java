@@ -1,26 +1,20 @@
 package direct.reflect.facilitator.facilitation.session;
 
-import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.facilitation.participant.ParticipantService;
-import direct.reflect.facilitator.facilitation.session.RetroSession;
-import direct.reflect.facilitator.facilitation.session.RetroSessionService;
-import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
 import direct.reflect.facilitator.facilitation.session.dto.AssistantStateDto;
 import direct.reflect.facilitator.facilitation.session.dto.CreateRetroRequest;
 import direct.reflect.facilitator.facilitation.session.dto.CreateRetroResponse;
 import direct.reflect.facilitator.facilitation.session.dto.NextStepResult;
 import direct.reflect.facilitator.facilitation.session.dto.TimerStateDto;
-import direct.reflect.facilitator.facilitation.session.RetroPhase;
-import direct.reflect.facilitator.facilitation.session.RetroSessionNotFoundException;
 import direct.reflect.facilitator.facilitation.participant.Participant;
-import direct.reflect.facilitator.facilitation.participant.ParticipantRole;
 import direct.reflect.facilitator.facilitation.participant.ParticipantNotFoundException;
+import direct.reflect.facilitator.facilitation.participant.ParticipantRole;
 import direct.reflect.facilitator.facilitation.dto.RetroStateDto;
 import direct.reflect.facilitator.facilitation.dto.StepSummaryDto;
 import direct.reflect.facilitator.facilitation.dto.SyncVersionedResponse;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.RetroStage;
-import direct.reflect.facilitator.configurator.RetroStepRepository;
+import direct.reflect.facilitator.configurator.RetroStepQueryService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -47,17 +41,17 @@ import java.util.UUID;
 public class SessionApiController {
     private final RetroSessionService retroService;
     private final ParticipantService participantService;
-    private final RetroStepRepository stepRepository;
+    private final RetroStepQueryService retroStepQueryService;
     private final RetroSyncVersionService retroSyncVersionService;
 
     public SessionApiController(
             RetroSessionService retroService,
             ParticipantService participantService,
-            RetroStepRepository stepRepository,
+            RetroStepQueryService retroStepQueryService,
             RetroSyncVersionService retroSyncVersionService) {
         this.retroService = retroService;
         this.participantService = participantService;
-        this.stepRepository = stepRepository;
+        this.retroStepQueryService = retroStepQueryService;
         this.retroSyncVersionService = retroSyncVersionService;
     }
 
@@ -234,9 +228,9 @@ public class SessionApiController {
 
             List<StepSummaryDto> steps = new ArrayList<>();
             for (RetroPhase phase : activePhases) {
-                RetroStage stage = session.getTemplate().getStageForPhase(phase);
+                RetroStage stage = session.getStageForPhase(phase);
                 if (stage == null) continue;
-                List<RetroStep> stageSteps = stepRepository.findByRetroStageOrderByOrderIndexAsc(stage);
+                List<RetroStep> stageSteps = retroStepQueryService.findStepsByStage(stage);
                 for (RetroStep step : stageSteps) {
                     steps.add(new StepSummaryDto(
                         step.getId(),
