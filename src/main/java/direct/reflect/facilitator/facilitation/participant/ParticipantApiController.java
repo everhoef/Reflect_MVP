@@ -13,8 +13,8 @@ import direct.reflect.facilitator.facilitation.dto.SyncVersionedResponse;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -30,19 +30,11 @@ import java.util.UUID;
 @RequestMapping("/api/retro")
 @Tag(name = "Participant API", description = "Retrospective participant management")
 @Slf4j
+@RequiredArgsConstructor
 public class ParticipantApiController {
     private final RetroSessionService retroService;
     private final ParticipantService participantService;
     private final RetroSyncVersionService retroSyncVersionService;
-
-    public ParticipantApiController(
-            RetroSessionService retroService,
-            ParticipantService participantService,
-            RetroSyncVersionService retroSyncVersionService) {
-        this.retroService = retroService;
-        this.participantService = participantService;
-        this.retroSyncVersionService = retroSyncVersionService;
-    }
 
     @PostMapping(value = "/join", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
@@ -102,28 +94,7 @@ public class ParticipantApiController {
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     public ResponseEntity<List<SessionInfo>> checkActiveSessions(HttpServletRequest httpRequest) {
         try {
-            HttpSession session = httpRequest.getSession(false);
-            if (session == null) {
-                return ResponseEntity.ok(List.of());
-            }
-            
-            UUID participantId = (UUID) session.getAttribute("participantId");
-            if (participantId == null) {
-                return ResponseEntity.ok(List.of());
-            }
-            
-            List<Participant> activeSessions = participantService.getActiveSessionsForParticipant(participantId);
-            
-            List<SessionInfo> sessionInfos = activeSessions.stream()
-                .map(p -> new SessionInfo(
-                    p.getSession().getId(),
-                    p.getSession().getName(),
-                    p.getRole().name()
-                ))
-                .toList();
-            
-            return ResponseEntity.ok(sessionInfos);
-            
+            return ResponseEntity.ok(participantService.getActiveSessionInfos(httpRequest));
         } catch (Exception e) {
             log.error("Error checking active sessions: ", e);
             return ResponseEntity.ok(List.of());

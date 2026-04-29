@@ -443,15 +443,13 @@ public class ResponseApiControllerTest {
         UUID retroId = UUID.randomUUID();
         Long stepId = 1L;
 
-        Participant participant = new Participant();
         RetroSession session = new RetroSession();
         RetroStage stage = new RetroStage();
         RetroStep step = new RetroStep();
         step.setId(stepId);
         step.setRetroStage(stage);
 
-        when(participantService.getParticipantForSession(any(HttpServletRequest.class), eq(retroId)))
-            .thenReturn(participant);
+        when(participantService.isParticipating(any(HttpServletRequest.class), eq(retroId))).thenReturn(true);
         when(retroSessionService.getSessionById(retroId)).thenReturn(session);
         when(retroStepQueryService.getStepById(stepId)).thenReturn(step);
         when(responseService.getResponsesForStageComponentType(session, stage, direct.reflect.facilitator.configurator.ComponentType.RATING_SCALE))

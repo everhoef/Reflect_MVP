@@ -22,6 +22,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,22 +36,12 @@ import java.util.UUID;
 @RequestMapping("/api/retro")
 @Tag(name = "Response API", description = "Participant response management")
 @Slf4j
+@RequiredArgsConstructor
 public class ResponseApiController {
     private final RetroSessionService retroService;
     private final ParticipantService participantService;
     private final ResponseService responseService;
     private final RetroStepQueryService retroStepQueryService;
-
-    public ResponseApiController(
-            RetroSessionService retroService,
-            ParticipantService participantService,
-            ResponseService responseService,
-            RetroStepQueryService retroStepQueryService) {
-        this.retroService = retroService;
-        this.participantService = participantService;
-        this.responseService = responseService;
-        this.retroStepQueryService = retroStepQueryService;
-    }
 
     @PostMapping("/{retroId}/step/{stepId}/response/column")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
@@ -148,13 +139,17 @@ public class ResponseApiController {
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Get rating responses for histogram", description = "Returns all rating responses for the stage containing this step (used by HISTOGRAM_CHART component)")
     @ApiResponse(responseCode = "200", description = "Rating responses returned")
+    @ApiResponse(responseCode = "403", description = "Participant is not part of this session")
     public ResponseEntity<List<RatingResponseDto>> getRatingResponses(
             @PathVariable UUID retroId,
             @PathVariable Long stepId,
             HttpServletRequest httpRequest) {
 
         try {
-            participantService.getParticipantForSession(httpRequest, retroId);
+            if (!participantService.isParticipating(httpRequest, retroId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+
             RetroSession session = retroService.getSessionById(retroId);
 
             RetroStep step = retroStepQueryService.getStepById(stepId);
@@ -168,8 +163,6 @@ public class ResponseApiController {
 
             return ResponseEntity.ok(dtos);
 
-        } catch (ParticipantNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } catch (RetroSessionNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (Exception e) {

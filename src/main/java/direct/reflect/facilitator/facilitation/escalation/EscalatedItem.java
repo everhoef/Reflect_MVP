@@ -48,10 +48,6 @@ public class EscalatedItem {
     @Column(name = "team_id", nullable = false)
     private UUID teamId;
 
-    public UUID getTeamId() {
-        return teamId;
-    }
-
     @Min(value = 1, message = "Vote threshold must be at least 1")
     @Column(name = "vote_threshold", nullable = false)
     private int voteThreshold;

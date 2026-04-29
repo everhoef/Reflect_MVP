@@ -24,6 +24,7 @@ import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.exc.InvalidFormatException;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +33,7 @@ import lombok.extern.slf4j.Slf4j;
  * Exception handler for API controllers.
  * Handles custom exceptions and provides appropriate HTTP status codes.
  */
-@RestControllerAdvice
+@RestControllerAdvice(annotations = RestController.class)
 @Order(1)
 @Slf4j
 public class ApiExceptionHandler {

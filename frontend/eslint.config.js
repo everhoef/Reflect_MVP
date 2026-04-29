@@ -9,7 +9,7 @@ import importPlugin from 'eslint-plugin-import'
 const isBoundaryCheck = process.env.LINT_BOUNDARIES === 'true';
 
 const baseConfig = [
-  globalIgnores(['dist', 'src/types/sse-schemas/**', 'node_modules', 'src/types/generated/**']),
+  globalIgnores(['dist', 'src/types/sse-schemas/**', 'src/generated/**', 'node_modules', 'src/types/generated/**']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -26,9 +26,10 @@ const baseConfig = [
 ];
 
 const boundaryConfig = [
-  globalIgnores(['dist', 'src/types/sse-schemas/**', 'node_modules', 'src/types/generated/**']),
+  globalIgnores(['dist', 'src/types/sse-schemas/**', 'src/generated/**', 'node_modules', 'src/types/generated/**']),
   {
     files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     plugins: {
       import: importPlugin,
       'react-refresh': reactRefresh
@@ -48,17 +49,16 @@ const boundaryConfig = [
       'react-refresh/only-export-components': 'off',
       'import/no-restricted-paths': ['error', {
         zones: [
-          { target: './src/shared/**/*', from: './src/modules/**/*', message: 'Shared code cannot import from feature modules.', except: ['**/*.test.ts', '**/*.test.tsx'] },
-          { target: './src/shared/**/*', from: './src/app/**/*', message: 'Shared code cannot import from app layer.', except: ['**/*.test.ts', '**/*.test.tsx'] },
-          
-          { target: './src/modules/**/*', from: './src/app/**/*', message: 'Feature modules cannot import from the app layer.', except: ['**/*.test.ts', '**/*.test.tsx'] },
-          
-          { target: './src/modules/auth/**/*', from: './src/modules/facilitation/**/*', message: 'Auth module cannot import from Facilitation module.', except: ['**/*.test.ts', '**/*.test.tsx'] },
-          { target: './src/modules/auth/**/*', from: './src/modules/organization/**/*', message: 'Auth module cannot import from Organization module.', except: ['**/*.test.ts', '**/*.test.tsx'] },
-          
-          { target: './src/modules/facilitation/**/*', from: './src/modules/organization/**/*', message: 'Facilitation module cannot import from Organization module.', except: ['**/*.test.ts', '**/*.test.tsx'] },
+          { target: './src/shared', from: './src/modules', message: 'Shared code cannot import from feature modules.' },
+          { target: './src/shared', from: './src/app', message: 'Shared code cannot import from app layer.' },
 
-          { target: './src/modules/organization/**/*', from: './src/modules/facilitation/**/*', message: 'Organization module cannot import from Facilitation module.', except: ['**/*.test.ts', '**/*.test.tsx'] }
+          { target: './src/modules', from: './src/app', message: 'Feature modules cannot import from the app layer.' },
+
+          { target: './src/modules/auth', from: ['./src/modules/facilitation', './src/modules/organization'], message: 'Auth module cannot import from facilitation or organization modules.' },
+
+          { target: './src/modules/facilitation', from: './src/modules/organization', message: 'Facilitation module cannot import from organization module.' },
+
+          { target: './src/modules/organization', from: './src/modules/facilitation', message: 'Organization module cannot import from facilitation module.' }
         ]
       }]
     }

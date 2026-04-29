@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import direct.reflect.facilitator.facilitation.participant.dto.SessionInfo;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
 import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
 import lombok.RequiredArgsConstructor;
@@ -227,6 +228,26 @@ public class ParticipantService implements SseParticipantAccess {
 
         log.debug("Participant {} has {} active sessions", participantId, activeSessions.size());
         return activeSessions;
+    }
+
+    public List<SessionInfo> getActiveSessionInfos(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            return List.of();
+        }
+
+        UUID participantId = (UUID) session.getAttribute("participantId");
+        if (participantId == null) {
+            return List.of();
+        }
+
+        return getActiveSessionsForParticipant(participantId).stream()
+            .map(participant -> new SessionInfo(
+                participant.getSession().getId(),
+                participant.getSession().getName(),
+                participant.getRole().name()
+            ))
+            .toList();
     }
     
     /**

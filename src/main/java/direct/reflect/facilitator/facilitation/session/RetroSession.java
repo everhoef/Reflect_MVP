@@ -68,10 +68,6 @@ public class RetroSession {
     };
   }
 
-  public UUID getTeamId() {
-    return teamId;
-  }
-
   public boolean isFinished() {
     return phase == RetroPhase.COMPLETED || phase == RetroPhase.ABANDONED;
   }

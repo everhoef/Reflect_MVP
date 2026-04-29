@@ -156,7 +156,8 @@ public class SessionApiControllerTest {
     void getTimerState_ValidParticipant_ShouldReturnTimerState() throws Exception {
         UUID retroId = UUID.randomUUID();
         TimerStateDto timerState = new TimerStateDto(300, false, "green");
-        
+
+        when(participantService.isParticipating(any(HttpServletRequest.class), eq(retroId))).thenReturn(true);
         when(retroSessionService.getTimerState(retroId)).thenReturn(timerState);
         when(retroSyncVersionService.getSyncVersion(retroId)).thenReturn(12L);
 
@@ -173,6 +174,7 @@ public class SessionApiControllerTest {
     void getTimerState_NoTimerForStep_ShouldReturnNoContent() throws Exception {
         UUID retroId = UUID.randomUUID();
 
+        when(participantService.isParticipating(any(HttpServletRequest.class), eq(retroId))).thenReturn(true);
         when(retroSessionService.getTimerState(retroId)).thenReturn(null);
 
         mockMvc.perform(get("/api/retro/{retroId}/timer", retroId))
@@ -184,8 +186,7 @@ public class SessionApiControllerTest {
     void getTimerState_NotParticipant_ShouldReturnForbidden() throws Exception {
         UUID retroId = UUID.randomUUID();
 
-        when(participantService.getParticipantForSession(any(HttpServletRequest.class), eq(retroId)))
-            .thenThrow(new ParticipantNotFoundException("Not a participant"));
+        when(participantService.isParticipating(any(HttpServletRequest.class), eq(retroId))).thenReturn(false);
 
         mockMvc.perform(get("/api/retro/{retroId}/timer", retroId))
                 .andExpect(status().isForbidden());
@@ -320,6 +321,8 @@ public class SessionApiControllerTest {
     @WithMockUser(roles = "USER")
     void getRetroState_ValidParticipant_ShouldIncludeAssistantState() throws Exception {
         UUID retroId = UUID.randomUUID();
+
+        when(participantService.isParticipating(any(HttpServletRequest.class), eq(retroId))).thenReturn(true);
 
         RetroTemplate mockTemplate = org.mockito.Mockito.mock(RetroTemplate.class);
         when(mockTemplate.getSetTheStage()).thenReturn((RetroStage) null);
