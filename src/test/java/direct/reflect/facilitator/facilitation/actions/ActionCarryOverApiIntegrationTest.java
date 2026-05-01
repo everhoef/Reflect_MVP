@@ -141,7 +141,7 @@ class ActionCarryOverApiIntegrationTest {
         LocalDateTime.of(2026, 4, 15, 9, 0),
         null);
 
-    mockMvc.perform(get("/api/retro/{retroId}/previous-actions", currentSession.getId())
+    mockMvc.perform(get("/api/retros/{retroId}/actions/previous", currentSession.getId())
             .with(authentication(testAuth)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(1))
@@ -163,7 +163,7 @@ class ActionCarryOverApiIntegrationTest {
         LocalDateTime.of(2026, 4, 15, 9, 0),
         null);
 
-    mockMvc.perform(get("/api/retro/{retroId}/previous-actions", currentSession.getId())
+    mockMvc.perform(get("/api/retros/{retroId}/actions/previous", currentSession.getId())
             .with(authentication(testAuth)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(0));
@@ -194,7 +194,7 @@ class ActionCarryOverApiIntegrationTest {
         LocalDateTime.of(2026, 4, 15, 9, 0),
         null);
 
-    mockMvc.perform(get("/api/retro/{retroId}/previous-actions", currentSession.getId())
+    mockMvc.perform(get("/api/retros/{retroId}/actions/previous", currentSession.getId())
             .with(authentication(testAuth)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(0));
@@ -232,7 +232,7 @@ class ActionCarryOverApiIntegrationTest {
         LocalDateTime.of(2026, 4, 15, 9, 0),
         null);
 
-    mockMvc.perform(get("/api/retro/{retroId}/previous-actions", currentSession.getId())
+    mockMvc.perform(get("/api/retros/{retroId}/actions/previous", currentSession.getId())
             .with(authentication(testAuth)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(1))
@@ -266,7 +266,7 @@ class ActionCarryOverApiIntegrationTest {
         LocalDateTime.of(2026, 4, 15, 9, 0),
         null);
 
-    mockMvc.perform(get("/api/retro/{retroId}/previous-actions", betaCurrent.getId())
+    mockMvc.perform(get("/api/retros/{retroId}/actions/previous", betaCurrent.getId())
             .with(authentication(testAuth)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(0));
@@ -297,7 +297,7 @@ class ActionCarryOverApiIntegrationTest {
         LocalDateTime.of(2026, 4, 15, 9, 0),
         null);
 
-    mockMvc.perform(get("/api/retro/{retroId}/previous-actions", currentSession.getId())
+    mockMvc.perform(get("/api/retros/{retroId}/actions/previous", currentSession.getId())
             .with(authentication(testAuth)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(0));

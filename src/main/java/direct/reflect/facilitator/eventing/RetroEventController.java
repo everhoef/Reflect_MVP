@@ -10,20 +10,18 @@ import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
-@RequestMapping("/api/retro")
 @Slf4j
 @RequiredArgsConstructor
 public class RetroEventController {
 
     private final EventService eventService;
     private final SseParticipantAccess sseParticipantAccess;
-    
-    @GetMapping(value = "/{retroId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+
+    @GetMapping(value = "/api/retros/{retroId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     public SseEmitter getRetroEvents(
             @PathVariable UUID retroId,

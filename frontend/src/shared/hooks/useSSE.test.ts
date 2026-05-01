@@ -90,13 +90,13 @@ describe('useSSE', () => {
   })
 
   it('creates an EventSource with the correct URL when retroId is present', () => {
-    renderHook(() => useSSE('retro-123', {}))
+    renderHook(() => useSSE('retro123', {}))
     expect(MockEventSource.instances).toHaveLength(1)
-    expect(latestInstance().url).toBe('/api/retro/retro-123/events')
+    expect(latestInstance().url).toBe('/api/retros/retro123/events')
   })
 
   it('registers listeners for all EventType values', () => {
-    renderHook(() => useSSE('retro-123', {}))
+    renderHook(() => useSSE('retro123', {}))
     const instance = latestInstance()
     for (const eventType of Object.values(EventType)) {
       expect(instance.getListenerCount(eventType)).toBe(1)
@@ -106,7 +106,7 @@ describe('useSSE', () => {
   it('unwraps the SSE transport envelope and passes the payload raw string to the handler', () => {
     const handler = vi.fn()
     const { result } = renderHook(() =>
-      useSSE('retro-123', { [EventType.NOTE_ADDED]: handler })
+      useSSE('retro123', { [EventType.NOTE_ADDED]: handler })
     )
     act(() => {
       latestInstance().triggerEvent(
@@ -122,7 +122,7 @@ describe('useSSE', () => {
   it('preserves null payloads when the SSE transport envelope is emitted', () => {
     const handler = vi.fn()
     renderHook(() =>
-      useSSE('retro-123', { [EventType.STEP_ADVANCED]: handler })
+      useSSE('retro123', { [EventType.STEP_ADVANCED]: handler })
     )
 
     act(() => {
@@ -138,7 +138,7 @@ describe('useSSE', () => {
 
   it('calls onConnected when onopen fires', () => {
     const onConnected = vi.fn()
-    const { result } = renderHook(() => useSSE('retro-123', {}, onConnected))
+    const { result } = renderHook(() => useSSE('retro123', {}, onConnected))
     act(() => {
       latestInstance().triggerOpen()
     })
@@ -148,7 +148,7 @@ describe('useSSE', () => {
   })
 
   it('tracks reconnect transitions after error then open', () => {
-    const { result } = renderHook(() => useSSE('retro-123', {}))
+    const { result } = renderHook(() => useSSE('retro123', {}))
 
     expect(result.current.connectionState).toBe('connecting')
     expect(result.current.openCount).toBe(0)
@@ -176,7 +176,7 @@ describe('useSSE', () => {
   })
 
   it('keeps signaledVersion monotonic when older envelopes arrive later', () => {
-    const { result } = renderHook(() => useSSE('retro-123', {}))
+    const { result } = renderHook(() => useSSE('retro123', {}))
 
     act(() => {
       latestInstance().triggerEvent(
@@ -198,7 +198,7 @@ describe('useSSE', () => {
   })
 
   it('calls close() on unmount', () => {
-    const { unmount } = renderHook(() => useSSE('retro-123', {}))
+    const { unmount } = renderHook(() => useSSE('retro123', {}))
     const instance = latestInstance()
     unmount()
     expect(instance.close).toHaveBeenCalledOnce()
@@ -207,16 +207,16 @@ describe('useSSE', () => {
   it('closes the old EventSource and opens a new one when retroId changes', () => {
     const { rerender } = renderHook(
       ({ retroId }: { retroId: string }) => useSSE(retroId, {}),
-      { initialProps: { retroId: 'retro-1' } }
+      { initialProps: { retroId: 'retro1' } }
     )
     const first = latestInstance()
-    expect(first.url).toBe('/api/retro/retro-1/events')
+    expect(first.url).toBe('/api/retros/retro1/events')
 
-    rerender({ retroId: 'retro-2' })
+    rerender({ retroId: 'retro2' })
 
     expect(first.close).toHaveBeenCalledOnce()
     expect(MockEventSource.instances).toHaveLength(2)
-    expect(latestInstance().url).toBe('/api/retro/retro-2/events')
+    expect(latestInstance().url).toBe('/api/retros/retro2/events')
   })
 
   it('uses the latest handler after a rerender (no stale closure)', () => {
@@ -225,7 +225,7 @@ describe('useSSE', () => {
 
     const { rerender } = renderHook(
       ({ handler }: { handler: (d: string) => void }) =>
-        useSSE('retro-123', { [EventType.STEP_ADVANCED]: handler }),
+        useSSE('retro123', { [EventType.STEP_ADVANCED]: handler }),
       { initialProps: { handler: firstHandler } }
     )
 

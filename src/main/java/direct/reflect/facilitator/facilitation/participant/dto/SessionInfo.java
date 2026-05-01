@@ -10,4 +10,4 @@ public record SessionInfo(
     UUID sessionId,
     String sessionName,
     String role
-) {}
+) { }

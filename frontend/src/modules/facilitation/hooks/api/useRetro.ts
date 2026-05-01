@@ -52,7 +52,7 @@ function unwrapSyncVersionedData<T>(value: T | SyncVersionedResponse<T>): {
 }
 
 export async function fetchRetroState(retroId: string): Promise<RetroStateDto> {
-  const { data, response } = await apiClient.GET("/api/retro/{retroId}/state", {
+  const { data, response } = await apiClient.GET("/api/retros/{retroId}", {
     params: { path: { retroId } },
   });
   if (!response.ok) throw new ApiError(response.status, `Failed to fetch retro state: ${response.status}`);
@@ -62,7 +62,7 @@ export async function fetchRetroState(retroId: string): Promise<RetroStateDto> {
 }
 
 export async function fetchParticipants(retroId: string): Promise<ParticipantDto[]> {
-  const { data, response } = await apiClient.GET("/api/retro/{retroId}/participants", {
+  const { data, response } = await apiClient.GET("/api/retros/{retroId}/participants", {
     params: { path: { retroId } },
   });
   if (!response.ok) throw new ApiError(response.status, `Failed to fetch participants: ${response.status}`);
@@ -72,7 +72,7 @@ export async function fetchParticipants(retroId: string): Promise<ParticipantDto
 }
 
 export async function fetchTimerState(retroId: string): Promise<TimerStateDto | null> {
-  const { data, response } = await apiClient.GET("/api/retro/{retroId}/timer", {
+  const { data, response } = await apiClient.GET("/api/retros/{retroId}/timer", {
     params: { path: { retroId } },
   });
   if (response.status === 204) return null;
@@ -106,7 +106,7 @@ export function useNextStep(retroId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const { response } = await apiClient.POST("/api/retro/{retroId}/next", {
+      const { response } = await apiClient.POST("/api/retros/{retroId}/advance", {
         params: { path: { retroId: retroId! } },
       });
       if (!response.ok) throw new ApiError(response.status, `Failed to advance step: ${response.status}`);
@@ -121,7 +121,7 @@ export function useStartSession(retroId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const { response } = await apiClient.POST("/api/retro/{retroId}/start", {
+      const { response } = await apiClient.POST("/api/retros/{retroId}/start", {
         params: { path: { retroId: retroId! } },
       });
       if (!response.ok) throw new ApiError(response.status, `Failed to start session: ${response.status}`);
@@ -144,7 +144,7 @@ export function useTimer(retroId: string | undefined) {
 export function usePauseTimer(retroId: string | undefined) {
   return useMutation({
     mutationFn: async () => {
-      const { response } = await apiClient.POST("/api/retro/{retroId}/timer/pause", {
+      const { response } = await apiClient.POST("/api/retros/{retroId}/timer/pause", {
         params: { path: { retroId: retroId! } },
       });
       if (!response.ok) throw new ApiError(response.status, `Failed to pause timer: ${response.status}`);
@@ -155,7 +155,7 @@ export function usePauseTimer(retroId: string | undefined) {
 export function useResumeTimer(retroId: string | undefined) {
   return useMutation({
     mutationFn: async () => {
-      const { response } = await apiClient.POST("/api/retro/{retroId}/timer/resume", {
+      const { response } = await apiClient.POST("/api/retros/{retroId}/timer/resume", {
         params: { path: { retroId: retroId! } },
       });
       if (!response.ok) throw new ApiError(response.status, `Failed to resume timer: ${response.status}`);

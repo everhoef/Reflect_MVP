@@ -21,7 +21,7 @@ public enum RetroPhase {
     private final String description;
 
     public RetroPhase next() {
-        return switch(this) {
+        return switch (this) {
             case CREATED -> LOBBY;
             case LOBBY -> SET_THE_STAGE;
             case SET_THE_STAGE -> GATHER_DATA;
@@ -38,7 +38,7 @@ public enum RetroPhase {
      * Active phases are those where retrospective activities are in progress.
      */
     public boolean isActivePhase() {
-        return switch(this) {
+        return switch (this) {
             case SET_THE_STAGE, GATHER_DATA, GENERATE_INSIGHTS, DECIDE_ACTIONS, CLOSE_RETRO -> true;
             case CREATED, LOBBY, PAUSED, COMPLETED, ABANDONED -> false;
         };

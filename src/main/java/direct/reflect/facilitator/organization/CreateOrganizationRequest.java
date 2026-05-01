@@ -13,4 +13,4 @@ public record CreateOrganizationRequest(
         @Size(max = 100, message = "Organization slug must be at most 100 characters")
         @Pattern(regexp = "[a-z0-9-]+", message = "Organization slug must contain only lowercase letters, numbers, and hyphens")
         String slug
-) {}
+) { }

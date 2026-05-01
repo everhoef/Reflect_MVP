@@ -7,10 +7,14 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 @OpenAPIDefinition(info = @Info(title = "Facilitator", version = "1.0", description = "Retrospective facilitation platform API"))
-public class FacilitatorApplication {
+public final class FacilitatorApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(FacilitatorApplication.class, args);
-	}
+    private FacilitatorApplication() {
+        // Utility class / Spring Boot entry point
+    }
+
+    public static void main(String[] args) {
+        SpringApplication.run(FacilitatorApplication.class, args);
+    }
 
 }

@@ -342,7 +342,7 @@ describe('MultiColumnBoard note editing', () => {
           )
         )
       }
-      if (url.includes('/response/') && !url.includes('/clusters')) {
+      if (url.includes('/responses/') && !url.includes('/clusters')) {
         return Promise.resolve(new Response('{}', { status: 200 }))
       }
       return Promise.resolve(new Response('{}', { status: 404 }))

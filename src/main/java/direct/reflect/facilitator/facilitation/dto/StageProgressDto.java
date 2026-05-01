@@ -29,11 +29,11 @@ public record StageProgressDto(
         new StageDefinition("Close Retro", 5, RetroPhase.CLOSE_RETRO)
     );
 
-    private record StageDefinition(String name, int number, RetroPhase phase) {}
+    private record StageDefinition(String name, int number, RetroPhase phase) { }
 
     public static List<StageProgressDto> forSession(RetroSession session) {
         RetroPhase currentPhase = session.getPhase();
-        
+
         return STAGE_DEFINITIONS.stream()
             .map(def -> {
                 Status status = computeStatus(currentPhase, def.phase());

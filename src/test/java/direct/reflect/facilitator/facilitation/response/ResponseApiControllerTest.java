@@ -90,7 +90,7 @@ public class ResponseApiControllerTest {
         UUID retroId = UUID.randomUUID();
         Long stepId = 1L;
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
                 .with(csrf())
                 .param("columnId", "Mad")
                 .param("content", "Too many meetings"))
@@ -104,7 +104,7 @@ public class ResponseApiControllerTest {
         UUID retroId = UUID.randomUUID();
         Long stepId = 1L;
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
                 .with(csrf())
                 .param("columnId", "Glad")
                 .param("content", "Great collaboration"))
@@ -118,7 +118,7 @@ public class ResponseApiControllerTest {
         UUID retroId = UUID.randomUUID();
         Long stepId = 1L;
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
                 .with(csrf())
                 .param("columnId", "Mad")
                 .param("content", ""))
@@ -133,7 +133,7 @@ public class ResponseApiControllerTest {
         Long stepId = 1L;
         String tooLongContent = "a".repeat(501);
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
                 .with(csrf())
                 .param("columnId", "Mad")
                 .param("content", tooLongContent))
@@ -147,7 +147,7 @@ public class ResponseApiControllerTest {
         UUID retroId = UUID.randomUUID();
         Long stepId = 1L;
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
                 .with(csrf())
                 .param("content", "Some content"))
                 .andExpect(status().isBadRequest());
@@ -159,7 +159,7 @@ public class ResponseApiControllerTest {
         UUID retroId = UUID.randomUUID();
         Long stepId = 1L;
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId)
                 .with(csrf())
                 .param("rating", "8")
                 .param("comment", "Good sprint overall"))
@@ -173,7 +173,7 @@ public class ResponseApiControllerTest {
         UUID retroId = UUID.randomUUID();
         Long stepId = 1L;
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId)
                 .with(csrf())
                 .param("rating", "7"))
                 .andExpect(status().isOk())
@@ -186,7 +186,7 @@ public class ResponseApiControllerTest {
         UUID retroId = UUID.randomUUID();
         Long stepId = 1L;
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId)
                 .with(csrf())
                 .param("rating", "0"))
                 .andExpect(status().isBadRequest())
@@ -199,7 +199,7 @@ public class ResponseApiControllerTest {
         UUID retroId = UUID.randomUUID();
         Long stepId = 1L;
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId)
                 .with(csrf())
                 .param("rating", "11"))
                 .andExpect(status().isBadRequest())
@@ -212,7 +212,7 @@ public class ResponseApiControllerTest {
         UUID retroId = UUID.randomUUID();
         Long stepId = 1L;
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId)
                 .with(csrf())
                 .param("comment", "Some comment"))
                 .andExpect(status().isBadRequest());
@@ -223,7 +223,7 @@ public class ResponseApiControllerTest {
         UUID retroId = UUID.randomUUID();
         Long stepId = 1L;
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
                 .with(anonymous())
                 .with(csrf())
                 .param("columnId", "Mad")
@@ -236,7 +236,7 @@ public class ResponseApiControllerTest {
         UUID retroId = UUID.randomUUID();
         Long stepId = 1L;
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId)
                 .with(anonymous())
                 .with(csrf())
                 .param("rating", "8"))
@@ -249,7 +249,7 @@ public class ResponseApiControllerTest {
         UUID retroId = UUID.randomUUID();
         Long stepId = 1L;
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
                 .param("columnId", "Mad")
                 .param("content", "Should not work"))
                 .andExpect(status().isForbidden());
@@ -261,7 +261,7 @@ public class ResponseApiControllerTest {
         UUID retroId = UUID.randomUUID();
         Long stepId = 1L;
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId)
                 .param("rating", "8"))
                 .andExpect(status().isForbidden());
     }
@@ -275,7 +275,7 @@ public class ResponseApiControllerTest {
         when(responseService.submitResponse(eq(retroId), eq(stepId), any(), any(HttpServletRequest.class)))
             .thenThrow(new InputLimitExceededException(10, 10));
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
                 .with(csrf())
                 .param("columnId", "Mad")
                 .param("content", "This is my 11th input"))
@@ -296,7 +296,7 @@ public class ResponseApiControllerTest {
         when(responseService.submitResponse(eq(retroId), eq(stepId), any(), any(HttpServletRequest.class)))
             .thenReturn(mockResponse);
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
                 .with(csrf())
                 .param("columnId", "Mad")
                 .param("content", "Valid input under limit"))
@@ -320,7 +320,7 @@ public class ResponseApiControllerTest {
         when(responseService.submitResponse(eq(retroId), eq(stepId), any(), any(HttpServletRequest.class)))
             .thenReturn(mockResponse);
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/column", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
                 .with(csrf())
                 .param("columnId", "Mad")
                 .param("content", "Valid response"))
@@ -346,7 +346,7 @@ public class ResponseApiControllerTest {
         when(responseService.submitResponse(eq(retroId), eq(stepId), any(), any(HttpServletRequest.class)))
             .thenReturn(mockResponse);
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId)
                 .with(csrf())
                 .param("rating", "7"))
                 .andExpect(status().isOk())
@@ -368,7 +368,7 @@ public class ResponseApiControllerTest {
         when(responseService.toggleVote(eq(retroId), eq(responseId), any(HttpServletRequest.class)))
             .thenReturn(mockResponse);
 
-        mockMvc.perform(post("/api/retro/{retroId}/response/{responseId}/vote", retroId, responseId)
+        mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote", retroId, responseId)
                 .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("HX-Trigger", "voteToggled"))
@@ -394,7 +394,7 @@ public class ResponseApiControllerTest {
         when(responseService.updateResponse(eq(responseId), eq(mockParticipant), eq(updatedContent)))
             .thenReturn(mockResponse);
 
-        mockMvc.perform(put("/api/retro/{retroId}/response/{responseId}", retroId, responseId)
+        mockMvc.perform(put("/api/retros/{retroId}/responses/{responseId}", retroId, responseId)
                 .with(csrf())
                 .param("content", updatedContent))
                 .andExpect(status().isOk())
@@ -415,7 +415,7 @@ public class ResponseApiControllerTest {
             .thenReturn(true);
         when(retroSessionService.getSessionById(retroId)).thenReturn(mockSession);
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/reveal", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/reveal", retroId, stepId)
                 .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("HX-Trigger", "responsesRevealed"))
@@ -432,7 +432,7 @@ public class ResponseApiControllerTest {
         when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
             .thenReturn(false);
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/reveal", retroId, stepId)
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/reveal", retroId, stepId)
                 .with(csrf()))
                 .andExpect(status().isForbidden());
     }
@@ -456,7 +456,7 @@ public class ResponseApiControllerTest {
             .thenReturn(java.util.List.of());
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
-                "/api/retro/{retroId}/step/{stepId}/response/rating", retroId, stepId))
+                "/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId))
             .andExpect(status().isOk())
             .andExpect(content().json("[]"));
     }

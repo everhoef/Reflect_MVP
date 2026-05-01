@@ -55,7 +55,7 @@ function mockFetchWithSpy(ratingPayload: typeof NO_RATING_RESPONSE | typeof EXIS
   )
   vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
     const url = String(input)
-    if (url.includes('/response/rating/me')) return fetchSpy(url) as Promise<Response>
+    if (url.includes('/responses/rating/me')) return fetchSpy(url) as Promise<Response>
     if (url.includes('/api/me'))
       return Promise.resolve(
         new Response(

@@ -23,7 +23,7 @@ async function fetchMyRating(
   retroId: string,
   stepId: number
 ): Promise<RatingResponseDto | null> {
-  const res = await fetch(`/api/retro/${retroId}/step/${stepId}/response/rating/me`);
+  const res = await fetch(`/api/retros/${retroId}/steps/${stepId}/responses/rating/me`);
   if (res.status === 404) return null;
   if (!res.ok) return null;
   return res.json() as Promise<RatingResponseDto>;

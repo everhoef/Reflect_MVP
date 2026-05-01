@@ -10,4 +10,4 @@ public record StepSummaryDto(
     Integer durationSeconds,
     Map<String, Object> componentConfig,
     String guidance
-) {}
+) { }

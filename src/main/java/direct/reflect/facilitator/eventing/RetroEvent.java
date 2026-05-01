@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Event message for retro-related events
+ * Event message for retro-related events.
  */
 public record RetroEvent<T>(
     String correlationId,
@@ -15,7 +15,7 @@ public record RetroEvent<T>(
     T payload
 ) {
     /**
-     * Enum of possible event types
+     * Enum of possible event types.
      */
     public enum EventType {
         PARTICIPANT_JOINED,
@@ -47,52 +47,64 @@ public record RetroEvent<T>(
         long voteCount,
         int threshold,
         boolean thresholdMet
-    ) {}
+    ) { }
 
     /**
-     * Create a participant joined event
+     * Create a participant joined event.
      */
     public static RetroEvent<String> participantJoined(UUID retroId, String displayName) {
-        return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.PARTICIPANT_JOINED, "system", Instant.now(), displayName);
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId, EventType.PARTICIPANT_JOINED, "system", Instant.now(), displayName);
     }
-    
+
     /**
-     * Create a participant left event
+     * Create a participant left event.
      */
     public static RetroEvent<String> participantLeft(UUID retroId, String displayName) {
-        return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.PARTICIPANT_LEFT, "system", Instant.now(), displayName);
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId, EventType.PARTICIPANT_LEFT, "system", Instant.now(), displayName);
     }
 
     /**
-     * Create a session started event
+     * Create a session started event.
      */
     public static RetroEvent<Void> sessionStarted(UUID retroId) {
-        return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.SESSION_STARTED, "system", Instant.now(), null);
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId, EventType.SESSION_STARTED, "system", Instant.now(), null);
     }
 
     /**
-     * Create a step advanced event
+     * Create a step advanced event.
      */
     public static RetroEvent<Void> stepAdvanced(UUID retroId) {
-        return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.STEP_ADVANCED, "system", Instant.now(), null);
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId, EventType.STEP_ADVANCED, "system", Instant.now(), null);
     }
 
     /**
-     * Create a retro created event
+     * Create a retro created event.
      */
     public static RetroEvent<Void> retroCreated(UUID retroId, String facilitatorId) {
-        return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.RETRO_CREATED, facilitatorId, Instant.now(), null);
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId, EventType.RETRO_CREATED, facilitatorId, Instant.now(), null);
     }
 
     /**
-     * Create a phase started event
+     * Create a phase started event.
      */
     public static RetroEvent<String> phaseStarted(UUID retroId, String facilitatorId, String phaseName) {
-        return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.PHASE_STARTED, facilitatorId, Instant.now(), phaseName);
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId, EventType.PHASE_STARTED, facilitatorId, Instant.now(), phaseName);
     }
-    
+
     /**
-     * Response data for NOTE events (responses)
+     * Response data for NOTE events (responses).
      */
     public record ResponseData(
         String responseId,
@@ -102,41 +114,51 @@ public record RetroEvent<T>(
         String displaySummary,
         boolean isVisible,
         Instant submittedAt
-    ) {}
-    
+    ) { }
+
     /**
-     * Create a response submitted event (NOTE_ADDED)
+     * Create a response submitted event (NOTE_ADDED).
      */
     public static RetroEvent<ResponseData> responseSubmitted(UUID retroId, String participantId, ResponseData responseData) {
-        return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.NOTE_ADDED, participantId, Instant.now(), responseData);
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId, EventType.NOTE_ADDED, participantId, Instant.now(), responseData);
     }
 
     /**
-     * Create a response privacy changed event (NOTE_UPDATED)
+     * Create a response privacy changed event (NOTE_UPDATED).
      */
     public static RetroEvent<ResponseData> responsePrivacyChanged(UUID retroId, String facilitatorId, ResponseData responseData) {
-        return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.NOTE_UPDATED, facilitatorId, Instant.now(), responseData);
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId, EventType.NOTE_UPDATED, facilitatorId, Instant.now(), responseData);
     }
 
     /**
-     * Create responses revealed event (batch privacy change)
+     * Create responses revealed event (batch privacy change).
      */
     public static RetroEvent<Long> responsesRevealed(UUID retroId, String facilitatorId, Long stepId) {
-        return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.NOTE_UPDATED, facilitatorId, Instant.now(), stepId);
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId, EventType.NOTE_UPDATED, facilitatorId, Instant.now(), stepId);
     }
 
     /**
-     * Create a timer paused event
+     * Create a timer paused event.
      */
     public static RetroEvent<Void> timerPaused(UUID retroId) {
-        return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.TIMER_PAUSED, "system", Instant.now(), null);
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId, EventType.TIMER_PAUSED, "system", Instant.now(), null);
     }
 
     /**
-     * Create a timer started/resumed event (use TIMER_STARTED for both start and resume)
+     * Create a timer started/resumed event (use TIMER_STARTED for both start and resume).
      */
     public static RetroEvent<Void> timerStarted(UUID retroId) {
-        return new RetroEvent<>("evt-" + UUID.randomUUID().toString().substring(0, 8), retroId, EventType.TIMER_STARTED, "system", Instant.now(), null);
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId, EventType.TIMER_STARTED, "system", Instant.now(), null);
     }
 
     public static RetroEvent<EscalationVoteData> escalationVoteUpdated(

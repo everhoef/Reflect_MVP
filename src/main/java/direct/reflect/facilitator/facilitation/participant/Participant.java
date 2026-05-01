@@ -2,7 +2,16 @@ package direct.reflect.facilitator.facilitation.participant;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.IdClass;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Table;
 import lombok.Data;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
 
@@ -19,7 +28,7 @@ public class Participant {
     @Id // Part of composite PK
     @Column(name = "participant_id", nullable = false)
     private UUID participantId;
-    
+
     /**
      * The session this participation record belongs to. Part of the composite primary key.
      */
@@ -34,17 +43,17 @@ public class Participant {
      */
     @Column(name = "username")
     private String username;
-    
+
     /**
      * User-selected display name for this specific session participation.
      */
     @Column(name = "display_name", nullable = false)
     private String displayName;
-    
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false) // Role should be non-nullable for a participation
     private ParticipantRole role;
-    
+
     /**
      * Last seen timestamp for the user in this specific session.
      * Also serves as "when did user leave?" when status = LEFT.
@@ -68,14 +77,14 @@ public class Participant {
     @Override
     public String toString() {
         String sessionInfo = "session=" + (session != null ? session.getId() : "null");
-        return "Participant{" +
-            "participantId=" + participantId +
-            ", " + sessionInfo +
-            ", username='" + username + '\'' +
-            ", displayName='" + displayName + '\'' +
-            ", role=" + role +
-            ", status=" + status +
-            ", lastSeen=" + lastSeen +
-            '}';
+        return "Participant{"
+            + "participantId=" + participantId
+            + ", " + sessionInfo
+            + ", username='" + username + '\''
+            + ", displayName='" + displayName + '\''
+            + ", role=" + role
+            + ", status=" + status
+            + ", lastSeen=" + lastSeen
+            + '}';
     }
 }

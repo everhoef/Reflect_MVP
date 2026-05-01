@@ -128,7 +128,7 @@ class ActionItemApiIntegrationTest {
 
     @Test
     void createActionItem_validRequest_returnsCreatedAndPublishesActionCreatedEvent() throws Exception {
-        mockMvc.perform(post("/api/retro/{retroId}/actions", testSession.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/actions", testSession.getId())
                         .with(authentication(testAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -178,7 +178,7 @@ class ActionItemApiIntegrationTest {
 
     @Test
     void createActionItem_missingRequiredFields_returnsBadRequest() throws Exception {
-        mockMvc.perform(post("/api/retro/{retroId}/actions", testSession.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/actions", testSession.getId())
                         .with(authentication(testAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -190,7 +190,7 @@ class ActionItemApiIntegrationTest {
                                 """))
                 .andExpect(status().isBadRequest());
 
-        mockMvc.perform(post("/api/retro/{retroId}/actions", testSession.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/actions", testSession.getId())
                         .with(authentication(testAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -202,7 +202,7 @@ class ActionItemApiIntegrationTest {
                                 """))
                 .andExpect(status().isBadRequest());
 
-        mockMvc.perform(post("/api/retro/{retroId}/actions", testSession.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/actions", testSession.getId())
                         .with(authentication(testAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -225,7 +225,7 @@ class ActionItemApiIntegrationTest {
         saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), "Attendance logged");
         saveActionItem("Review incidents weekly", "Bob", LocalDate.of(2026, 5, 8), null);
 
-        mockMvc.perform(get("/api/retro/{retroId}/actions", testSession.getId())
+        mockMvc.perform(get("/api/retros/{retroId}/actions", testSession.getId())
                         .with(authentication(testAuth)))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -245,7 +245,7 @@ class ActionItemApiIntegrationTest {
         testSession.setSyncVersion(7L);
         sessionRepository.saveAndFlush(testSession);
 
-        mockMvc.perform(get("/api/retro/{retroId}/actions", testSession.getId())
+        mockMvc.perform(get("/api/retros/{retroId}/actions", testSession.getId())
                         .with(authentication(testAuth)))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -260,7 +260,7 @@ class ActionItemApiIntegrationTest {
     void updateActionItem_validRequest_returnsUpdatedItemAndPublishesActionUpdatedEvent() throws Exception {
         ActionItem actionItem = saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), null);
 
-        mockMvc.perform(patch("/api/retro/{retroId}/actions/{actionId}", testSession.getId(), actionItem.getId())
+        mockMvc.perform(patch("/api/retros/{retroId}/actions/{actionId}", testSession.getId(), actionItem.getId())
                         .with(authentication(testAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -297,7 +297,7 @@ class ActionItemApiIntegrationTest {
     void createActionItem_incrementsPersistedRetroSyncVersion() throws Exception {
         long initialSyncVersion = sessionRepository.findById(testSession.getId()).orElseThrow().getSyncVersion();
 
-        mockMvc.perform(post("/api/retro/{retroId}/actions", testSession.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/actions", testSession.getId())
                         .with(authentication(testAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -318,7 +318,7 @@ class ActionItemApiIntegrationTest {
     void deleteActionItem_existingItem_returnsNoContentAndPublishesActionDeletedEvent() throws Exception {
         ActionItem actionItem = saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), null);
 
-        mockMvc.perform(delete("/api/retro/{retroId}/actions/{actionId}", testSession.getId(), actionItem.getId())
+        mockMvc.perform(delete("/api/retros/{retroId}/actions/{actionId}", testSession.getId(), actionItem.getId())
                         .with(authentication(testAuth))
                         .with(csrf()))
                 .andExpect(status().isNoContent());
@@ -339,7 +339,7 @@ class ActionItemApiIntegrationTest {
     void updateActionItemStatus_validRequest_returnsUpdatedStatus() throws Exception {
         ActionItem actionItem = saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), null);
 
-        mockMvc.perform(post("/api/retro/{retroId}/actions/{actionId}/status", testSession.getId(), actionItem.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/status", testSession.getId(), actionItem.getId())
                         .with(authentication(testAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -365,7 +365,7 @@ class ActionItemApiIntegrationTest {
     void nonSessionParticipant_getsForbiddenJsonResponse() throws Exception {
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(UUID.randomUUID());
 
-        mockMvc.perform(get("/api/retro/{retroId}/actions", testSession.getId())
+        mockMvc.perform(get("/api/retros/{retroId}/actions", testSession.getId())
                         .with(authentication(testAuth)))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))

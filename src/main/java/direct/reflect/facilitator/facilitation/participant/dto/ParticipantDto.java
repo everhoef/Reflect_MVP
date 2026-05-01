@@ -6,4 +6,4 @@ public record ParticipantDto(
     UUID participantId,
     String displayName,
     String role
-) {}
+) { }

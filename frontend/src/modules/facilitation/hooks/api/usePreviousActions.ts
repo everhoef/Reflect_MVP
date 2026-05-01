@@ -11,7 +11,7 @@ export function usePreviousActions(retroId: string) {
   const query = useQuery<ActionItemDto[]>({
     queryKey: ["previousActions", retroId],
     queryFn: async () => {
-      const { data, response } = await apiClient.GET("/api/retro/{retroId}/previous-actions", {
+      const { data, response } = await apiClient.GET("/api/retros/{retroId}/actions/previous", {
         params: { path: { retroId } },
       });
       if (!response.ok) throw new ApiError(response.status, `Failed to fetch previous actions`);

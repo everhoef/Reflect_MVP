@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/api/retro/{retroId}/step/{stepId}/cluster/{clusterId}/name": {
+    "/api/retros/{retroId}/steps/{stepId}/clusters/{clusterId}/name": {
         parameters: {
             query?: never;
             header?: never;
@@ -20,7 +20,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/response/{responseId}": {
+    "/api/retros/{retroId}/responses/{responseId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -40,7 +40,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/timer/resume": {
+    "/api/retros": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a retrospective session
+         * @description Creates a new retrospective session and registers the creator as facilitator
+         */
+        post: operations["createRetrospective"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retros/{retroId}/timer/resume": {
         parameters: {
             query?: never;
             header?: never;
@@ -60,7 +80,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/timer/pause": {
+    "/api/retros/{retroId}/timer/pause": {
         parameters: {
             query?: never;
             header?: never;
@@ -80,7 +100,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/step/{stepId}/reveal": {
+    "/api/retros/{retroId}/steps/{stepId}/responses/reveal": {
         parameters: {
             query?: never;
             header?: never;
@@ -100,7 +120,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/step/{stepId}/response/rating": {
+    "/api/retros/{retroId}/steps/{stepId}/responses/rating": {
         parameters: {
             query?: never;
             header?: never;
@@ -124,7 +144,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/step/{stepId}/response/column": {
+    "/api/retros/{retroId}/steps/{stepId}/responses/column": {
         parameters: {
             query?: never;
             header?: never;
@@ -144,7 +164,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/step/{stepId}/cluster/unmerge": {
+    "/api/retros/{retroId}/steps/{stepId}/clusters/unmerge": {
         parameters: {
             query?: never;
             header?: never;
@@ -160,7 +180,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/step/{stepId}/cluster/merge": {
+    "/api/retros/{retroId}/steps/{stepId}/clusters/merge": {
         parameters: {
             query?: never;
             header?: never;
@@ -176,7 +196,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/start": {
+    "/api/retros/{retroId}/start": {
         parameters: {
             query?: never;
             header?: never;
@@ -196,7 +216,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/response/{responseId}/vote": {
+    "/api/retros/{retroId}/responses/{responseId}/vote": {
         parameters: {
             query?: never;
             header?: never;
@@ -216,23 +236,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/next": {
+    "/api/retros/{retroId}/participants": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["getParticipants"];
         put?: never;
-        post: operations["nextStep"];
+        post: operations["joinRetrospective"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/escalations/{escalationId}/vote": {
+    "/api/retros/{retroId}/escalations/{escalationId}/vote": {
         parameters: {
             query?: never;
             header?: never;
@@ -248,7 +268,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/actions": {
+    "/api/retros/{retroId}/advance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Advance to the next step
+         * @description Advances the retrospective to the next step; facilitator-only action
+         */
+        post: operations["nextStep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retros/{retroId}/actions": {
         parameters: {
             query?: never;
             header?: never;
@@ -264,7 +304,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/actions/{actionId}/status": {
+    "/api/retros/{retroId}/actions/{actionId}/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -280,7 +320,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/actions/{actionId}/escalate": {
+    "/api/retros/{retroId}/actions/{actionId}/escalations": {
         parameters: {
             query?: never;
             header?: never;
@@ -290,54 +330,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["escalateAction"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/retro/leave-active-sessions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["leaveActiveSessions"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/retro/join": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["joinRetrospective"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/retro/create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["createRetrospective"];
         delete?: never;
         options?: never;
         head?: never;
@@ -392,7 +384,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/actions/{actionId}": {
+    "/api/retros/{retroId}/actions/{actionId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -408,13 +400,37 @@ export interface paths {
         patch: operations["updateActionItem"];
         trace?: never;
     };
-    "/api/retro/{retroId}/timer": {
+    "/api/retros/{retroId}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
+        /**
+         * Get retrospective state
+         * @description Returns the current retrospective state for an active participant
+         */
+        get: operations["getRetroState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retros/{retroId}/timer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get timer state
+         * @description Returns the timer state for the current step
+         */
         get: operations["getTimerState"];
         put?: never;
         post?: never;
@@ -424,7 +440,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/step/{stepId}/response/rating/me": {
+    "/api/retros/{retroId}/steps/{stepId}/responses/rating/me": {
         parameters: {
             query?: never;
             header?: never;
@@ -444,7 +460,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/step/{stepId}/clusters": {
+    "/api/retros/{retroId}/steps/{stepId}/clusters": {
         parameters: {
             query?: never;
             header?: never;
@@ -460,55 +476,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/state": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getRetroState"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/retro/{retroId}/previous-actions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getPreviousActions"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/retro/{retroId}/participants": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getParticipants"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/retro/{retroId}/events": {
+    "/api/retros/{retroId}/events": {
         parameters: {
             query?: never;
             header?: never;
@@ -524,7 +492,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/{retroId}/escalations": {
+    "/api/retros/{retroId}/escalations": {
         parameters: {
             query?: never;
             header?: never;
@@ -540,14 +508,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retro/check-active-sessions": {
+    "/api/retros/{retroId}/actions/previous": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["checkActiveSessions"];
+        get: operations["getPreviousActions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -567,6 +535,22 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/retros/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["checkActiveSessions"];
+        put?: never;
+        post?: never;
+        delete: operations["leaveActiveSessions"];
         options?: never;
         head?: never;
         patch?: never;
@@ -620,6 +604,15 @@ export interface components {
             responseId?: string;
             /** @description Updated content of the response */
             content?: string;
+        };
+        CreateRetroRequest: {
+            sessionName: string;
+        };
+        CreateRetroResponse: {
+            /** Format: uuid */
+            retroId?: string;
+            redirectUrl?: string;
+            sessionName?: string;
         };
         /** @description Result of revealing responses for a step */
         RevealResult: {
@@ -692,10 +685,10 @@ export interface components {
              */
             voteCount?: number;
         };
-        NextStepResult: {
+        JoinRetroResponse: {
             /** Format: uuid */
             retroId?: string;
-            advanced?: boolean;
+            redirectUrl?: string;
         };
         EscalationVoteResultDto: {
             /** Format: int64 */
@@ -708,6 +701,11 @@ export interface components {
             threshold?: number;
             thresholdMet?: boolean;
             voted?: boolean;
+        };
+        NextStepResult: {
+            /** Format: uuid */
+            retroId?: string;
+            advanced?: boolean;
         };
         CreateActionItemRequest: {
             what: string;
@@ -757,26 +755,6 @@ export interface components {
             /** Format: date-time */
             createdAt?: string;
         };
-        LeaveActiveSessionsResult: {
-            success?: boolean;
-        };
-        JoinRetroRequest: {
-            retroId: string;
-        };
-        JoinRetroResponse: {
-            /** Format: uuid */
-            retroId?: string;
-            redirectUrl?: string;
-        };
-        CreateRetroRequest: {
-            sessionName: string;
-        };
-        CreateRetroResponse: {
-            /** Format: uuid */
-            retroId?: string;
-            redirectUrl?: string;
-            sessionName?: string;
-        };
         CreateOrganizationRequest: {
             name: string;
             slug: string;
@@ -817,23 +795,6 @@ export interface components {
             /** Format: date */
             dueDate?: string;
             successCriteria?: string;
-        };
-        SyncVersionedResponseTimerStateDto: {
-            /** Format: int64 */
-            syncVersion?: number;
-            data?: components["schemas"]["TimerStateDto"];
-        };
-        TimerStateDto: {
-            /** Format: int64 */
-            remainingSeconds?: number;
-            isPaused?: boolean;
-            state?: string;
-        };
-        ClusterGroupsDto: {
-            clustered?: {
-                [key: string]: components["schemas"]["ColumnResponseDto"][];
-            };
-            unclustered?: components["schemas"]["ColumnResponseDto"][];
         };
         AssistantMessageDto: {
             /** Format: uuid */
@@ -879,6 +840,23 @@ export interface components {
             };
             guidance?: string;
         };
+        SyncVersionedResponseTimerStateDto: {
+            /** Format: int64 */
+            syncVersion?: number;
+            data?: components["schemas"]["TimerStateDto"];
+        };
+        TimerStateDto: {
+            /** Format: int64 */
+            remainingSeconds?: number;
+            isPaused?: boolean;
+            state?: string;
+        };
+        ClusterGroupsDto: {
+            clustered?: {
+                [key: string]: components["schemas"]["ColumnResponseDto"][];
+            };
+            unclustered?: components["schemas"]["ColumnResponseDto"][];
+        };
         ParticipantDto: {
             /** Format: uuid */
             participantId?: string;
@@ -909,6 +887,9 @@ export interface components {
             sessionId?: string;
             sessionName?: string;
             role?: string;
+        };
+        LeaveActiveSessionsResult: {
+            success?: boolean;
         };
     };
     responses: never;
@@ -975,6 +956,48 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["UpdateResponseResult"];
+                };
+            };
+        };
+    };
+    createRetrospective: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRetroRequest"];
+            };
+        };
+        responses: {
+            /** @description Session created successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CreateRetroResponse"];
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CreateRetroResponse"];
+                };
+            };
+            /** @description Session could not be created */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CreateRetroResponse"];
                 };
             };
         };
@@ -1079,6 +1102,15 @@ export interface operations {
         responses: {
             /** @description Rating responses returned */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RatingResponseDto"][];
+                };
+            };
+            /** @description Participant is not part of this session */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1269,7 +1301,7 @@ export interface operations {
             };
         };
     };
-    nextStep: {
+    getParticipants: {
         parameters: {
             query?: never;
             header?: never;
@@ -1286,7 +1318,29 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["NextStepResult"];
+                    "*/*": components["schemas"]["SyncVersionedResponseListParticipantDto"];
+                };
+            };
+        };
+    };
+    joinRetrospective: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["JoinRetroResponse"];
                 };
             };
         };
@@ -1310,6 +1364,37 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["EscalationVoteResultDto"];
+                };
+            };
+        };
+    };
+    nextStep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Advanced to the next step */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NextStepResult"];
+                };
+            };
+            /** @description Only facilitators can advance the session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NextStepResult"];
                 };
             };
         };
@@ -1412,74 +1497,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["EscalatedItemDto"];
-                };
-            };
-        };
-    };
-    leaveActiveSessions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LeaveActiveSessionsResult"];
-                };
-            };
-        };
-    };
-    joinRetrospective: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["JoinRetroRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["JoinRetroResponse"];
-                };
-            };
-        };
-    };
-    createRetrospective: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateRetroRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["CreateRetroResponse"];
                 };
             };
         };
@@ -1674,6 +1691,46 @@ export interface operations {
             };
         };
     };
+    getRetroState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retroId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Retrospective state returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RetroStateDto"];
+                };
+            };
+            /** @description Participant is not part of this session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RetroStateDto"];
+                };
+            };
+            /** @description Session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RetroStateDto"];
+                };
+            };
+        };
+    };
     getTimerState: {
         parameters: {
             query?: never;
@@ -1685,8 +1742,26 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description Timer state returned */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SyncVersionedResponseTimerStateDto"];
+                };
+            };
+            /** @description Current step has no timer */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SyncVersionedResponseTimerStateDto"];
+                };
+            };
+            /** @description Participant is not part of this session */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1751,72 +1826,6 @@ export interface operations {
             };
         };
     };
-    getRetroState: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                retroId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RetroStateDto"];
-                };
-            };
-        };
-    };
-    getPreviousActions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                retroId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ActionItemDto"][];
-                };
-            };
-        };
-    };
-    getParticipants: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                retroId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["SyncVersionedResponseListParticipantDto"];
-                };
-            };
-        };
-    };
     getRetroEvents: {
         parameters: {
             query?: never;
@@ -1861,11 +1870,13 @@ export interface operations {
             };
         };
     };
-    checkActiveSessions: {
+    getPreviousActions: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                retroId: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -1876,7 +1887,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["SessionInfo"][];
+                    "*/*": components["schemas"]["ActionItemDto"][];
                 };
             };
         };
@@ -1897,6 +1908,46 @@ export interface operations {
                 };
                 content: {
                     "*/*": Record<string, never>;
+                };
+            };
+        };
+    };
+    checkActiveSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SessionInfo"][];
+                };
+            };
+        };
+    };
+    leaveActiveSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LeaveActiveSessionsResult"];
                 };
             };
         };

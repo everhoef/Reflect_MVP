@@ -27,13 +27,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/retro")
 @Tag(name = "Response API", description = "Participant response management")
 @Slf4j
 @RequiredArgsConstructor
@@ -43,7 +49,7 @@ public class ResponseApiController {
     private final ResponseService responseService;
     private final RetroStepQueryService retroStepQueryService;
 
-    @PostMapping("/{retroId}/step/{stepId}/response/column")
+    @PostMapping("/api/retros/{retroId}/steps/{stepId}/responses/column")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Submit a column/categorical response", description = "Submits a response to a multi-column board step")
     @ApiResponse(responseCode = "200", description = "Response submitted successfully")
@@ -59,7 +65,7 @@ public class ResponseApiController {
 
         try {
             ParticipantResponse saved = responseService.submitResponse(retroId, stepId, dto, httpRequest);
-            log.info("Submitted column response for step: {}", stepId);
+            log.debug("Submitted column response for step: {}", stepId);
 
             return ResponseEntity.ok()
                 .header("HX-Trigger", "responseSubmitted")
@@ -69,7 +75,7 @@ public class ResponseApiController {
             log.debug("Input limit exceeded for retro {}: {}", retroId, e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         } catch (RetroSessionNotFoundException e) {
-            log.warn("Session not found: {}", retroId);
+            log.debug("Session not found: {}", retroId);
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error submitting column response: ", e);
@@ -77,7 +83,7 @@ public class ResponseApiController {
         }
     }
 
-    @PostMapping("/{retroId}/step/{stepId}/response/rating")
+    @PostMapping("/api/retros/{retroId}/steps/{stepId}/responses/rating")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Submit a rating response", description = "Submits a rating scale response for the current step")
     @ApiResponse(responseCode = "200", description = "Rating submitted successfully")
@@ -93,14 +99,14 @@ public class ResponseApiController {
 
         try {
             ParticipantResponse saved = responseService.submitResponse(retroId, stepId, dto, httpRequest);
-            log.info("Submitted rating response for step: {}", stepId);
+            log.debug("Submitted rating response for step: {}", stepId);
 
             return ResponseEntity.ok()
                 .header("HX-Trigger", "responseSubmitted")
                 .body(new SubmitResponseResult(saved.getId(), stepId));
 
         } catch (RetroSessionNotFoundException e) {
-            log.warn("Session not found: {}", retroId);
+            log.debug("Session not found: {}", retroId);
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error submitting rating response: ", e);
@@ -108,9 +114,10 @@ public class ResponseApiController {
         }
     }
 
-    @GetMapping("/{retroId}/step/{stepId}/response/rating/me")
+    @GetMapping("/api/retros/{retroId}/steps/{stepId}/responses/rating/me")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    @Operation(summary = "Get current user's rating response", description = "Returns the authenticated user's rating response for a given step, or 404 if not yet submitted")
+    @Operation(summary = "Get current user's rating response",
+        description = "Returns the authenticated user's rating response for a given step, or 404 if not yet submitted")
     @ApiResponse(responseCode = "200", description = "Rating response returned")
     @ApiResponse(responseCode = "404", description = "No rating response found for this participant and step")
     public ResponseEntity<RatingResponseDto> getMyRatingResponse(
@@ -135,9 +142,10 @@ public class ResponseApiController {
         }
     }
 
-    @GetMapping("/{retroId}/step/{stepId}/response/rating")
+    @GetMapping("/api/retros/{retroId}/steps/{stepId}/responses/rating")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    @Operation(summary = "Get rating responses for histogram", description = "Returns all rating responses for the stage containing this step (used by HISTOGRAM_CHART component)")
+    @Operation(summary = "Get rating responses for histogram",
+        description = "Returns all rating responses for the stage containing this step (used by HISTOGRAM_CHART component)")
     @ApiResponse(responseCode = "200", description = "Rating responses returned")
     @ApiResponse(responseCode = "403", description = "Participant is not part of this session")
     public ResponseEntity<List<RatingResponseDto>> getRatingResponses(
@@ -171,7 +179,7 @@ public class ResponseApiController {
         }
     }
 
-    @PutMapping("/{retroId}/response/{responseId}")
+    @PutMapping("/api/retros/{retroId}/responses/{responseId}")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Update a response", description = "Updates the content of an existing participant response")
     @ApiResponse(responseCode = "200", description = "Response updated successfully")
@@ -192,7 +200,7 @@ public class ResponseApiController {
 
             ParticipantResponse saved = responseService.updateResponse(responseId, participant, content);
 
-            log.info("Updated response: {}", responseId);
+            log.debug("Updated response: {}", responseId);
 
             return ResponseEntity.ok(new UpdateResponseResult(saved.getId(), content));
 
@@ -205,9 +213,10 @@ public class ResponseApiController {
         }
     }
 
-    @PostMapping("/{retroId}/response/{responseId}/vote")
+    @PostMapping("/api/retros/{retroId}/responses/{responseId}/vote")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    @Operation(summary = "Toggle a vote on a response", description = "Adds or removes a vote for the current participant on the specified response")
+    @Operation(summary = "Toggle a vote on a response",
+        description = "Adds or removes a vote for the current participant on the specified response")
     @ApiResponse(responseCode = "200", description = "Vote toggled successfully, returns updated vote count")
     @ApiResponse(responseCode = "400", description = "Vote limit exceeded")
     public ResponseEntity<VoteResult> toggleVote(
@@ -219,7 +228,7 @@ public class ResponseApiController {
 
         try {
             ParticipantResponse saved = responseService.toggleVote(retroId, responseId, httpRequest);
-            log.info("Toggled vote for response: {}", responseId);
+            log.debug("Toggled vote for response: {}", responseId);
 
             Object votesObj = saved.getResponseData().get("votes");
             int voteCount = 0;
@@ -232,10 +241,10 @@ public class ResponseApiController {
                 .body(new VoteResult(responseId, voteCount));
 
         } catch (VoteLimitExceededException e) {
-            log.warn("Vote limit exceeded: {}", e.getMessage());
+            log.debug("Vote limit exceeded: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         } catch (SecurityException e) {
-            log.warn("Unauthorized vote attempt: {}", e.getMessage());
+            log.debug("Unauthorized vote attempt: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } catch (Exception e) {
             log.error("Error toggling vote: ", e);
@@ -243,7 +252,7 @@ public class ResponseApiController {
         }
     }
 
-    @PostMapping("/{retroId}/step/{stepId}/reveal")
+    @PostMapping("/api/retros/{retroId}/steps/{stepId}/responses/reveal")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Reveal responses for a step", description = "Makes all participant responses visible; facilitator-only action")
     @ApiResponse(responseCode = "200", description = "Responses revealed successfully")
@@ -252,28 +261,28 @@ public class ResponseApiController {
             @PathVariable UUID retroId,
             @PathVariable Long stepId,
             HttpServletRequest httpRequest) {
-        
+
         log.debug("Revealing responses for retro: {}, step: {}", retroId, stepId);
-        
+
         try {
             boolean isFacilitator = participantService.isFacilitator(httpRequest, retroId);
             if (!isFacilitator) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
-            
+
             RetroSession session = retroService.getSessionById(retroId);
             if (session == null) {
                 return ResponseEntity.notFound().build();
             }
-            
+
             responseService.revealAllResponses(session, stepId);
-            
-            log.info("Revealed responses for step: {} in retro: {}", stepId, retroId);
-                
+
+            log.debug("Revealed responses for step: {} in retro: {}", stepId, retroId);
+
             return ResponseEntity.ok()
                 .header("HX-Trigger", "responsesRevealed")
                 .body(new RevealResult(stepId, true));
-                
+
         } catch (Exception e) {
             log.error("Error revealing responses: ", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();

@@ -180,7 +180,8 @@ public class EscalationService {
         }
 
         Map<UUID, Long> voteCountsByEscalationId = getVoteCountsByEscalationId(escalatedItems);
-        Map<UUID, List<Participant>> participantsBySessionId = getParticipantsBySessionIdForTieBreaks(escalatedItems, voteCountsByEscalationId);
+        Map<UUID, List<Participant>> participantsBySessionId = getParticipantsBySessionIdForTieBreaks(
+            escalatedItems, voteCountsByEscalationId);
 
         return escalatedItems.stream()
                 .map(escalatedItem -> {
@@ -206,7 +207,7 @@ public class EscalationService {
             return false;
         }
 
-        return isThresholdMet(voteCount, participants, escalatedItem.getId());
+        return isThresholdMet(participants, escalatedItem.getId());
     }
 
     private boolean isThresholdMet(EscalatedItem escalatedItem, long voteCount) {
@@ -220,10 +221,10 @@ public class EscalationService {
         }
 
         List<Participant> participants = participantService.getSessionParticipants(escalatedItem.getRetroSession().getId());
-        return isThresholdMet(voteCount, participants, escalatedItem.getId());
+        return isThresholdMet(participants, escalatedItem.getId());
     }
 
-    private boolean isThresholdMet(long voteCount, List<Participant> participants, UUID escalationId) {
+    private boolean isThresholdMet(List<Participant> participants, UUID escalationId) {
         boolean facilitatorVoted = facilitatorHasVoted(escalationId, participants);
 
         return EscalationThresholdPolicy.facilitatorTieBreakApplies(participants.size(), facilitatorVoted);

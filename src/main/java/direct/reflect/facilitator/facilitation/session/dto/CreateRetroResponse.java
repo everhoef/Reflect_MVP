@@ -6,4 +6,4 @@ public record CreateRetroResponse(
     UUID retroId,
     String redirectUrl,
     String sessionName
-) {}
+) { }

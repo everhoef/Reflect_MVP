@@ -33,10 +33,10 @@
 		<org.projectlombok.version>1.18.42</org.projectlombok.version>
 		<org.mapstruct.version>1.6.2</org.mapstruct.version>
 		<testcontainers.version>2.0.2</testcontainers.version>
-		<pmd.maxAllowedViolations>18</pmd.maxAllowedViolations>
-		<checkstyle.maxAllowedViolations>2297</checkstyle.maxAllowedViolations>
-		<spotbugs.skip>true</spotbugs.skip>
-		<spotbugs.failOnError>false</spotbugs.failOnError>
+<pmd.maxAllowedViolations>0</pmd.maxAllowedViolations>
+<checkstyle.maxAllowedViolations>0</checkstyle.maxAllowedViolations>
+		<spotbugs.skip>false</spotbugs.skip>
+		<spotbugs.failOnError>true</spotbugs.failOnError>
 	</properties>
 	
 	<dependencies>
@@ -361,6 +361,7 @@
 				<artifactId>maven-checkstyle-plugin</artifactId>
 				<version>3.6.0</version>
 				<configuration>
+					<configLocation>checkstyle.xml</configLocation>
 					<failOnViolation>true</failOnViolation>
 					<consoleOutput>true</consoleOutput>
 					<maxAllowedViolations>${checkstyle.maxAllowedViolations}</maxAllowedViolations>

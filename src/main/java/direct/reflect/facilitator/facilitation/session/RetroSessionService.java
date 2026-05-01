@@ -119,9 +119,9 @@ public class RetroSessionService {
     public List<RetroTemplate> getAvailableTemplates() {
         return retroTemplateService.getAvailableTemplates();
     }
-    
+
     /**
-     * Get the current RetroStep for a session based on current phase and step index
+     * Get the current RetroStep for a session based on current phase and step index.
      */
     public RetroStep getCurrentStep(UUID sessionId) {
         RetroSession session = getSessionById(sessionId);
@@ -144,7 +144,7 @@ public class RetroSessionService {
     }
 
     /**
-     * Find a step with the specified componentType in the given stage
+     * Find a step with the specified componentType in the given stage.
      */
     public RetroStep findStepByComponentType(RetroStage stage, ComponentType componentType) {
         List<RetroStep> steps = retroStepQueryService.findStepsByStageAndComponentType(
@@ -154,7 +154,7 @@ public class RetroSessionService {
     }
 
     /**
-     * Check if there's a next step within the current stage
+     * Check if there's a next step within the current stage.
      */
     public boolean hasNextStepInCurrentStage(UUID sessionId) {
         RetroSession session = getSessionById(sessionId);
@@ -220,29 +220,32 @@ public class RetroSessionService {
     public TimerStateDto getTimerState(UUID sessionId) {
         RetroSession session = getSessionById(sessionId);
         RetroStep currentStep = getCurrentStep(sessionId);
-        
+
         if (currentStep == null || currentStep.getDurationSeconds() == null || currentStep.getDurationSeconds() <= 0) {
             return null;
         }
-        
+
         // Guard against null stepStartedAt (can happen before step is fully initialized)
         if (session.getStepStartedAt() == null) {
             return null;
         }
-        
+
         LocalDateTime now = LocalDateTime.now();
         long elapsedWallClock = Duration.between(session.getStepStartedAt(), now).getSeconds();
-        
+
         boolean isPaused = session.getTimerPausedAt() != null;
         if (isPaused) {
             elapsedWallClock = Duration.between(session.getStepStartedAt(), session.getTimerPausedAt()).getSeconds();
         }
-        
-        long effectiveElapsed = elapsedWallClock - (session.getAccumulatedPauseSeconds() != null ? session.getAccumulatedPauseSeconds() : 0L);
-        
+
+        long effectiveElapsed = elapsedWallClock
+            - (session.getAccumulatedPauseSeconds() != null ? session.getAccumulatedPauseSeconds() : 0L);
+
         long remaining = currentStep.getDurationSeconds() - effectiveElapsed;
-        if (remaining < 0) remaining = 0;
-        
+        if (remaining < 0) {
+            remaining = 0;
+        }
+
         String state;
         if (remaining <= 0) {
             state = "expired";
@@ -253,7 +256,7 @@ public class RetroSessionService {
         } else {
             state = "green";
         }
-        
+
         return new TimerStateDto(remaining, isPaused, state);
     }
 

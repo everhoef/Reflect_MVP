@@ -24,12 +24,12 @@ import direct.reflect.facilitator.eventing.RetroEvent;
 
 /**
  * Service responsible for managing {@link Participant} entities.
- * 
+ *
  * Refactored for OIDC + Anonymous Guest hybrid authentication:
  * - Uses AuthService for clean identity extraction
  * - Supports both OIDC users and anonymous guests uniformly
  * - Focuses on business logic rather than authentication concerns
- * 
+ *
  * This includes creating participants, assigning roles (FACILITATOR/PARTICIPANT),
  * associating them with RetroSessions, and handling participant lifecycle.
  */
@@ -127,7 +127,7 @@ public class ParticipantService implements SseParticipantAccess {
                 participant.getParticipantId(),
                 participant.getDisplayName());
     }
-    
+
     /**
      * Gets all participants in a session.
      */
@@ -168,7 +168,7 @@ public class ParticipantService implements SseParticipantAccess {
         Participant participant = getParticipantForSession(request, sessionId);
         participant.setLastSeen(LocalDateTime.now());
         participantRepository.save(participant);
-        log.debug("Updated lastSeen for participant '{}' (ID: {}) in session {}", 
+        log.debug("Updated lastSeen for participant '{}' (ID: {}) in session {}",
             participant.getDisplayName(), participant.getParticipantId(), sessionId);
     }
 
@@ -180,31 +180,31 @@ public class ParticipantService implements SseParticipantAccess {
      */
     private void checkForActiveSession(UUID participantId, UUID targetSessionId) {
         List<Participant> activeSessions = getActiveSessionsForParticipant(participantId);
-        
+
         if (!activeSessions.isEmpty()) {
             // Check if they're trying to join a session they're already in
             boolean alreadyInTargetSession = activeSessions.stream()
                 .anyMatch(p -> p.getSession().getId().equals(targetSessionId));
-                
+
             if (alreadyInTargetSession) {
-                log.info("Participant {} is already in target session {} - allowing rejoin", 
+                log.info("Participant {} is already in target session {} - allowing rejoin",
                     participantId, targetSessionId);
                 return; // Allow rejoining the same session
             }
-            
+
             // They're switching to a different session - terminate old sessions
-            log.info("Participant {} switching from {} active session(s) to new session {}", 
+            log.info("Participant {} switching from {} active session(s) to new session {}",
                 participantId, activeSessions.size(), targetSessionId);
-                
+
             for (Participant activeParticipant : activeSessions) {
                 removeParticipantFromSession(activeParticipant);
             }
-            
-            log.info("Successfully terminated {} old session(s) for participant {}", 
+
+            log.info("Successfully terminated {} old session(s) for participant {}",
                 activeSessions.size(), participantId);
         }
     }
-    
+
     /**
      * Gets all active sessions for a participant.
      * Returns only sessions where participant status is ACTIVE and session is not finished.
@@ -213,7 +213,8 @@ public class ParticipantService implements SseParticipantAccess {
         log.debug("Checking for active sessions for participant: {}", participantId);
 
         // Use repository query to filter by status = ACTIVE (more efficient)
-        List<Participant> activeParticipants = participantRepository.findByParticipantIdAndStatusWithSession(participantId, ParticipantStatus.ACTIVE);
+        List<Participant> activeParticipants = participantRepository
+            .findByParticipantIdAndStatusWithSession(participantId, ParticipantStatus.ACTIVE);
 
         log.debug("Found {} ACTIVE participations for participant {}", activeParticipants.size(), participantId);
 
@@ -249,7 +250,7 @@ public class ParticipantService implements SseParticipantAccess {
             ))
             .toList();
     }
-    
+
     /**
      * Leaves all active sessions for the current user.
      */
@@ -261,7 +262,7 @@ public class ParticipantService implements SseParticipantAccess {
         for (Participant activeParticipant : activeSessions) {
             removeParticipantFromSession(activeParticipant);
         }
-        
+
         // Clear session attributes since we're leaving all sessions
         if (request.getSession(false) != null) {
             request.getSession().removeAttribute("retroId");
@@ -269,8 +270,8 @@ public class ParticipantService implements SseParticipantAccess {
             request.getSession().removeAttribute("participantId");
             log.debug("Cleared session attributes after leaving all active sessions");
         }
-        
-        log.info("Successfully removed participant {} from {} active sessions", 
+
+        log.info("Successfully removed participant {} from {} active sessions",
             participantId, activeSessions.size());
     }
 
@@ -283,43 +284,43 @@ public class ParticipantService implements SseParticipantAccess {
         UUID participantId = authHelper.getParticipantId(request);
         String username = authHelper.getUsername(request); // null for guests
         String displayName = authHelper.getDisplayName(request);
-        
-        log.debug("createParticipantForSession called with role: {} for participant: {} in session: {}", 
+
+        log.debug("createParticipantForSession called with role: {} for participant: {} in session: {}",
             role, participantId, session.getId());
-        
+
         // Check if this participant already exists in this session
         ParticipantId pk = new ParticipantId(participantId, session.getId());
         var existingParticipant = participantRepository.findById(pk);
-        
+
         if (existingParticipant.isPresent()) {
-            log.debug("Participant {} already exists in session {}. Current role: {}, requested role: {}", 
+            log.debug("Participant {} already exists in session {}. Current role: {}, requested role: {}",
                 participantId, session.getId(), existingParticipant.get().getRole(), role);
-            
+
             // Update existing participant
             Participant existing = existingParticipant.get();
             existing.setDisplayName(displayName);
             existing.setLastSeen(LocalDateTime.now());
             existing.setRole(role); // Allow role updates
-            
+
             log.debug("About to save updated participant with role: {}", existing.getRole());
             Participant updatedParticipant = participantRepository.save(existing);
             log.debug("Saved updated participant. Role after save: {}", updatedParticipant.getRole());
-            
+
             // Update session attributes
             if (request.getSession(false) != null) {
                 request.getSession().setAttribute("retroId", session.getId());
                 request.getSession().setAttribute("participantRole", role.name());
                 request.getSession().setAttribute("participantId", participantId);
-                log.debug("Updated session attributes: retroId={}, role={}, participantId={}", 
+                log.debug("Updated session attributes: retroId={}, role={}, participantId={}",
                     session.getId(), role.name(), participantId);
             }
-            
+
             return updatedParticipant;
         }
-        
-        log.debug("Creating new participant with role: {} for participant: {} in session: {}", 
+
+        log.debug("Creating new participant with role: {} for participant: {} in session: {}",
             role, participantId, session.getId());
-        
+
         // Create new participant
         Participant participant = new Participant();
         participant.setParticipantId(participantId);
@@ -328,23 +329,23 @@ public class ParticipantService implements SseParticipantAccess {
         participant.setSession(session);
         participant.setRole(role);
         participant.setLastSeen(LocalDateTime.now());
-        
+
         log.debug("About to save new participant with role: {}", participant.getRole());
         Participant savedParticipant = participantRepository.save(participant);
         log.debug("Saved new participant. Role after save: {}", savedParticipant.getRole());
-        
+
         // Set session attributes for participant tracking
         if (request.getSession(false) != null) {
             request.getSession().setAttribute("retroId", session.getId());
             request.getSession().setAttribute("participantRole", role.name());
             request.getSession().setAttribute("participantId", participantId);
-            log.debug("Set session attributes: retroId={}, role={}, participantId={}", 
+            log.debug("Set session attributes: retroId={}, role={}, participantId={}",
                 session.getId(), role.name(), participantId);
         }
-        
+
         return savedParticipant;
     }
-    
+
     /**
      * Marks a participant as LEFT from their session with proper event handling.
      * Does not delete the participant - preserves data for audit/history.

@@ -174,7 +174,7 @@ class EscalationApiIntegrationTest {
 
         ActionItem actionItem = saveActionItem(retroSession, "Stabilize cross-team deployment handoff");
 
-        mockMvc.perform(post("/api/retro/{retroId}/actions/{actionId}/escalate", retroSession.getId(), actionItem.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/escalations", retroSession.getId(), actionItem.getId())
                         .with(authentication(participantAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -206,7 +206,7 @@ class EscalationApiIntegrationTest {
 
         ActionItem actionItem = saveActionItem(retroSession, "Clarify cross-team release ownership");
 
-        mockMvc.perform(post("/api/retro/{retroId}/actions/{actionId}/escalate", retroSession.getId(), actionItem.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/escalations", retroSession.getId(), actionItem.getId())
                         .with(authentication(participantAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -229,7 +229,7 @@ class EscalationApiIntegrationTest {
 
         ActionItem actionItem = saveActionItem(retroSession, "Stabilize release ownership");
 
-        mockMvc.perform(post("/api/retro/{retroId}/actions/{actionId}/escalate", retroSession.getId(), actionItem.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/escalations", retroSession.getId(), actionItem.getId())
                         .with(authentication(participantAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -238,7 +238,7 @@ class EscalationApiIntegrationTest {
                                 "}"))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(post("/api/retro/{retroId}/actions/{actionId}/escalate", retroSession.getId(), actionItem.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/escalations", retroSession.getId(), actionItem.getId())
                         .with(authentication(participantAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -273,7 +273,7 @@ class EscalationApiIntegrationTest {
         when(authService.getUsername(any(HttpServletRequest.class))).thenReturn("manager-user");
         when(authService.findSingleManagedTeamId(any(HttpServletRequest.class))).thenReturn(Optional.of(team.getId()));
 
-        mockMvc.perform(post("/api/retro/create")
+        mockMvc.perform(post("/api/retros")
                         .with(authentication(managerAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -291,7 +291,7 @@ class EscalationApiIntegrationTest {
         ActionItem actionItem = saveActionItem(retroSession, "Stabilize release ownership");
         setCurrentParticipant(facilitator);
 
-        mockMvc.perform(post("/api/retro/{retroId}/actions/{actionId}/escalate", retroSession.getId(), actionItem.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/escalations", retroSession.getId(), actionItem.getId())
                         .with(authentication(managerAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -322,7 +322,7 @@ class EscalationApiIntegrationTest {
 
         ActionItem actionItem = saveActionItem(retroSession, "Clarify org-wide deployment process");
 
-        mockMvc.perform(post("/api/retro/{retroId}/actions/{actionId}/escalate", retroSession.getId(), actionItem.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/escalations", retroSession.getId(), actionItem.getId())
                         .with(authentication(participantAuth))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -351,7 +351,7 @@ class EscalationApiIntegrationTest {
                 2,
                 LocalDateTime.of(2026, 4, 7, 10, 0));
 
-        mockMvc.perform(post("/api/retro/{retroId}/escalations/{escalationId}/vote", retroSession.getId(), escalatedItem.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/escalations/{escalationId}/vote", retroSession.getId(), escalatedItem.getId())
                         .with(authentication(participantAuth))
                         .with(csrf()))
                 .andExpect(status().isOk())
@@ -367,7 +367,7 @@ class EscalationApiIntegrationTest {
 
         assertThat(escalatedItemVoteRepository.countByEscalatedItemId(escalatedItem.getId())).isEqualTo(1);
 
-        mockMvc.perform(post("/api/retro/{retroId}/escalations/{escalationId}/vote", retroSession.getId(), escalatedItem.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/escalations/{escalationId}/vote", retroSession.getId(), escalatedItem.getId())
                         .with(authentication(participantAuth))
                         .with(csrf()))
                 .andExpect(status().isOk())
@@ -430,7 +430,7 @@ class EscalationApiIntegrationTest {
         saveVote(stillBelowThreshold, participantOne);
         saveVote(stillBelowThreshold, participantTwo);
 
-        mockMvc.perform(get("/api/retro/{retroId}/escalations", retroSession.getId())
+        mockMvc.perform(get("/api/retros/{retroId}/escalations", retroSession.getId())
                         .with(authentication(participantAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.syncVersion").value(8))
@@ -464,7 +464,7 @@ class EscalationApiIntegrationTest {
         saveVote(thresholdReached, participantOne);
         saveVote(thresholdReached, participantTwo);
 
-        mockMvc.perform(get("/api/retro/{retroId}/escalations", retroSession.getId())
+        mockMvc.perform(get("/api/retros/{retroId}/escalations", retroSession.getId())
                         .with(authentication(participantAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.syncVersion").value(6))
@@ -482,7 +482,7 @@ class EscalationApiIntegrationTest {
         retroSession.setSyncVersion(9L);
         sessionRepository.saveAndFlush(retroSession);
 
-        mockMvc.perform(get("/api/retro/{retroId}/escalations", retroSession.getId())
+        mockMvc.perform(get("/api/retros/{retroId}/escalations", retroSession.getId())
                         .with(authentication(participantAuth)))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
