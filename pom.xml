@@ -33,6 +33,7 @@
 		<org.projectlombok.version>1.18.42</org.projectlombok.version>
 		<org.mapstruct.version>1.6.2</org.mapstruct.version>
 		<testcontainers.version>2.0.2</testcontainers.version>
+		<spotbugs.version>4.9.8.3</spotbugs.version>
 <pmd.maxAllowedViolations>0</pmd.maxAllowedViolations>
 <checkstyle.maxAllowedViolations>0</checkstyle.maxAllowedViolations>
 		<spotbugs.skip>false</spotbugs.skip>
@@ -370,12 +371,13 @@
 			<plugin>
 				<groupId>com.github.spotbugs</groupId>
 				<artifactId>spotbugs-maven-plugin</artifactId>
-				<version>4.9.2.0</version>
+				<version>${spotbugs.version}</version>
 				<configuration>
 					<effort>Max</effort>
 					<threshold>Low</threshold>
 					<skip>${spotbugs.skip}</skip>
 					<failOnError>${spotbugs.failOnError}</failOnError>
+					<excludeFilterFile>spotbugs-baseline.xml</excludeFilterFile>
 				</configuration>
 				<dependencies>
 					<dependency>

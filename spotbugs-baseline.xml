@@ -116,4 +116,9 @@
     <Method name="handleJsonDeserialization"/>
     <Bug pattern="BC_UNCONFIRMED_CAST_OF_RETURN_VALUE"/>
   </Match>
+  <Match>
+    <Class name="direct.reflect.facilitator.configurator.CsvImporterService"/>
+    <Method name="importRetroSteps"/>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+  </Match>
 </FindBugsFilter>
