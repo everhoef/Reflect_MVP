@@ -7,6 +7,7 @@ import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -181,7 +182,7 @@ public class EventService {
             log.error("[SSE] Failed to establish connection for {}: {}",
                 participantInfo, e.getMessage());
             cleanupConnection(connectionId, emitter, participantInfo, retroId);
-            throw new RuntimeException("Failed to establish SSE connection", e);
+            throw new IllegalStateException("Failed to establish SSE connection", e);
         }
 
         return emitter;
@@ -247,7 +248,7 @@ public class EventService {
             try {
                 entry.getValue().emitter().send(SseEmitter.event()
                     .id(event.correlationId())
-                    .name(event.type().name().toLowerCase())
+                    .name(event.type().name().toLowerCase(Locale.ROOT))
                     .data(eventData));
 
                 log.trace("[{}] Delivered to {}", event.correlationId(), participantName);

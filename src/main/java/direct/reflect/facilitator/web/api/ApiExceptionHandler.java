@@ -118,8 +118,7 @@ public class ApiExceptionHandler {
         log.warn("JSON deserialization failed: {}", ex.getMessage());
 
         // Check if this is a UUID format error specifically
-        if (ex.getCause() instanceof InvalidFormatException) {
-            InvalidFormatException ife = (InvalidFormatException) ex.getCause();
+        if (ex.getCause() instanceof InvalidFormatException ife) {
             if (ife.getTargetType().equals(java.util.UUID.class)) {
                 log.warn("UUID format error for value: {}", ife.getValue());
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)

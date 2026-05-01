@@ -1,5 +1,6 @@
 package direct.reflect.facilitator.configurator;
 
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -11,11 +12,14 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +30,9 @@ public class CsvImporterService {
     private final RetroStageRepository retroStageRepository;
     private final RetroStepRepository retroStepRepository;
     private final ObjectMapper objectMapper;
+
+    private static final tools.jackson.core.type.TypeReference<Map<String, Object>> MAP_TYPE_REF =
+            new tools.jackson.core.type.TypeReference<>() { };
 
     @PostConstruct
     @Profile("import")
@@ -39,7 +46,7 @@ public class CsvImporterService {
         try {
             log.info("Starting import of retro stages...");
             ClassPathResource resource = new ClassPathResource("retrospective_stages.csv");
-            Reader reader = new InputStreamReader(resource.getInputStream());
+            Reader reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8);
             CSVFormat csvFormat = CSVFormat.Builder.create(CSVFormat.DEFAULT)
                     .setHeader("mastersheetID", "Stage Name", "Duration", "Why", "What")
                     .setSkipHeaderRecord(true)
@@ -84,7 +91,7 @@ public class CsvImporterService {
                 }
                 log.info("Successfully imported/updated {} retro stages.", count);
             }
-        } catch (Exception e) {
+        } catch (IOException | NumberFormatException e) {
             log.error("Failed to import retro stages from CSV", e);
         }
     }
@@ -97,7 +104,7 @@ public class CsvImporterService {
         try {
             log.info("Starting import of retro templates...");
             ClassPathResource resource = new ClassPathResource("retrospective_templates.csv");
-            Reader reader = new InputStreamReader(resource.getInputStream());
+            Reader reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8);
             CSVFormat csvFormat = CSVFormat.Builder.create(CSVFormat.DEFAULT)
                     .setHeader()
                     .setTrim(true)
@@ -135,7 +142,7 @@ public class CsvImporterService {
                 }
                 log.info("Successfully imported {} retro templates.", count);
             }
-        } catch (Exception e) {
+        } catch (IOException | NumberFormatException e) {
             log.error("Failed to import retro templates from CSV", e);
         }
     }
@@ -149,7 +156,7 @@ public class CsvImporterService {
                 return;
             }
 
-            Reader reader = new InputStreamReader(resource.getInputStream());
+            Reader reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8);
             CSVFormat csvFormat = CSVFormat.Builder.create(CSVFormat.DEFAULT)
                     .setHeader("stageID", "orderIndex", "componentType",
                         "advancementTrigger", "durationSeconds", "componentConfig", "guidance")
@@ -209,10 +216,10 @@ public class CsvImporterService {
                         try {
                             Map<String, Object> configMap = objectMapper.readValue(
                                 componentConfigStr.trim(),
-                                new tools.jackson.core.type.TypeReference<Map<String, Object>>() { }
+                                MAP_TYPE_REF
                             );
                             step.setComponentConfig(configMap);
-                        } catch (Exception e) {
+                        } catch (JacksonException e) {
                             log.warn("Failed to parse componentConfig JSON for stage {}: {}", stageId, e.getMessage());
                             step.setComponentConfig(new HashMap<>());
                         }
@@ -230,7 +237,7 @@ public class CsvImporterService {
                 }
                 log.info("Successfully imported {} retro steps.", count);
             }
-        } catch (Exception e) {
+        } catch (IOException | NumberFormatException e) {
             log.error("Failed to import retro steps from CSV", e);
         }
     }

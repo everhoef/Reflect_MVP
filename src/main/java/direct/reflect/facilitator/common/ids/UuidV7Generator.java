@@ -13,6 +13,8 @@ import java.io.Serializable;
  */
 public class UuidV7Generator implements IdentifierGenerator {
 
+    private static final long serialVersionUID = 1L;
+
     private static final TimeBasedEpochGenerator UUID_V7_EPOCH_GENERATOR = Generators.timeBasedEpochGenerator();
 
     @Override

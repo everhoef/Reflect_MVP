@@ -31,7 +31,16 @@ public class ClusteringApiController {
 
     private final ClusteringService clusteringService;
 
-    public record MergeRequest(@NotEmpty List<UUID> responseIds) { }
+    public record MergeRequest(@NotEmpty List<UUID> responseIds) {
+        public MergeRequest {
+            responseIds = responseIds != null ? List.copyOf(responseIds) : null;
+        }
+
+        @Override
+        public List<UUID> responseIds() {
+            return responseIds != null ? List.copyOf(responseIds) : null;
+        }
+    }
 
     public record UnmergeRequest(@NotNull UUID responseId) { }
 
