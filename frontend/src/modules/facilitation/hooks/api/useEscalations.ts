@@ -16,7 +16,7 @@ type SyncVersionedResponse<T> = { syncVersion?: number | null; data?: T | null }
 
 export async function fetchEscalations(retroId?: string): Promise<EscalatedItemDto[]> {
   if (!retroId) return [];
-  const { data, response } = await apiClient.GET("/api/retro/{retroId}/escalations", {
+  const { data, response } = await apiClient.GET("/api/retros/{retroId}/escalations", {
     params: { path: { retroId } },
   });
   if (!response.ok) throw new ApiError(response.status, `Failed to fetch escalations`);
@@ -81,7 +81,7 @@ export function useEscalations(retroId?: string) {
   const escalateMutation = useMutation({
     mutationFn: async ({ actionId, problemDescription }: { actionId: string; problemDescription: string }) => {
       if (!retroId) throw new Error('No retro ID');
-      const { data, error, response } = await apiClient.POST("/api/retro/{retroId}/actions/{actionId}/escalate", {
+      const { data, error, response } = await apiClient.POST("/api/retros/{retroId}/actions/{actionId}/escalations", {
         params: { path: { retroId, actionId } },
         body: { problemDescription },
       });
@@ -108,7 +108,7 @@ export function useEscalations(retroId?: string) {
   const voteMutation = useMutation({
     mutationFn: async (escalationId: string) => {
       if (!retroId) throw new Error('No retro ID');
-      const { data, response } = await apiClient.POST("/api/retro/{retroId}/escalations/{escalationId}/vote", {
+      const { data, response } = await apiClient.POST("/api/retros/{retroId}/escalations/{escalationId}/vote", {
         params: { path: { retroId, escalationId } },
       });
       if (!response.ok) throw new ApiError(response.status, `Failed to toggle vote`);

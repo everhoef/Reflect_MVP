@@ -155,7 +155,7 @@ class VotingIntegrationTest {
     void vote_OnResponse_IncrementsVoteCount() throws Exception {
         ParticipantResponse response = responseRepository.save(buildResponse("slow deploys"));
 
-        mockMvc.perform(post("/api/retro/{retroId}/response/{responseId}/vote",
+        mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
                         .with(csrf()))
                 .andExpect(status().isOk());
@@ -171,14 +171,14 @@ class VotingIntegrationTest {
     void vote_SameResponseTwice_UnvotesAndDecrementsCount() throws Exception {
         ParticipantResponse response = responseRepository.save(buildResponse("too many meetings"));
 
-        mockMvc.perform(post("/api/retro/{retroId}/response/{responseId}/vote",
+        mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
                         .with(csrf()))
                 .andExpect(status().isOk());
 
         assertThat(getVotes(responseRepository.findById(response.getId()).orElseThrow())).hasSize(1);
 
-        mockMvc.perform(post("/api/retro/{retroId}/response/{responseId}/vote",
+        mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
                         .with(csrf()))
                 .andExpect(status().isOk());
@@ -194,7 +194,7 @@ class VotingIntegrationTest {
         ParticipantResponse r3 = responseRepository.save(buildResponse("item three"));
 
         for (UUID responseId : List.of(r1.getId(), r2.getId(), r3.getId())) {
-            mockMvc.perform(post("/api/retro/{retroId}/response/{responseId}/vote",
+            mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                             testSession.getId(), responseId)
                             .with(csrf()))
                     .andExpect(status().isOk());
@@ -214,13 +214,13 @@ class VotingIntegrationTest {
         }
 
         for (int i = 0; i < 5; i++) {
-            mockMvc.perform(post("/api/retro/{retroId}/response/{responseId}/vote",
+            mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                             testSession.getId(), responses.get(i).getId())
                             .with(csrf()))
                     .andExpect(status().isOk());
         }
 
-        mockMvc.perform(post("/api/retro/{retroId}/response/{responseId}/vote",
+        mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), responses.get(5).getId())
                         .with(csrf()))
                 .andExpect(status().isBadRequest());
@@ -241,7 +241,7 @@ class VotingIntegrationTest {
         ParticipantResponse response = responseRepository.save(buildResponse("shared concern"));
 
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(participantAUuid);
-        mockMvc.perform(post("/api/retro/{retroId}/response/{responseId}/vote",
+        mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
                         .with(csrf()))
                 .andExpect(status().isOk());
@@ -249,7 +249,7 @@ class VotingIntegrationTest {
         assertThat(getVotes(responseRepository.findById(response.getId()).orElseThrow())).hasSize(1);
 
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(participantBUuid);
-        mockMvc.perform(post("/api/retro/{retroId}/response/{responseId}/vote",
+        mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
                         .with(csrf()))
                 .andExpect(status().isOk());
@@ -257,7 +257,7 @@ class VotingIntegrationTest {
         assertThat(getVotes(responseRepository.findById(response.getId()).orElseThrow())).hasSize(2);
 
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(participantAUuid);
-        mockMvc.perform(post("/api/retro/{retroId}/response/{responseId}/vote",
+        mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
                         .with(csrf()))
                 .andExpect(status().isOk());

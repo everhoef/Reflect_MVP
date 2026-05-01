@@ -42,7 +42,7 @@ public class EventService {
     private long sseTimeoutMs;
 
     // Record to store SSE emitter with participant info
-    private record EmitterConnection(SseEmitter emitter, String participantName) {}
+    private record EmitterConnection(SseEmitter emitter, String participantName) { }
 
     // Local SSE connections for this pod instance
     private final ConcurrentHashMap<String, EmitterConnection> localEmitters = new ConcurrentHashMap<>();
@@ -62,7 +62,7 @@ public class EventService {
 
         log.info("EventService initialized - SSE keep-alive scheduled every 30s");
     }
-    
+
     @PreDestroy
     public void cleanup() {
         // Close all local SSE connections
@@ -75,7 +75,7 @@ public class EventService {
         });
         keepAliveExecutor.shutdown();
     }
-    
+
     /**
      * Publishes RetroEvent with transaction awareness.
      *
@@ -154,10 +154,10 @@ public class EventService {
 
         emitter.onError((error) -> {
             // Check if this is a normal client disconnection (user navigating away)
-            boolean isClientDisconnection = error instanceof org.springframework.web.context.request.async.AsyncRequestNotUsableException ||
-                error.getMessage().contains("Broken pipe") ||
-                error.getMessage().contains("Connection reset") ||
-                error.getMessage().contains("disconnected client");
+            boolean isClientDisconnection = error instanceof org.springframework.web.context.request.async.AsyncRequestNotUsableException
+                || error.getMessage().contains("Broken pipe")
+                || error.getMessage().contains("Connection reset")
+                || error.getMessage().contains("disconnected client");
 
             if (isClientDisconnection) {
                 log.trace("SSE connection closed by client for participant {} in retro {}", participantInfo, retroId);
@@ -186,7 +186,7 @@ public class EventService {
 
         return emitter;
     }
-    
+
     /**
      * Thread-safe cleanup method to avoid double-decrements.
      */
@@ -199,16 +199,18 @@ public class EventService {
                 && existingConnection.emitter() == emitter
                 && localEmitters.remove(connectionId, existingConnection)) {
             int remainingConnections = activeConnections.decrementAndGet();
-            log.trace("Cleaned up SSE connection for participant {} in retro {} (active: {})", participantInfo, retroId, remainingConnections);
+            log.trace("Cleaned up SSE connection for participant {} in retro {} (active: {})",
+                participantInfo, retroId, remainingConnections);
             try {
                 emitter.complete();
             } catch (Exception e) {
                 // Silently ignore completion errors during cleanup - these are expected when client disconnects
-                log.trace("Error completing emitter during cleanup for participant {} in retro {} (expected): {}", participantInfo, retroId, e.getMessage());
+                log.trace("Error completing emitter during cleanup for participant {} in retro {} (expected): {}",
+                    participantInfo, retroId, e.getMessage());
             }
         }
     }
-    
+
     /**
      * Send to local emitters.
      */
@@ -268,7 +270,7 @@ public class EventService {
         long syncVersion = retroSyncVersionQuery.getSyncVersion(event.retroId());
         return new RetroSseEnvelope<>(syncVersion, event.payload());
     }
-    
+
     /**
      * Send keep-alive messages to all active connections.
      */

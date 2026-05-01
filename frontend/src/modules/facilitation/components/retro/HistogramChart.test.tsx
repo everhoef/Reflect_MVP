@@ -68,7 +68,7 @@ function mockFetchSequential(first: RatingPayload, second: RatingPayload) {
   let callCount = 0
   vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
     const url = input instanceof Request ? input.url : String(input)
-    if (url.includes('/response/rating')) {
+    if (url.includes('/responses/rating')) {
       callCount++
       const payload = callCount === 1 ? first : second
       return Promise.resolve(
@@ -91,7 +91,7 @@ function mockFetchWithSpy(payload: RatingPayload): ReturnType<typeof vi.fn> {
   )
   vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
     const url = input instanceof Request ? input.url : String(input)
-    if (url.includes('/response/rating')) return fetchSpy(url) as Promise<Response>
+    if (url.includes('/responses/rating')) return fetchSpy(url) as Promise<Response>
     return Promise.resolve(new Response('{}', { status: 404 }))
   })
   return fetchSpy

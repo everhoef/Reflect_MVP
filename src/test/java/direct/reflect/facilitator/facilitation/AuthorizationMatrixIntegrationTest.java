@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.security.test.context.support.WithMockUser;
 
 import java.util.UUID;
 
@@ -66,48 +67,87 @@ class AuthorizationMatrixIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
-    // ==================== POST /api/retro/create ====================
+    // ==================== POST /api/retros ====================
 
     @Test
-    @DisplayName("POST /api/retro/create — unauthenticated → 401 JSON, not 302 redirect")
+    @DisplayName("POST /api/retros — unauthenticated → 401 JSON, not 302 redirect")
     void createRetro_Unauthenticated_Returns401() throws Exception {
-        mockMvc.perform(post("/api/retro/create")
+        mockMvc.perform(post("/api/retros")
                         .contentType("application/json")
                         .content("{\"name\":\"test\"}")
                         .with(csrf()))
                 .andExpect(status().isUnauthorized());
     }
 
-    // ==================== POST /api/retro/{id}/next ====================
+    // ==================== POST /api/retros/{id}/advance ====================
 
     @Test
-    @DisplayName("POST /api/retro/{id}/next — unauthenticated → 401 JSON, not 302 redirect")
+    @DisplayName("POST /api/retros/{id}/advance — unauthenticated → 401 JSON, not 302 redirect")
     void advanceStep_Unauthenticated_Returns401() throws Exception {
+        UUID fakeRetroId = UUID.randomUUID();
+        mockMvc.perform(post("/api/retros/{retroId}/advance", fakeRetroId)
+                        .with(csrf()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // ==================== POST /api/retros/{id}/start ====================
+
+    @Test
+    @DisplayName("POST /api/retros/{id}/start — unauthenticated → 401 JSON, not 302 redirect")
+    void startSession_Unauthenticated_Returns401() throws Exception {
+        UUID fakeRetroId = UUID.randomUUID();
+        mockMvc.perform(post("/api/retros/{retroId}/start", fakeRetroId)
+                        .with(csrf()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // ==================== GET /api/retros/{id}/events ====================
+
+    @Test
+    @DisplayName("GET /api/retros/{id}/events — unauthenticated → 401 JSON, not 302 redirect")
+    void sseStream_Unauthenticated_Returns401() throws Exception {
+        UUID fakeRetroId = UUID.randomUUID();
+        mockMvc.perform(get("/api/retros/{retroId}/events", fakeRetroId))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // ==================== GET /api/me/retros/active ====================
+
+    @Test
+    @DisplayName("GET /api/me/retros/active — unauthenticated → 401 JSON, not 302 redirect")
+    void activeSessions_Unauthenticated_Returns401() throws Exception {
+        mockMvc.perform(get("/api/me/retros/active"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("POST /api/retro/create — legacy route → 404")
+    void legacyCreateRetro_Returns404() throws Exception {
+        mockMvc.perform(post("/api/retro/create")
+                        .contentType("application/json")
+                        .content("{\"name\":\"test\"}")
+                        .with(csrf()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("POST /api/retro/{id}/next — legacy route → 404")
+    void legacyAdvanceStep_Returns404() throws Exception {
         UUID fakeRetroId = UUID.randomUUID();
         mockMvc.perform(post("/api/retro/{retroId}/next", fakeRetroId)
                         .with(csrf()))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isNotFound());
     }
 
-    // ==================== POST /api/retro/{id}/start ====================
-
     @Test
-    @DisplayName("POST /api/retro/{id}/start — unauthenticated → 401 JSON, not 302 redirect")
-    void startSession_Unauthenticated_Returns401() throws Exception {
-        UUID fakeRetroId = UUID.randomUUID();
-        mockMvc.perform(post("/api/retro/{retroId}/start", fakeRetroId)
+    @WithMockUser
+    @DisplayName("POST /api/retro/join — legacy route → 404")
+    void legacyJoinRetro_Returns404() throws Exception {
+        mockMvc.perform(post("/api/retro/join")
                         .with(csrf()))
-                .andExpect(status().isUnauthorized());
-    }
-
-    // ==================== GET /api/retro/{id}/events ====================
-
-    @Test
-    @DisplayName("GET /api/retro/{id}/events — unauthenticated → 401 JSON, not 302 redirect")
-    void sseStream_Unauthenticated_Returns401() throws Exception {
-        UUID fakeRetroId = UUID.randomUUID();
-        mockMvc.perform(get("/api/retro/{retroId}/events", fakeRetroId))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isNotFound());
     }
 
     // ==================== Response body contract ====================
@@ -116,10 +156,11 @@ class AuthorizationMatrixIntegrationTest {
     @DisplayName("401 response body contains JSON error payload with loginUrl")
     void unauthenticated_Returns401_WithJsonBody() throws Exception {
         UUID fakeRetroId = UUID.randomUUID();
-        mockMvc.perform(post("/api/retro/{retroId}/next", fakeRetroId)
+        mockMvc.perform(post("/api/retros/{retroId}/advance", fakeRetroId)
                         .with(csrf()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentType("application/json"))
                 .andExpect(content().json("{\"error\":\"Authentication required\",\"loginUrl\":\"/login\"}"));
     }
+
 }

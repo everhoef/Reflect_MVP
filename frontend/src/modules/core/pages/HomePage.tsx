@@ -32,7 +32,7 @@ export default function HomePage() {
     setJoining(true)
     setError(null)
     try {
-      const data = await joinRetrospective({ retroId: retroId.trim() })
+      const data = await joinRetrospective(retroId.trim())
       navigate(data.redirectUrl)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to join session')

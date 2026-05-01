@@ -25,14 +25,14 @@ import java.io.IOException;
 import java.util.Set;
 
 /**
- * Hybrid Security Configuration: OIDC + Anonymous Guests
- * 
+ * Hybrid Security Configuration: OIDC + Anonymous Guests.
+ *
  * Architecture:
  * - OIDC authentication for registered users (extracts username only)
  * - Anonymous access for guest users (no external authentication)
  * - Application-level role management (FACILITATOR/PARTICIPANT)
  * - Session-based state tracking for both user types
- * 
+ *
  * This approach cleanly separates:
  * - Authentication (WHO): External OIDC provider handles user identity
  * - Authorization (WHAT): Application handles business roles and permissions
@@ -60,36 +60,36 @@ public class SecurityConfig {
                 // Public static resources
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/img/**", "/static/**", "/webjars/**", "/assets/**").permitAll()
                 .requestMatchers("/favicon.ico", "/favicon.svg", "/vite.svg").permitAll()
-                
+
                 // Public pages
                 .requestMatchers("/login").permitAll()
-                
+
                 // Auth endpoints
                 .requestMatchers("/auth/guest").permitAll()
-                
+
                 // Home page requires authentication - Spring Security will redirect to /login
                 .requestMatchers("/", "/home").authenticated()
-                
+
                 // Health checks for monitoring
                 .requestMatchers("/actuator/health/**").permitAll()
-                
+
                 // OpenAPI / Swagger UI - no auth required
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                
+
                 // Mixed endpoints - require authentication (either OIDC or guest session)
-                // Service layer handles business logic authorization  
-                .requestMatchers("/api/retro/*/join").authenticated()
-                .requestMatchers("/api/retro/*/participants").authenticated()
-                .requestMatchers("/api/retro/*/events").authenticated()
+                // Service layer handles business logic authorization
+                .requestMatchers("/api/retros/*/participants").authenticated()
+                .requestMatchers("/api/retros/*/events").authenticated()
+                .requestMatchers("/api/me/retros/active").authenticated()
                 .requestMatchers("/retro/**").authenticated()
-                
+
                 // User-only endpoints - require OIDC authentication
                 .requestMatchers("/api/user/**").authenticated()
                 .requestMatchers("/profile/**").authenticated()
-                
+
                 // Admin endpoints - require authentication + application-level admin check
                 .requestMatchers("/admin/**").authenticated()
-                
+
                 .anyRequest().authenticated()
             )
             // Exception handling
@@ -113,21 +113,21 @@ public class SecurityConfig {
             )
             .build();
     }
-    
+
     @Bean
     public OidcSuccessHandler oidcSuccessHandler(AuthService authService) {
         return new OidcSuccessHandler(authService);
     }
-    
+
     /**
-     * Handles logout for both OIDC users and guest users
+     * Handles logout for both OIDC users and guest users.
      */
     private SimpleUrlLogoutSuccessHandler hybridLogoutHandler() {
         SimpleUrlLogoutSuccessHandler handler = new SimpleUrlLogoutSuccessHandler();
         handler.setDefaultTargetUrl("/");
         return handler;
     }
-    
+
     public static class OidcSuccessHandler implements AuthenticationSuccessHandler {
 
         private final AuthService authService;
@@ -135,57 +135,57 @@ public class SecurityConfig {
         public OidcSuccessHandler(AuthService authService) {
             this.authService = authService;
         }
-        
+
         @Override
-        public void onAuthenticationSuccess(HttpServletRequest request, 
-                                          HttpServletResponse response, 
+        public void onAuthenticationSuccess(HttpServletRequest request,
+                                          HttpServletResponse response,
                                           Authentication authentication) throws IOException, ServletException {
-            
+
             if (authentication instanceof OAuth2AuthenticationToken oauth2Token) {
                 // Extract basic user identity from OIDC claims
                 String username = extractUsername(oauth2Token);
                 String email = oauth2Token.getPrincipal().getAttribute("email");
                 String displayName = oauth2Token.getPrincipal().getAttribute("name");
-                
+
                 // Store in session for application use
                 HttpSession session = request.getSession(true);
                 session.setAttribute("authenticatedUser", username);
                 session.setAttribute("userEmail", email);
                 session.setAttribute("userDisplayName", displayName != null ? displayName : username);
                 session.setAttribute("authType", "OIDC");
-                
+
                 // Clear any guest session data
                 session.removeAttribute("guestDisplayName");
                 session.removeAttribute("guestId");
-                
+
                 // Create new authentication token with ROLE_USER
                 OAuth2User userPrincipal = oauth2Token.getPrincipal();
-                
+
                 Set<GrantedAuthority> authorities = authService.resolveOidcAuthorities(
                     userPrincipal.getAuthorities(),
                     username
                 );
-                
+
                 OAuth2User userWithRole = new DefaultOAuth2User(
                     authorities,
                     userPrincipal.getAttributes(),
                     oauth2Token.getPrincipal().getAttribute("login") != null ? "login" : "sub"
                 );
-                
+
                 OAuth2AuthenticationToken newAuth = new OAuth2AuthenticationToken(
                     userWithRole,
                     authorities,
                     oauth2Token.getAuthorizedClientRegistrationId()
                 );
-                
+
                 SecurityContextHolder.getContext().setAuthentication(newAuth);
             }
-            
+
             response.sendRedirect("/");
         }
-        
+
         /**
-         * Extract username from OIDC token with fallback strategies
+         * Extract username from OIDC token with fallback strategies.
          */
         private String extractUsername(OAuth2AuthenticationToken token) {
             // Try different common claim names for username
@@ -203,11 +203,11 @@ public class SecurityConfig {
             if (username == null) {
                 username = token.getPrincipal().getAttribute("email");
             }
-            
+
             if (username == null) {
                 throw new IllegalStateException("No username claim found in OIDC token");
             }
-            
+
             return username;
         }
     }

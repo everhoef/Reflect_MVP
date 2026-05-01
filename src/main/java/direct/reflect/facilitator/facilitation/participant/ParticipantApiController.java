@@ -1,6 +1,5 @@
 package direct.reflect.facilitator.facilitation.participant;
 
-import direct.reflect.facilitator.facilitation.participant.dto.JoinRetroRequest;
 import direct.reflect.facilitator.facilitation.participant.dto.JoinRetroResponse;
 import direct.reflect.facilitator.facilitation.participant.dto.LeaveActiveSessionsResult;
 import direct.reflect.facilitator.facilitation.participant.dto.ParticipantDto;
@@ -13,21 +12,22 @@ import direct.reflect.facilitator.facilitation.dto.SyncVersionedResponse;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/retro")
 @Tag(name = "Participant API", description = "Retrospective participant management")
 @Slf4j
 @RequiredArgsConstructor
@@ -36,38 +36,30 @@ public class ParticipantApiController {
     private final ParticipantService participantService;
     private final RetroSyncVersionService retroSyncVersionService;
 
-    @PostMapping(value = "/join", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping("/api/retros/{retroId}/participants")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     public ResponseEntity<JoinRetroResponse> joinRetrospective(
-            @Valid @RequestBody JoinRetroRequest request,
+            @PathVariable UUID retroId,
             HttpServletRequest httpRequest,
             Authentication authentication) {
-        
+
         log.debug("=== JOIN REQUEST START ===");
-        log.debug("Request retroId: {}", request.retroId());
+        log.debug("Request retroId: {}", retroId);
         log.debug("Authentication: {} (type: {})", authentication.getName(), authentication.getClass().getSimpleName());
-        
-        UUID retroId;
-        try {
-            retroId = UUID.fromString(request.retroId());
-        } catch (IllegalArgumentException e) {
-            log.warn("Invalid UUID format for retroId: {}", request.retroId());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-        }
-        
-        log.debug("Join request for retro: {} by user: {}", 
+
+        log.debug("Join request for retro: {} by user: {}",
             retroId, authentication.getName());
-        
+
         try {
             RetroSession sessionToJoin = retroService.getSessionById(retroId);
             participantService.addParticipantToSession(httpRequest, sessionToJoin, ParticipantRole.PARTICIPANT);
-            
+
             log.debug("Successfully added participant to session: {}", retroId);
-            
+
             return ResponseEntity.ok(new JoinRetroResponse(retroId, "/retro/" + retroId));
-            
+
         } catch (RetroSessionNotFoundException e) {
-            log.warn("Session not found: {}", retroId);
+            log.debug("Session not found: {}", retroId);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         } catch (Exception e) {
             log.error("Error joining retro session {}: ", retroId, e);
@@ -75,22 +67,22 @@ public class ParticipantApiController {
         }
     }
 
-    @PostMapping("/leave-active-sessions")
+    @DeleteMapping("/api/me/retros/active")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     public ResponseEntity<LeaveActiveSessionsResult> leaveActiveSessions(HttpServletRequest httpRequest) {
         log.debug("Request to leave all active sessions");
-        
+
         try {
             participantService.leaveAllActiveSessions(httpRequest);
-            log.info("Successfully left all active sessions");
+            log.debug("Successfully left all active sessions");
             return ResponseEntity.ok(new LeaveActiveSessionsResult(true));
         } catch (Exception e) {
             log.error("Error leaving active sessions: ", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-    
-    @GetMapping("/check-active-sessions")
+
+    @GetMapping("/api/me/retros/active")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     public ResponseEntity<List<SessionInfo>> checkActiveSessions(HttpServletRequest httpRequest) {
         try {
@@ -101,7 +93,7 @@ public class ParticipantApiController {
         }
     }
 
-    @GetMapping("/{retroId}/participants")
+    @GetMapping("/api/retros/{retroId}/participants")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     public ResponseEntity<SyncVersionedResponse<List<ParticipantDto>>> getParticipants(
             @PathVariable UUID retroId,

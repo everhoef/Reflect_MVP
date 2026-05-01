@@ -15,14 +15,14 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
-@RequestMapping("/api/retro")
+@RequestMapping("/api/retros")
 @Slf4j
 @RequiredArgsConstructor
 public class RetroEventController {
 
     private final EventService eventService;
     private final SseParticipantAccess sseParticipantAccess;
-    
+
     @GetMapping(value = "/{retroId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     public SseEmitter getRetroEvents(

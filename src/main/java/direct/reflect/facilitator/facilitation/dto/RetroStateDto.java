@@ -15,4 +15,4 @@ public record RetroStateDto(
     boolean isFacilitator,
     int participantCount,
     AssistantStateDto assistantState
-) {}
+) { }

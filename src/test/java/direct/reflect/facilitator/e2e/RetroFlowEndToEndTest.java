@@ -495,7 +495,7 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
             facilitatorPage.navigate(retroUrl);
             waitForElement(facilitatorPage, "[data-column='Start']");
 
-            // Wait for timer to hydrate from backend (useTimer hook polls /api/retro/{id}/timer)
+            // Wait for timer to hydrate from backend (useTimer hook polls /api/retros/{id}/timer)
             facilitatorPage.waitForFunction(
                     "() => !document.body.textContent.includes('Timer not started') || " +
                     "  document.querySelector('[data-testid=\"pause-timer-button\"]') !== null || " +
@@ -507,7 +507,7 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
             String bodyText = facilitatorPage.textContent("body");
             assertFalse(bodyText.contains("Timer not started"),
                     "Timer should be active and showing a countdown, not 'Timer not started'. " +
-                    "This verifies the useTimer hook hydrates from the backend /api/retro/{id}/timer endpoint.");
+                    "This verifies the useTimer hook hydrates from the backend /api/retros/{id}/timer endpoint.");
 
         } catch (Exception e) {
             reportTestFailure(facilitatorPage, "Timer Display Countdown", e);

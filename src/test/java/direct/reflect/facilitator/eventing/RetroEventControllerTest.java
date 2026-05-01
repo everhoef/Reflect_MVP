@@ -62,7 +62,7 @@ class RetroEventControllerTest {
             .thenReturn(testEmitter);
 
         // When & Then
-        mockMvc.perform(get("/api/retro/{retroId}/events", retroId)
+        mockMvc.perform(get("/api/retros/{retroId}/events", retroId)
                 .accept(MediaType.TEXT_EVENT_STREAM_VALUE))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM));
@@ -116,7 +116,7 @@ class RetroEventControllerTest {
             .thenThrow(new ParticipantNotFoundException("Not authorized for session: " + retroId));
 
         // When & Then
-        mockMvc.perform(get("/api/retro/{retroId}/events", retroId)
+        mockMvc.perform(get("/api/retros/{retroId}/events", retroId)
                 .accept(MediaType.TEXT_EVENT_STREAM_VALUE))
                 .andExpect(status().isNotFound()); // ParticipantNotFoundException maps to 404
                 
@@ -142,7 +142,7 @@ class RetroEventControllerTest {
             .thenReturn(testEmitter);
 
         // When & Then
-        mockMvc.perform(get("/api/retro/{retroId}/events", retroId)
+        mockMvc.perform(get("/api/retros/{retroId}/events", retroId)
                 .accept(MediaType.TEXT_EVENT_STREAM_VALUE))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM));
@@ -158,7 +158,7 @@ class RetroEventControllerTest {
         UUID retroId = UUID.randomUUID();
 
         // When & Then - No @WithMockUser annotation means no authentication
-        mockMvc.perform(get("/api/retro/{retroId}/events", retroId)
+        mockMvc.perform(get("/api/retros/{retroId}/events", retroId)
                 .accept(MediaType.TEXT_EVENT_STREAM_VALUE))
                 .andExpect(status().is3xxRedirection()); // WebMvcTest redirects to login for unauthenticated requests
                 

@@ -135,7 +135,7 @@ class ClusteringApiIntegrationTest {
         String mergeBody = "{\"responseIds\": [\"" + r1.getId() + "\", \"" + r2.getId() + "\"]}";
 
         // When: POST merge
-        String responseJson = mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/cluster/merge",
+        String responseJson = mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/clusters/merge",
                         testSession.getId(), testStep.getId())
                         .with(authentication(testAuth))
                         .with(csrf())
@@ -168,7 +168,7 @@ class ClusteringApiIntegrationTest {
 
         String unmergeBody = "{\"responseId\": \"" + r1.getId() + "\"}";
 
-        mockMvc.perform(post("/api/retro/{retroId}/step/{stepId}/cluster/unmerge",
+        mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/clusters/unmerge",
                         testSession.getId(), testStep.getId())
                         .with(authentication(testAuth))
                         .with(csrf())
@@ -198,7 +198,7 @@ class ClusteringApiIntegrationTest {
 
         String renameBody = "{\"name\": \"Code Review Issues\"}";
 
-        mockMvc.perform(put("/api/retro/{retroId}/step/{stepId}/cluster/{clusterId}/name",
+        mockMvc.perform(put("/api/retros/{retroId}/steps/{stepId}/clusters/{clusterId}/name",
                         testSession.getId(), testStep.getId(), clusterId)
                         .with(authentication(testAuth))
                         .with(csrf())
@@ -227,7 +227,7 @@ class ClusteringApiIntegrationTest {
         responseRepository.saveAll(List.of(clustered1, clustered2, unclustered));
 
         // When: GET clusters
-        mockMvc.perform(get("/api/retro/{retroId}/step/{stepId}/clusters",
+        mockMvc.perform(get("/api/retros/{retroId}/steps/{stepId}/clusters",
                         testSession.getId(), testStep.getId())
                         .with(authentication(testAuth)))
                 .andExpect(status().isOk())

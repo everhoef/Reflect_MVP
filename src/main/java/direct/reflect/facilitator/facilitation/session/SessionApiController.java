@@ -27,7 +27,12 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +40,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/retro")
+@RequestMapping("/api/retros")
 @Tag(name = "Session API", description = "Retrospective session management")
 @Slf4j
 @RequiredArgsConstructor
@@ -45,9 +50,10 @@ public class SessionApiController {
     private final RetroStepQueryService retroStepQueryService;
     private final RetroSyncVersionService retroSyncVersionService;
 
-    @PostMapping(value = "/create", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    @Operation(summary = "Create a retrospective session", description = "Creates a new retrospective session and registers the creator as facilitator")
+    @Operation(summary = "Create a retrospective session",
+        description = "Creates a new retrospective session and registers the creator as facilitator")
     @ApiResponse(responseCode = "200", description = "Session created successfully")
     @ApiResponse(responseCode = "400", description = "Validation error")
     @ApiResponse(responseCode = "500", description = "Session could not be created")
@@ -75,20 +81,21 @@ public class SessionApiController {
 
     @PostMapping("/{retroId}/start")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    @Operation(summary = "Start a retrospective session", description = "Transitions the session from LOBBY to active phase; facilitator-only action")
+    @Operation(summary = "Start a retrospective session",
+        description = "Transitions the session from LOBBY to active phase; facilitator-only action")
     @ApiResponse(responseCode = "200", description = "Session started successfully")
     @ApiResponse(responseCode = "403", description = "Only facilitators can start sessions")
     public ResponseEntity<Void> startSession(
             @PathVariable UUID retroId,
             HttpServletRequest httpRequest) {
-        
+
         boolean isFacilitator = participantService.isFacilitator(httpRequest, retroId);
         if (!isFacilitator) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .header("HX-Redirect", "/retro/" + retroId)
                 .build();
         }
-        
+
         try {
             retroService.startSession(retroId);
             return ResponseEntity.ok().build();
@@ -98,7 +105,7 @@ public class SessionApiController {
         }
     }
 
-    @PostMapping("/{retroId}/next")
+    @PostMapping("/{retroId}/advance")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Advance to the next step", description = "Advances the retrospective to the next step; facilitator-only action")
     @ApiResponse(responseCode = "200", description = "Advanced to the next step")
@@ -142,14 +149,15 @@ public class SessionApiController {
         }
 
         long syncVersion = retroSyncVersionService.getSyncVersion(retroId);
-        log.debug("Returning timer state for retro: {} - remaining: {}s, paused: {}", 
+        log.debug("Returning timer state for retro: {} - remaining: {}s, paused: {}",
             retroId, state.remainingSeconds(), state.isPaused());
         return ResponseEntity.ok(new SyncVersionedResponse<>(syncVersion, state));
     }
 
     @PostMapping("/{retroId}/timer/pause")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    @Operation(summary = "Pause the session timer", description = "Pauses the countdown timer for the current step; facilitator-only action")
+    @Operation(summary = "Pause the session timer",
+        description = "Pauses the countdown timer for the current step; facilitator-only action")
     @ApiResponse(responseCode = "200", description = "Timer paused successfully")
     @ApiResponse(responseCode = "403", description = "Only facilitators can pause the timer")
     public ResponseEntity<Void> pauseTimer(
@@ -165,7 +173,7 @@ public class SessionApiController {
 
         try {
             retroService.pauseTimer(retroId);
-            log.info("Paused timer for retro: {}", retroId);
+            log.debug("Paused timer for retro: {}", retroId);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             log.error("Error pausing timer for retro: {}", retroId, e);
@@ -175,7 +183,8 @@ public class SessionApiController {
 
     @PostMapping("/{retroId}/timer/resume")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
-    @Operation(summary = "Resume the session timer", description = "Resumes the countdown timer for the current step; facilitator-only action")
+    @Operation(summary = "Resume the session timer",
+        description = "Resumes the countdown timer for the current step; facilitator-only action")
     @ApiResponse(responseCode = "200", description = "Timer resumed successfully")
     @ApiResponse(responseCode = "403", description = "Only facilitators can resume the timer")
     public ResponseEntity<Void> resumeTimer(
@@ -191,7 +200,7 @@ public class SessionApiController {
 
         try {
             retroService.resumeTimer(retroId);
-            log.info("Resumed timer for retro: {}", retroId);
+            log.debug("Resumed timer for retro: {}", retroId);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             log.error("Error resuming timer for retro: {}", retroId, e);
@@ -199,7 +208,7 @@ public class SessionApiController {
         }
     }
 
-    @GetMapping("/{retroId}/state")
+    @GetMapping("/{retroId}")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Get retrospective state", description = "Returns the current retrospective state for an active participant")
     @ApiResponse(responseCode = "200", description = "Retrospective state returned")
@@ -228,7 +237,9 @@ public class SessionApiController {
             List<StepSummaryDto> steps = new ArrayList<>();
             for (RetroPhase phase : activePhases) {
                 RetroStage stage = session.getStageForPhase(phase);
-                if (stage == null) continue;
+                if (stage == null) {
+                    continue;
+                }
                 List<RetroStep> stageSteps = retroStepQueryService.findStepsByStage(stage);
                 for (RetroStep step : stageSteps) {
                     steps.add(new StepSummaryDto(

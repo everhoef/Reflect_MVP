@@ -100,7 +100,7 @@ class WebConfigTest {
 
         @Test
         void doesNotServeIndexHtmlForApiPathWithHtmlAccept() throws Exception {
-            mockMvc.perform(get("/api/retro/anything").accept(MediaType.TEXT_HTML))
+            mockMvc.perform(get("/api/retros/anything").accept(MediaType.TEXT_HTML))
                     .andExpect(status().isNotFound())
                     .andExpect(forwardedUrl(null));
         }

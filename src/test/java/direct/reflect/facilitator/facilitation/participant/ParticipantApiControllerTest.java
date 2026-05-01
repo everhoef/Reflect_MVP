@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -84,10 +85,8 @@ public class ParticipantApiControllerTest {
         when(participantService.addParticipantToSession(any(HttpServletRequest.class), eq(mockSession), eq(ParticipantRole.PARTICIPANT)))
             .thenReturn(mockParticipant);
 
-        mockMvc.perform(post("/api/retro/join")
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"retroId\":\"" + retroId + "\"}"))
+        mockMvc.perform(post("/api/retros/{retroId}/participants", retroId)
+                .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.retroId").value(retroId.toString()))
                 .andExpect(jsonPath("$.redirectUrl").value("/retro/" + retroId));
@@ -96,7 +95,7 @@ public class ParticipantApiControllerTest {
     @Test
     @WithMockUser(roles = "USER")
     void leaveActiveSessions_ShouldReturnJsonWithSuccessTrue() throws Exception {
-        mockMvc.perform(post("/api/retro/leave-active-sessions")
+        mockMvc.perform(delete("/api/me/retros/active")
                 .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
@@ -121,7 +120,7 @@ public class ParticipantApiControllerTest {
         when(participantService.getSessionParticipants(retroId)).thenReturn(List.of(facilitator, participant));
         when(retroSyncVersionService.getSyncVersion(retroId)).thenReturn(34L);
 
-        mockMvc.perform(get("/api/retro/{retroId}/participants", retroId))
+        mockMvc.perform(get("/api/retros/{retroId}/participants", retroId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.syncVersion").value(34))
                 .andExpect(jsonPath("$.data[0].displayName").value("Facilitator"))

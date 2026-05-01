@@ -23,9 +23,9 @@ public record EscalatedItemDto(
                 escalatedItem.getCreatedAt());
     }
 
-    public EscalatedItemDto withSyncVersion(long syncVersion) {
+    public EscalatedItemDto withSyncVersion(long newSyncVersion) {
         return new EscalatedItemDto(
-                syncVersion,
+                newSyncVersion,
                 id,
                 problemDescription,
                 voteCount,

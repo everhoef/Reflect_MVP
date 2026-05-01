@@ -10,7 +10,7 @@ export type UpdateActionItemRequest = components["schemas"]["UpdateActionItemReq
 type SyncVersionedResponse<T> = { syncVersion?: number | null; data?: T | null };
 
 export async function fetchActionItems(retroId: string): Promise<ActionItemDto[]> {
-  const { data, response } = await apiClient.GET("/api/retro/{retroId}/actions", {
+  const { data, response } = await apiClient.GET("/api/retros/{retroId}/actions", {
     params: { path: { retroId } },
   });
   if (!response.ok) throw new ApiError(response.status, `Failed to fetch action items: ${response.status}`);
@@ -40,7 +40,7 @@ export function useActionItems(retroId: string) {
 
   const createActionItem = useMutation({
     mutationFn: async (req: CreateActionItemRequest) => {
-      const { data, response } = await apiClient.POST("/api/retro/{retroId}/actions", {
+      const { data, response } = await apiClient.POST("/api/retros/{retroId}/actions", {
         params: { path: { retroId } },
         body: req,
       });
@@ -52,7 +52,7 @@ export function useActionItems(retroId: string) {
 
   const updateActionItem = useMutation({
     mutationFn: async ({ actionId, req }: { actionId: string; req: UpdateActionItemRequest }) => {
-      const { data, response } = await apiClient.PATCH("/api/retro/{retroId}/actions/{actionId}", {
+      const { data, response } = await apiClient.PATCH("/api/retros/{retroId}/actions/{actionId}", {
         params: { path: { retroId, actionId } },
         body: req,
       });
@@ -64,7 +64,7 @@ export function useActionItems(retroId: string) {
 
   const deleteActionItem = useMutation({
     mutationFn: async (actionId: string) => {
-      const { response } = await apiClient.DELETE("/api/retro/{retroId}/actions/{actionId}", {
+      const { response } = await apiClient.DELETE("/api/retros/{retroId}/actions/{actionId}", {
         params: { path: { retroId, actionId } },
       });
       if (!response.ok) throw new ApiError(response.status, `Failed to delete action item`);

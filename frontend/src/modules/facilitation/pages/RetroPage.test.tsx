@@ -152,7 +152,7 @@ function mockFetchSuccess(stateOverride?: Partial<typeof baseState>, participant
   const participants = participantsOverride ?? baseParticipants
   vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
     const url = input instanceof Request ? input.url : String(input)
-    if (url.includes('/state')) {
+    if (url.match(/\/retros\/[^/]+$/)) {
       return Promise.resolve(new Response(JSON.stringify(state), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     }
     if (url.includes('/participants')) {
@@ -218,7 +218,7 @@ describe('RetroPage SSE routing', () => {
 
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         fetchCounts.state += 1
         return Promise.resolve(new Response(JSON.stringify(baseState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
@@ -267,7 +267,7 @@ describe('RetroPage SSE routing', () => {
 
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         fetchCounts.state += 1
         return Promise.resolve(new Response(JSON.stringify({ ...baseState, syncVersion: stateSyncVersion }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
@@ -316,7 +316,7 @@ describe('RetroPage SSE routing', () => {
 
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         return Promise.resolve(new Response(JSON.stringify(baseState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
       if (url.includes('/participants')) {
@@ -362,7 +362,7 @@ describe('RetroPage SSE routing', () => {
 
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         return Promise.resolve(new Response(JSON.stringify({ ...baseState, syncVersion: stateSyncVersion }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
       if (url.includes('/participants')) {
@@ -407,7 +407,7 @@ describe('RetroPage SSE routing', () => {
     const fetchSpy = vi.fn()
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         fetchSpy(url)
         return Promise.resolve(new Response(JSON.stringify(baseState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
@@ -438,7 +438,7 @@ describe('RetroPage SSE routing', () => {
     const fetchSpy = vi.fn()
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         fetchSpy(url)
         return Promise.resolve(new Response(JSON.stringify(baseState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
@@ -469,7 +469,7 @@ describe('RetroPage SSE routing', () => {
     const fetchSpy = vi.fn()
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         fetchSpy(url)
         return Promise.resolve(new Response(JSON.stringify(baseState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
@@ -500,7 +500,7 @@ describe('RetroPage SSE routing', () => {
     const participantFetchSpy = vi.fn()
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         return Promise.resolve(new Response(JSON.stringify(baseState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
       if (url.includes('/participants')) {
@@ -531,7 +531,7 @@ describe('RetroPage SSE routing', () => {
     const participantFetchSpy = vi.fn()
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         return Promise.resolve(new Response(JSON.stringify(baseState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
       if (url.includes('/participants')) {
@@ -715,7 +715,7 @@ describe('RetroPage lobby phase', () => {
   function mockLobbyFetch() {
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         return Promise.resolve(new Response(JSON.stringify(lobbyState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
       if (url.includes('/participants')) {
@@ -798,7 +798,7 @@ describe('RetroPage facilitator role', () => {
   function mockLobbyFetchWithState(state: typeof lobbyFacilitatorState) {
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         return Promise.resolve(new Response(JSON.stringify(state), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
       if (url.includes('/participants')) {
@@ -854,7 +854,7 @@ describe('RetroPage timer role visibility', () => {
     const state = { ...timedStepState, ...stateOverride }
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         return Promise.resolve(new Response(JSON.stringify(state), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
       if (url.includes('/participants')) {
@@ -1153,7 +1153,7 @@ describe('RetroPage reload/late-join bootstrap path (Task 10)', () => {
     let currentServerState = stateAtStep3
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         return Promise.resolve(new Response(JSON.stringify(currentServerState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
       if (url.includes('/participants')) {
@@ -1205,7 +1205,7 @@ describe('RetroPage reload/late-join bootstrap path (Task 10)', () => {
     let callCount = 0
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         // Return stateAtStep3 on first fetch, stateAtStep4 on subsequent fetches
         const s = callCount === 0 ? states[0]! : states[1]!
         callCount++
@@ -1265,7 +1265,7 @@ describe('RetroPage guidance-sidebar coachmark integration', () => {
     }
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         return Promise.resolve(new Response(JSON.stringify(lobbyState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
       if (url.includes('/participants')) {
@@ -1349,7 +1349,7 @@ describe('RetroPage next-step coachmark (facilitator anchor)', () => {
     }
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         return Promise.resolve(new Response(JSON.stringify(lobbyState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
       if (url.includes('/participants')) {
@@ -1484,7 +1484,7 @@ describe('RetroPage note-input coachmark (board anchor)', () => {
     }
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         return Promise.resolve(new Response(JSON.stringify(lobbyState), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
       if (url.includes('/participants')) {
@@ -1554,7 +1554,7 @@ describe('RetroPage quickActions wiring (task 14)', () => {
   function mockWithState(state: object) {
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input instanceof Request ? input.url : String(input)
-      if (url.includes('/state')) {
+      if (url.match(/\/retros\/[^/]+$/)) {
         return Promise.resolve(new Response(JSON.stringify(state), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
       if (url.includes('/participants')) {

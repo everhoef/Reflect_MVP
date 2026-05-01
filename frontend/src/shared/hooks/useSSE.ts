@@ -67,7 +67,7 @@ export function useSSE(
 
     setConnectionState("connecting");
 
-    const source = new EventSource(`/api/retro/${retroId}/events`);
+    const source = new EventSource(`/api/retros/${retroId}/events`);
 
     for (const eventType of Object.values(EventType)) {
       source.addEventListener(eventType, (e: MessageEvent) => {

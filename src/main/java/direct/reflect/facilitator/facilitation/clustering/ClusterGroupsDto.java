@@ -9,4 +9,4 @@ import java.util.UUID;
 public record ClusterGroupsDto(
         Map<UUID, List<ColumnResponseDto>> clustered,
         List<ColumnResponseDto> unclustered
-) {}
+) { }

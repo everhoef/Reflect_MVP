@@ -744,7 +744,7 @@ public abstract class BaseEndToEndTest {
 
         final String[] redirectUrl = {null};
         facilitatorPage.onResponse(response -> {
-            if (response.url().contains("/api/retro/create")) {
+            if (response.url().contains("/api/retros")) {
                 log.debug("Session create response: status={}", response.status());
                 String hxRedirect = response.headers().get("hx-redirect");
                 if (hxRedirect == null) {
@@ -843,13 +843,13 @@ public abstract class BaseEndToEndTest {
 
             final String[] redirectUrl = {null};
             participantPage.onRequest(request -> {
-                if (request.url().contains("/api/retro/join")) {
+                if (request.url().contains("/api/retros/") && request.url().contains("/participants") && "POST".equals(request.method())) {
                     log.info("📤 JOIN REQUEST: {} {}", request.method(), request.url());
                 }
             });
 
             participantPage.onResponse(response -> {
-                if (response.url().contains("/api/retro/join")) {
+                if (response.url().contains("/api/retros/") && response.url().contains("/participants") && "POST".equals(response.request().method())) {
                     String hxRedirect = response.headers().get("hx-redirect");
                     if (hxRedirect == null) {
                         hxRedirect = response.headers().get("HX-Redirect");

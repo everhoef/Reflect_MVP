@@ -47,8 +47,8 @@ public class AuthController {
     @PostMapping("/guest")
     public String authenticateGuest(HttpServletRequest request, String displayName) {
 
-        log.info("=== GUEST AUTHENTICATION ===");
-        log.info("Display name: {}", displayName);
+        log.debug("=== GUEST AUTHENTICATION ===");
+        log.debug("Display name: {}", displayName);
 
         if (displayName == null || displayName.trim().isEmpty()) {
             return "redirect:/login?error=missing_display_name";
@@ -58,7 +58,7 @@ public class AuthController {
             // Initialize guest session - same structure as OIDC users for consistency
             // This clears any existing OIDC session data to ensure clean isolation
             authenticationHelper.initializeGuestSession(request, displayName.trim());
-            log.info("Guest '{}' successfully authenticated", displayName.trim());
+            log.debug("Guest '{}' successfully authenticated", displayName.trim());
 
             return "redirect:/";
         } catch (Exception e) {
@@ -74,10 +74,10 @@ public class AuthController {
     public String logout(HttpServletRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null) {
-            log.info("Logging out user: {} (type: {})", 
+            log.debug("Logging out user: {} (type: {})",
                 auth.getName(), auth.getClass().getSimpleName());
         }
-        
+
         // Spring Security logout handles session clearing automatically
         return "redirect:/login";
     }

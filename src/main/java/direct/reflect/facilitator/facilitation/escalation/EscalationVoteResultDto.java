@@ -10,7 +10,7 @@ public record EscalationVoteResultDto(
         boolean thresholdMet,
         boolean voted) {
 
-    public EscalationVoteResultDto withSyncVersion(long syncVersion) {
-        return new EscalationVoteResultDto(syncVersion, escalationId, voteCount, threshold, thresholdMet, voted);
+    public EscalationVoteResultDto withSyncVersion(long newSyncVersion) {
+        return new EscalationVoteResultDto(newSyncVersion, escalationId, voteCount, threshold, thresholdMet, voted);
     }
 }

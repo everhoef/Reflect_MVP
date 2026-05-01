@@ -11,7 +11,7 @@ export function useRatingResponses(retroId: string, stepId: number) {
   const query = useQuery<RatingResponseDto[]>({
     queryKey: ["ratingResponses", retroId, stepId],
     queryFn: async () => {
-      const { data, response } = await apiClient.GET("/api/retro/{retroId}/step/{stepId}/response/rating", {
+      const { data, response } = await apiClient.GET("/api/retros/{retroId}/steps/{stepId}/responses/rating", {
         params: { path: { retroId, stepId } },
       });
       if (!response.ok) return [];
@@ -37,7 +37,7 @@ export async function submitRatingResponse(
   if (comment) params.comment = comment;
   const base = typeof window !== "undefined" ? window.location.origin : "http://localhost";
   const response = await globalThis.fetch(
-    `${base}/api/retro/${retroId}/step/${stepId}/response/rating`,
+    `${base}/api/retros/${retroId}/steps/${stepId}/responses/rating`,
     {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded", ...csrfHeaders() },

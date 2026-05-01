@@ -102,7 +102,7 @@ class ParticipantStateDataIntegrationTest {
         when(authService.getDisplayName(any(HttpServletRequest.class))).thenReturn("TestUser");
 
         // ── Step 1: Create first session ──────────────────────────────────────────
-        mockMvc.perform(post("/api/retro/create")
+        mockMvc.perform(post("/api/retros")
                         .with(authentication(testAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sessionName\": \"First Session\"}")
@@ -129,7 +129,7 @@ class ParticipantStateDataIntegrationTest {
                 .isEqualTo(fixedParticipantId);
 
         // ── Step 2: Create second session (same user) ──────────────────────────────
-        mockMvc.perform(post("/api/retro/create")
+        mockMvc.perform(post("/api/retros")
                         .with(authentication(testAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sessionName\": \"Second Session\"}")

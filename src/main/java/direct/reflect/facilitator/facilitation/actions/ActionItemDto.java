@@ -32,9 +32,9 @@ public record ActionItemDto(
                 actionItem.getUpdatedAt());
     }
 
-    public ActionItemDto withSyncVersion(long syncVersion) {
+    public ActionItemDto withSyncVersion(long newSyncVersion) {
         return new ActionItemDto(
-                syncVersion,
+                newSyncVersion,
                 id,
                 what,
                 who,

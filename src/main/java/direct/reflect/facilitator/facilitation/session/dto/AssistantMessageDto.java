@@ -7,4 +7,4 @@ public record AssistantMessageDto(
     Long stepId,
     String stepTitle,
     String publicText
-) {}
+) { }

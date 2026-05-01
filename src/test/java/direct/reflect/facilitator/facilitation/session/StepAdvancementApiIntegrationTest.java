@@ -115,7 +115,7 @@ class StepAdvancementApiIntegrationTest {
         assertThat(initial.getCurrentStepIndex()).isEqualTo(-1);
         long initialSyncVersion = initial.getSyncVersion();
 
-        mockMvc.perform(post("/api/retro/{retroId}/next", testSession.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/advance", testSession.getId())
                         .with(csrf()))
                 .andExpect(status().isOk());
 
@@ -128,7 +128,7 @@ class StepAdvancementApiIntegrationTest {
     @WithMockUser(roles = "USER")
     void advanceNext_MultipleTimesSequentially_IncrementsStepIndex() throws Exception {
         for (int expectedStepIndex = 0; expectedStepIndex <= 4; expectedStepIndex++) {
-            mockMvc.perform(post("/api/retro/{retroId}/next", testSession.getId())
+            mockMvc.perform(post("/api/retros/{retroId}/advance", testSession.getId())
                             .with(csrf()))
                     .andExpect(status().isOk());
 
@@ -145,7 +145,7 @@ class StepAdvancementApiIntegrationTest {
         UUID unknownParticipantId = UUID.randomUUID();
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(unknownParticipantId);
 
-        mockMvc.perform(post("/api/retro/{retroId}/next", testSession.getId())
+        mockMvc.perform(post("/api/retros/{retroId}/advance", testSession.getId())
                         .with(csrf()))
                 .andExpect(status().isForbidden());
     }

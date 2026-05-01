@@ -92,7 +92,7 @@ public class SessionApiControllerTest {
         when(retroSessionService.createSessionWithFacilitator(eq("Test Session"), any(HttpServletRequest.class)))
             .thenReturn(mockSession);
 
-        mockMvc.perform(post("/api/retro/create")
+        mockMvc.perform(post("/api/retros")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"sessionName\":\"Test Session\"}"))
@@ -114,7 +114,7 @@ public class SessionApiControllerTest {
         when(retroSessionService.createSessionWithFacilitator(eq("Test Session"), any(HttpServletRequest.class)))
             .thenReturn(mockSession);
 
-        mockMvc.perform(post("/api/retro/create")
+        mockMvc.perform(post("/api/retros")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"sessionName\":\"Test Session\"}"))
@@ -131,7 +131,7 @@ public class SessionApiControllerTest {
         when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
             .thenReturn(true);
 
-        mockMvc.perform(post("/api/retro/{retroId}/next", retroId)
+        mockMvc.perform(post("/api/retros/{retroId}/advance", retroId)
                 .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.retroId").value(retroId.toString()))
@@ -146,7 +146,7 @@ public class SessionApiControllerTest {
         when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
             .thenReturn(false);
 
-        mockMvc.perform(post("/api/retro/{retroId}/next", retroId)
+        mockMvc.perform(post("/api/retros/{retroId}/advance", retroId)
                 .with(csrf()))
                 .andExpect(status().isForbidden());
     }
@@ -161,7 +161,7 @@ public class SessionApiControllerTest {
         when(retroSessionService.getTimerState(retroId)).thenReturn(timerState);
         when(retroSyncVersionService.getSyncVersion(retroId)).thenReturn(12L);
 
-        mockMvc.perform(get("/api/retro/{retroId}/timer", retroId))
+        mockMvc.perform(get("/api/retros/{retroId}/timer", retroId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.syncVersion").value(12))
                 .andExpect(jsonPath("$.data.remainingSeconds").value(300))
@@ -177,7 +177,7 @@ public class SessionApiControllerTest {
         when(participantService.isParticipating(any(HttpServletRequest.class), eq(retroId))).thenReturn(true);
         when(retroSessionService.getTimerState(retroId)).thenReturn(null);
 
-        mockMvc.perform(get("/api/retro/{retroId}/timer", retroId))
+        mockMvc.perform(get("/api/retros/{retroId}/timer", retroId))
                 .andExpect(status().isNoContent());
     }
 
@@ -188,7 +188,7 @@ public class SessionApiControllerTest {
 
         when(participantService.isParticipating(any(HttpServletRequest.class), eq(retroId))).thenReturn(false);
 
-        mockMvc.perform(get("/api/retro/{retroId}/timer", retroId))
+        mockMvc.perform(get("/api/retros/{retroId}/timer", retroId))
                 .andExpect(status().isForbidden());
     }
 
@@ -196,7 +196,7 @@ public class SessionApiControllerTest {
     void getTimerState_Unauthenticated_ShouldReturnUnauthorized() throws Exception {
         UUID retroId = UUID.randomUUID();
 
-        mockMvc.perform(get("/api/retro/{retroId}/timer", retroId)
+        mockMvc.perform(get("/api/retros/{retroId}/timer", retroId)
                 .with(anonymous()))
                 .andExpect(status().isUnauthorized());
     }
@@ -209,7 +209,7 @@ public class SessionApiControllerTest {
         when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
             .thenReturn(true);
 
-        mockMvc.perform(post("/api/retro/{retroId}/timer/pause", retroId)
+        mockMvc.perform(post("/api/retros/{retroId}/timer/pause", retroId)
                 .with(csrf()))
                 .andExpect(status().isOk());
     }
@@ -222,7 +222,7 @@ public class SessionApiControllerTest {
         when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
             .thenReturn(false);
 
-        mockMvc.perform(post("/api/retro/{retroId}/timer/pause", retroId)
+        mockMvc.perform(post("/api/retros/{retroId}/timer/pause", retroId)
                 .with(csrf()))
                 .andExpect(status().isForbidden());
     }
@@ -231,7 +231,7 @@ public class SessionApiControllerTest {
     void pauseTimer_Unauthenticated_ShouldReturnUnauthorized() throws Exception {
         UUID retroId = UUID.randomUUID();
 
-        mockMvc.perform(post("/api/retro/{retroId}/timer/pause", retroId)
+        mockMvc.perform(post("/api/retros/{retroId}/timer/pause", retroId)
                 .with(anonymous())
                 .with(csrf()))
                 .andExpect(status().isUnauthorized());
@@ -242,7 +242,7 @@ public class SessionApiControllerTest {
     void pauseTimer_WithoutCSRF_ShouldReturnForbidden() throws Exception {
         UUID retroId = UUID.randomUUID();
 
-        mockMvc.perform(post("/api/retro/{retroId}/timer/pause", retroId))
+        mockMvc.perform(post("/api/retros/{retroId}/timer/pause", retroId))
                 .andExpect(status().isForbidden());
     }
 
@@ -254,7 +254,7 @@ public class SessionApiControllerTest {
         when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
             .thenReturn(true);
 
-        mockMvc.perform(post("/api/retro/{retroId}/timer/resume", retroId)
+        mockMvc.perform(post("/api/retros/{retroId}/timer/resume", retroId)
                 .with(csrf()))
                 .andExpect(status().isOk());
     }
@@ -267,7 +267,7 @@ public class SessionApiControllerTest {
         when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
             .thenReturn(false);
 
-        mockMvc.perform(post("/api/retro/{retroId}/timer/resume", retroId)
+        mockMvc.perform(post("/api/retros/{retroId}/timer/resume", retroId)
                 .with(csrf()))
                 .andExpect(status().isForbidden());
     }
@@ -276,7 +276,7 @@ public class SessionApiControllerTest {
     void resumeTimer_Unauthenticated_ShouldReturnUnauthorized() throws Exception {
         UUID retroId = UUID.randomUUID();
 
-        mockMvc.perform(post("/api/retro/{retroId}/timer/resume", retroId)
+        mockMvc.perform(post("/api/retros/{retroId}/timer/resume", retroId)
                 .with(anonymous())
                 .with(csrf()))
                 .andExpect(status().isUnauthorized());
@@ -287,7 +287,7 @@ public class SessionApiControllerTest {
     void resumeTimer_WithoutCSRF_ShouldReturnForbidden() throws Exception {
         UUID retroId = UUID.randomUUID();
 
-        mockMvc.perform(post("/api/retro/{retroId}/timer/resume", retroId))
+        mockMvc.perform(post("/api/retros/{retroId}/timer/resume", retroId))
                 .andExpect(status().isForbidden());
     }
 
@@ -299,7 +299,7 @@ public class SessionApiControllerTest {
         when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
             .thenReturn(true);
 
-        mockMvc.perform(post("/api/retro/{retroId}/timer/pause", retroId)
+        mockMvc.perform(post("/api/retros/{retroId}/timer/pause", retroId)
                 .with(csrf()))
                 .andExpect(status().isOk());
     }
@@ -312,7 +312,7 @@ public class SessionApiControllerTest {
         when(participantService.isFacilitator(any(HttpServletRequest.class), eq(retroId)))
             .thenReturn(true);
 
-        mockMvc.perform(post("/api/retro/{retroId}/timer/resume", retroId)
+        mockMvc.perform(post("/api/retros/{retroId}/timer/resume", retroId)
                 .with(csrf()))
                 .andExpect(status().isOk());
     }
@@ -354,7 +354,7 @@ public class SessionApiControllerTest {
         when(retroSessionService.getAssistantHistory(retroId)).thenReturn(assistantState);
         when(retroSyncVersionService.getSyncVersion(retroId)).thenReturn(21L);
 
-        mockMvc.perform(get("/api/retro/{retroId}/state", retroId))
+        mockMvc.perform(get("/api/retros/{retroId}", retroId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.retroId").value(retroId.toString()))
                 .andExpect(jsonPath("$.syncVersion").value(21))
@@ -366,14 +366,14 @@ public class SessionApiControllerTest {
     void getRetroState_Unauthenticated_ShouldReturnUnauthorized() throws Exception {
         UUID retroId = UUID.randomUUID();
 
-        mockMvc.perform(get("/api/retro/{retroId}/state", retroId)
+        mockMvc.perform(get("/api/retros/{retroId}", retroId)
                 .with(anonymous()))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void shouldRequireAuthenticationForSessionCreation() throws Exception {
-        mockMvc.perform(post("/api/retro/create")
+        mockMvc.perform(post("/api/retros")
                 .with(anonymous()) 
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -384,7 +384,7 @@ public class SessionApiControllerTest {
     @Test
     @WithMockUser(roles = "USER")
     void shouldRequireCSRFToken() throws Exception {
-        mockMvc.perform(post("/api/retro/create")
+        mockMvc.perform(post("/api/retros")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"sessionName\":\"Test Session\"}"))
                 .andExpect(status().isForbidden());

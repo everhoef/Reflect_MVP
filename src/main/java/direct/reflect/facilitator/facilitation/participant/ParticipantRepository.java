@@ -42,8 +42,11 @@ public interface ParticipantRepository extends JpaRepository<Participant, Partic
     /**
      * Find participant records with session data eagerly loaded, filtered by status.
      */
-    @Query("SELECT p FROM Participant p JOIN FETCH p.session WHERE p.participantId = :participantId AND p.status = :status")
-    List<Participant> findByParticipantIdAndStatusWithSession(@Param("participantId") UUID participantId, @Param("status") ParticipantStatus status);
+    @Query("SELECT p FROM Participant p JOIN FETCH p.session"
+        + " WHERE p.participantId = :participantId AND p.status = :status")
+    List<Participant> findByParticipantIdAndStatusWithSession(
+        @Param("participantId") UUID participantId,
+        @Param("status") ParticipantStatus status);
 
     Optional<Participant> findByParticipantIdAndSession_Id(UUID participantId, UUID sessionId);
 
