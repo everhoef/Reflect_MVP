@@ -74,7 +74,7 @@ public class AuthApiController {
             return null;
         }
 
-        String authType = session != null ? (String) session.getAttribute("authType") : null;
+        String authType = (String) session.getAttribute("authType");
         if (authType != null) {
             return authType;
         }
@@ -87,9 +87,7 @@ public class AuthApiController {
                 .anyMatch(a -> a.getAuthority().equals("ROLE_GUEST"));
 
         String derivedAuthType = isGuest ? "GUEST" : "OIDC";
-        if (session != null) {
-            session.setAttribute("authType", derivedAuthType);
-        }
+        session.setAttribute("authType", derivedAuthType);
 
         return derivedAuthType;
     }

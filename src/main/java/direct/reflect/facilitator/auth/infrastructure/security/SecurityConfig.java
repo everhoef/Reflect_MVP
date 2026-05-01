@@ -44,8 +44,9 @@ import java.util.Set;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, OidcSuccessHandler oidcSuccessHandler) throws Exception {
-        return http
+    public SecurityFilterChain filterChain(HttpSecurity http, OidcSuccessHandler oidcSuccessHandler) {
+        try {
+            return http
             // OIDC authentication for registered users
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/login")
@@ -112,6 +113,9 @@ public class SecurityConfig {
                 .clearAuthentication(true)
             )
             .build();
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to configure security filter chain", e);
+        }
     }
 
     @Bean
