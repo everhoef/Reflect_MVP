@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/retros")
 @Tag(name = "Response API", description = "Participant response management")
 @Slf4j
 @RequiredArgsConstructor
@@ -50,7 +49,7 @@ public class ResponseApiController {
     private final ResponseService responseService;
     private final RetroStepQueryService retroStepQueryService;
 
-    @PostMapping("/{retroId}/steps/{stepId}/responses/column")
+    @PostMapping("/api/retros/{retroId}/steps/{stepId}/responses/column")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Submit a column/categorical response", description = "Submits a response to a multi-column board step")
     @ApiResponse(responseCode = "200", description = "Response submitted successfully")
@@ -84,7 +83,7 @@ public class ResponseApiController {
         }
     }
 
-    @PostMapping("/{retroId}/steps/{stepId}/responses/rating")
+    @PostMapping("/api/retros/{retroId}/steps/{stepId}/responses/rating")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Submit a rating response", description = "Submits a rating scale response for the current step")
     @ApiResponse(responseCode = "200", description = "Rating submitted successfully")
@@ -115,7 +114,7 @@ public class ResponseApiController {
         }
     }
 
-    @GetMapping("/{retroId}/steps/{stepId}/responses/rating/me")
+    @GetMapping("/api/retros/{retroId}/steps/{stepId}/responses/rating/me")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Get current user's rating response",
         description = "Returns the authenticated user's rating response for a given step, or 404 if not yet submitted")
@@ -143,7 +142,7 @@ public class ResponseApiController {
         }
     }
 
-    @GetMapping("/{retroId}/steps/{stepId}/responses/rating")
+    @GetMapping("/api/retros/{retroId}/steps/{stepId}/responses/rating")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Get rating responses for histogram",
         description = "Returns all rating responses for the stage containing this step (used by HISTOGRAM_CHART component)")
@@ -180,7 +179,7 @@ public class ResponseApiController {
         }
     }
 
-    @PutMapping("/{retroId}/responses/{responseId}")
+    @PutMapping("/api/retros/{retroId}/responses/{responseId}")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Update a response", description = "Updates the content of an existing participant response")
     @ApiResponse(responseCode = "200", description = "Response updated successfully")
@@ -214,7 +213,7 @@ public class ResponseApiController {
         }
     }
 
-    @PostMapping("/{retroId}/responses/{responseId}/vote")
+    @PostMapping("/api/retros/{retroId}/responses/{responseId}/vote")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Toggle a vote on a response",
         description = "Adds or removes a vote for the current participant on the specified response")
@@ -253,7 +252,7 @@ public class ResponseApiController {
         }
     }
 
-    @PostMapping("/{retroId}/steps/{stepId}/responses/reveal")
+    @PostMapping("/api/retros/{retroId}/steps/{stepId}/responses/reveal")
     @PreAuthorize("hasAnyRole('USER', 'GUEST')")
     @Operation(summary = "Reveal responses for a step", description = "Makes all participant responses visible; facilitator-only action")
     @ApiResponse(responseCode = "200", description = "Responses revealed successfully")
