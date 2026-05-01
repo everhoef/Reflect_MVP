@@ -12,10 +12,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /**
-         * Rename a cluster
-         * @description Updates the display name of a response cluster
-         */
         put: operations["renameCluster"];
         post?: never;
         delete?: never;
@@ -177,10 +173,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Unmerge a response from its cluster
-         * @description Removes a response from a cluster and restores it as an individual response
-         */
         post: operations["unmerge"];
         delete?: never;
         options?: never;
@@ -197,10 +189,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Merge responses into a cluster
-         * @description Combines multiple responses into a single cluster
-         */
         post: operations["merge"];
         delete?: never;
         options?: never;
@@ -255,16 +243,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get session participants
-         * @description Returns the list of participants for the specified session
-         */
         get: operations["getParticipants"];
         put?: never;
-        /**
-         * Join a retrospective session
-         * @description Adds the current user as a participant to the specified session
-         */
         post: operations["joinRetrospective"];
         delete?: never;
         options?: never;
@@ -281,10 +261,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Toggle escalation vote
-         * @description Toggles the current participant's vote on an escalation
-         */
         post: operations["toggleVote_1"];
         delete?: never;
         options?: never;
@@ -319,16 +295,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get all action items
-         * @description Returns all action items for the retrospective with sync version
-         */
         get: operations["getActionItems"];
         put?: never;
-        /**
-         * Create an action item
-         * @description Creates a new SMART action item for the retrospective
-         */
         post: operations["createActionItem"];
         delete?: never;
         options?: never;
@@ -345,10 +313,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Update action item status
-         * @description Updates the completion status of an action item
-         */
         post: operations["updateActionItemStatus"];
         delete?: never;
         options?: never;
@@ -365,10 +329,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Escalate an action item
-         * @description Flags an action item for management escalation with a problem description
-         */
         post: operations["escalateAction"];
         delete?: never;
         options?: never;
@@ -434,17 +394,9 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /**
-         * Delete an action item
-         * @description Deletes an action item from the retrospective
-         */
         delete: operations["deleteActionItem"];
         options?: never;
         head?: never;
-        /**
-         * Update an action item
-         * @description Updates an existing action item
-         */
         patch: operations["updateActionItem"];
         trace?: never;
     };
@@ -515,10 +467,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get all clusters for a retro
-         * @description Returns the current clustering of responses for the session
-         */
         get: operations["getClusters"];
         put?: never;
         post?: never;
@@ -535,10 +483,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Subscribe to session events
-         * @description Opens an SSE stream for real-time retrospective updates
-         */
         get: operations["getRetroEvents"];
         put?: never;
         post?: never;
@@ -555,10 +499,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get all escalations
-         * @description Returns all escalations for the retrospective with sync version
-         */
         get: operations["getEscalations"];
         put?: never;
         post?: never;
@@ -575,10 +515,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get previous open actions
-         * @description Returns open action items from the previous retrospective session
-         */
         get: operations["getPreviousActions"];
         put?: never;
         post?: never;
@@ -611,17 +547,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Check active sessions
-         * @description Returns a list of retrospective sessions the current user is actively participating in
-         */
         get: operations["checkActiveSessions"];
         put?: never;
         post?: never;
-        /**
-         * Leave all active sessions
-         * @description Removes the current user from all active retrospective sessions
-         */
         delete: operations["leaveActiveSessions"];
         options?: never;
         head?: never;
@@ -989,7 +917,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Cluster renamed successfully */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1276,7 +1204,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Response unmerged successfully */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1301,7 +1229,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Responses merged successfully */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1384,26 +1312,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Participants returned */
+            /** @description OK */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["SyncVersionedResponseListParticipantDto"];
-                };
-            };
-            /** @description Participant is not part of this session */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["SyncVersionedResponseListParticipantDto"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1424,26 +1334,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Joined successfully */
+            /** @description OK */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["JoinRetroResponse"];
-                };
-            };
-            /** @description Session not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["JoinRetroResponse"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1465,7 +1357,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Vote toggled successfully */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1518,7 +1410,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Action items returned successfully */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1571,7 +1463,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Action item status updated successfully */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1788,7 +1680,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Action item updated successfully */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1923,7 +1815,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Clusters returned successfully */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1945,7 +1837,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description SSE stream established */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1967,7 +1859,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Escalations returned successfully */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1989,7 +1881,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Previous open actions returned successfully */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2029,7 +1921,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Active sessions returned */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2049,17 +1941,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Left all active sessions successfully */
+            /** @description OK */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LeaveActiveSessionsResult"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
                 headers: {
                     [name: string]: unknown;
                 };
