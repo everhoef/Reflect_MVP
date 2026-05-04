@@ -1,0 +1,2 @@
+grep -R "@visual-clue-pilot" src/test/resources/features
+src/test/resources/features/visual-clue-stage.feature:@visual-clue-pilot @facilitation @story-visual-clue-stage

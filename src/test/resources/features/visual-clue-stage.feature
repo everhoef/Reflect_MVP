@@ -1,3 +1,4 @@
+@visual-clue-pilot @facilitation @story-visual-clue-stage
 Feature: Visual Clue Stage
 
   Scenario: Scenario 1: Underground map displayed horizontally at top of screen
