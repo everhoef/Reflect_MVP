@@ -3,7 +3,6 @@ package direct.reflect.facilitator.bdd.support.drivers;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Locator;
 import direct.reflect.facilitator.bdd.support.PlaywrightWorld;
-import io.cucumber.java.PendingException;
 import io.cucumber.spring.ScenarioScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -44,7 +43,7 @@ public class SyncDriver {
             page.waitForTimeout(500);
         }
 
-        throw new PendingException("PENDING: Application server did not become ready in time for the Playwright BDD scenario.");
+        throw new AssertionError("Application server did not become ready in time for the Playwright BDD scenario.");
     }
 
     public void assertRetroContentLoaded() {

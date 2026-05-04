@@ -1,0 +1,11 @@
+Command: ./mvnw -q -DskipTests compile
+Exit code: 0
+
+Command: bash scripts/bdd-audit.sh
+Exit code: 0
+
+AUDIT PASSED: No BaseEndToEndTest inheritance in BDD
+AUDIT PASSED: No committed PendingException in BDD
+AUDIT PASSED: No raw Playwright waits in stepdefinitions
+AUDIT PASSED: No CSS/layout coupling in BDD step definitions or drivers
+AUDIT PASSED: only visual-clue-stage.feature may migrate in first-rollout branch

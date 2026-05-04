@@ -3,7 +3,6 @@ package direct.reflect.facilitator.bdd.support.drivers;
 import com.microsoft.playwright.Locator;
 import direct.reflect.facilitator.bdd.support.PlaywrightWorld;
 import direct.reflect.facilitator.bdd.support.selectors.RetroSelectors;
-import io.cucumber.java.PendingException;
 import io.cucumber.spring.ScenarioScope;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.Assertions;
@@ -22,7 +21,7 @@ public class ProgressBarDriver {
         Locator indicator = progressIndicator();
         syncDriver.assertSemanticHookPresent(indicator, "stage progress bar");
         if (!indicator.isVisible()) {
-            throw new PendingException("PENDING: Could not find a visible stage progress indicator using the current selectors.");
+            throw new AssertionError("Could not find a visible stage progress indicator using the current selectors.");
         }
     }
 

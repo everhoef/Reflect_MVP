@@ -69,3 +69,8 @@
 - Success screenshots now live beside failure screenshots in `.sisyphus/evidence/bdd-pilot/`, using the same safe scenario naming convention with `_success.png` / `_failure.png` suffixes.
 - Fail-fast hook checks belong in `SyncDriver` so semantic selectors can fail with an immediate contract error instead of a Playwright timeout.
 - Progress bar assertions should ask for semantic hook presence before reading `data-stage-status` / `data-connector-status`; this keeps the pilot readable when the DOM contract breaks.
+
+## [2026-05-04] Task 7: Audit gates
+- The fail-fast audit script is simplest as a standalone repo-root script under `scripts/bdd-audit.sh`; it can gate the BDD boundary rules without adding Maven/plugin complexity.
+- `PendingException` can no longer live in pilot BDD drivers because the audit checks all BDD paths recursively; use `AssertionError` for contract violations and keep the pilot executable on current code.
+- The first-rollout feature scope check should read `git diff --name-only origin/main...HEAD` and reject any feature migration except `src/test/resources/features/visual-clue-stage.feature`.

@@ -4,7 +4,6 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import direct.reflect.facilitator.bdd.support.PlaywrightWorld;
 import direct.reflect.facilitator.bdd.support.context.RetroScenarioContext;
-import io.cucumber.java.PendingException;
 import io.cucumber.spring.ScenarioScope;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,7 +56,7 @@ public class RetroSessionDriver {
         }
 
         if (context.getCurrentPhaseNumber() != targetPhase) {
-            throw new PendingException("PENDING: Could not align the retrospective to phase " + targetPhase + " using the current progress-indicator pilot helpers.");
+            throw new AssertionError("Could not align the retrospective to phase " + targetPhase + " using the current progress-indicator pilot helpers.");
         }
 
         syncDriver.assertRetroContentLoaded();
@@ -104,7 +103,7 @@ public class RetroSessionDriver {
         while (context.getCurrentPhaseNumber() < targetPhase && safetyCounter <= 40) {
             Locator nextButton = page.locator(NEXT_STEP_BUTTON);
             if (nextButton.count() == 0) {
-                throw new PendingException("PENDING: Cannot advance to target phase because the facilitator next-step button is not visible.");
+                throw new AssertionError("Cannot advance to target phase because the facilitator next-step button is not visible.");
             }
 
             String previousPhaseEnum = currentPhaseEnum();
@@ -117,7 +116,7 @@ public class RetroSessionDriver {
         }
 
         if (context.getCurrentPhaseNumber() < targetPhase) {
-            throw new PendingException("PENDING: Retrospective did not advance to requested phase " + targetPhase + " within the safety limit.");
+            throw new AssertionError("Retrospective did not advance to requested phase " + targetPhase + " within the safety limit.");
         }
     }
 
@@ -129,7 +128,7 @@ public class RetroSessionDriver {
             }
         }
 
-        throw new PendingException("PENDING: Unknown retro phase enum: " + phaseEnum);
+        throw new IllegalArgumentException("Unknown retro phase enum: " + phaseEnum);
     }
 
     private String currentPhaseEnum() {
