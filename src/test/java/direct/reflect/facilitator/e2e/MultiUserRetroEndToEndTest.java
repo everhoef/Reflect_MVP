@@ -733,8 +733,8 @@ public class MultiUserRetroEndToEndTest extends BaseEndToEndTest {
             joinRetroSession(participantPage, sessionId);
             startRetroSession(facilitatorPage, sessionId);
 
-            waitForAllPagesElement("[data-testid='retro-content']", facilitatorPage, participantPage);
-            waitForElement(facilitatorPage, "[data-coachmark='next-step']");
+            waitForAllPagesElement("[data-testid='retro-content']", SSE_PROPAGATION_TIMEOUT_MS, facilitatorPage, participantPage);
+            waitForElement(facilitatorPage, "[data-coachmark='next-step']", SSE_PROPAGATION_TIMEOUT_MS);
 
             logTestProgress("COACHMARK", 3, 4, "Verifying next-step coachmark visible to facilitator, hidden from participant");
             waitForElement(facilitatorPage, "[data-testid='next-step-coachmark']");

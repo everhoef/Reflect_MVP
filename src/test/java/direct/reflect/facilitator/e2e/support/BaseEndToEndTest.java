@@ -1831,7 +1831,7 @@ public abstract class BaseEndToEndTest {
             "[data-testid='retro-content'][data-sse-connected='true']",
             new Page.WaitForSelectorOptions()
                 .setState(WaitForSelectorState.ATTACHED)
-                .setTimeout(DEFAULT_TIMEOUT_MS)
+                .setTimeout(SSE_PROPAGATION_TIMEOUT_MS)
         );
         log.debug("SSE connection established for retro: {} (data-sse-connected='true')", retroId);
         recordActivity("SSE connection established: " + retroId);
