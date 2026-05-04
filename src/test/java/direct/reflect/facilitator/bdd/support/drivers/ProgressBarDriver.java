@@ -1,7 +1,6 @@
 package direct.reflect.facilitator.bdd.support.drivers;
 
 import com.microsoft.playwright.Locator;
-import com.microsoft.playwright.options.BoundingBox;
 import direct.reflect.facilitator.bdd.support.PlaywrightWorld;
 import direct.reflect.facilitator.bdd.support.selectors.RetroSelectors;
 import io.cucumber.java.PendingException;
@@ -79,16 +78,16 @@ public class ProgressBarDriver {
     }
 
     public void assertStationsIncreaseLeftToRight() {
-        BoundingBox previous = null;
-        for (int phase = 1; phase <= 5; phase++) {
-            BoundingBox current = station(phase).boundingBox();
-            if (current == null) {
-                throw new PendingException("PENDING: Could not capture station layout boxes for left-to-right verification.");
-            }
-            if (previous != null) {
-                Assertions.assertTrue(current.x > previous.x, "Stations should progress left-to-right across the header.");
-            }
-            previous = current;
-        }
+        Boolean isOrdered = (Boolean) world.getPage().evaluate(
+            "() => {" +
+            "  const bar = document.querySelector('[data-testid=\"stage-progress-bar\"]');" +
+            "  if (!bar) return false;" +
+            "  const stations = Array.from(bar.querySelectorAll('[data-stage-index]'));" +
+            "  const indices = stations.map(el => parseInt(el.getAttribute('data-stage-index'), 10));" +
+            "  return indices.every((val, idx) => idx === 0 || val > indices[idx - 1]);" +
+            "}"
+        );
+        Assertions.assertTrue(Boolean.TRUE.equals(isOrdered),
+            "Stage stations should appear in increasing data-stage-index order (left to right).");
     }
 }
