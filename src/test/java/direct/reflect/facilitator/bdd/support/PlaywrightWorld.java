@@ -60,9 +60,7 @@ public class PlaywrightWorld {
 
     @After(order = 100)
     public void tearDownBrowser(Scenario scenario) {
-        if (scenario.isFailed()) {
-            captureFailureScreenshot(scenario);
-        }
+        captureScenarioScreenshot(scenario, scenario.isFailed() ? "failure" : "success");
         if (browserContext != null) {
             try {
                 browserContext.close();
@@ -119,7 +117,7 @@ public class PlaywrightWorld {
         ctx.route(Pattern.compile(".*cdn\\.jsdelivr\\.net.*"), route -> route.abort());
     }
 
-    private void captureFailureScreenshot(Scenario scenario) {
+    private void captureScenarioScreenshot(Scenario scenario, String outcome) {
         if (page == null) {
             return;
         }
@@ -130,12 +128,12 @@ public class PlaywrightWorld {
             String safeName = scenario.getName()
                     .replaceAll("[^a-zA-Z0-9]", "_")
                     .toLowerCase();
-            Path screenshotPath = evidenceDir.resolve(safeName + "_failure.png");
+            Path screenshotPath = evidenceDir.resolve(safeName + "_" + outcome + ".png");
 
             page.screenshot(new Page.ScreenshotOptions().setPath(screenshotPath).setFullPage(true));
-            log.info("Failure screenshot saved: {}", screenshotPath);
+            log.info("{} screenshot saved: {}", outcome.substring(0, 1).toUpperCase() + outcome.substring(1), screenshotPath);
         } catch (Exception e) {
-            log.warn("Failed to capture failure screenshot for scenario '{}': {}", scenario.getName(), e.getMessage());
+            log.warn("Failed to capture {} screenshot for scenario '{}': {}", outcome, scenario.getName(), e.getMessage());
         }
     }
 }

@@ -16,10 +16,12 @@ import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ST
 @RequiredArgsConstructor
 public class ProgressBarDriver {
     private final PlaywrightWorld world;
+    private final SyncDriver syncDriver;
 
     public void assertProgressIndicatorPresent() {
         Locator indicator = progressIndicator();
-        if (indicator.count() == 0 || !indicator.isVisible()) {
+        syncDriver.assertSemanticHookPresent(indicator, "stage progress bar");
+        if (!indicator.isVisible()) {
             throw new PendingException("PENDING: Could not find a visible stage progress indicator using the current selectors.");
         }
     }
@@ -38,17 +40,13 @@ public class ProgressBarDriver {
 
     public Locator station(int stageId) {
         Locator station = progressIndicator().locator(RetroSelectors.stationSelector(stageId));
-        if (station.count() == 0) {
-            throw new PendingException("PENDING: Could not resolve station element for phase " + stageId + ".");
-        }
+        syncDriver.assertSemanticHookPresent(station, "stage station " + stageId);
         return station.first();
     }
 
     public Locator connector(int connectorIndex) {
         Locator connector = progressIndicator().locator(RetroSelectors.connectorSelector(connectorIndex));
-        if (connector.count() == 0) {
-            throw new PendingException("PENDING: Could not resolve connector element " + connectorIndex + ".");
-        }
+        syncDriver.assertSemanticHookPresent(connector, "connector " + connectorIndex);
         return connector.first();
     }
 

@@ -1,6 +1,7 @@
 package direct.reflect.facilitator.bdd.support.drivers;
 
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.Locator;
 import direct.reflect.facilitator.bdd.support.PlaywrightWorld;
 import io.cucumber.java.PendingException;
 import io.cucumber.spring.ScenarioScope;
@@ -51,6 +52,12 @@ public class SyncDriver {
             RETRO_CONTENT,
             new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS)
         );
+    }
+
+    public void assertSemanticHookPresent(Locator locator, String hookDescription) {
+        if (locator.count() == 0) {
+            throw new AssertionError("Missing semantic hook: " + hookDescription + " — selector returned no elements");
+        }
     }
 
     public void waitForPhaseOrStepChange(String previousPhaseEnum, String previousStepIndex) {
