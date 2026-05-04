@@ -34,13 +34,13 @@ class ArchitectureGuardrailTest {
             };
 
     @Test
-    @DisplayName("browser tests stay in e2e package only")
+    @DisplayName("browser tests stay in e2e or bdd package only")
     void browserTestsStayInE2ePackageOnly() {
         ArchRule rule = noClasses()
-                .that().resideOutsideOfPackage("..e2e..")
+                .that().resideOutsideOfPackages("..e2e..", "..bdd..")
                 .should().dependOnClassesThat().resideInAnyPackage("com.microsoft.playwright..")
-                .as("browser tests stay in e2e package only")
-                .because("Playwright-dependent test code belongs in direct.reflect.facilitator.e2e so module packages stay focused on non-UI correctness.");
+                .as("browser tests stay in e2e or bdd package only")
+                .because("Playwright-dependent test code belongs in direct.reflect.facilitator.e2e (Playwright E2E journeys) or direct.reflect.facilitator.bdd (Cucumber BDD step definitions) so module packages stay focused on non-UI correctness.");
 
         rule.check(TEST_CLASSES);
     }
