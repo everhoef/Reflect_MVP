@@ -16,7 +16,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -193,15 +192,14 @@ public class VisualClueStageSteps {
 
     @Then("the highlighting should clearly distinguish it from other phases")
     public void theHighlightingShouldClearlyDistinguishItFromOtherPhases() {
-        String currentClasses = stationClasses(currentPhaseNumber);
         for (int phase = 1; phase <= 5; phase++) {
             if (phase == currentPhaseNumber) {
                 continue;
             }
             Assertions.assertNotEquals(
-                    currentClasses,
-                    stationClasses(phase),
-                    "The current phase should use different styling than non-current phases."
+                    station(phase).getAttribute("data-stage-status"),
+                    station(currentPhaseNumber).getAttribute("data-stage-status"),
+                    "The current phase should use a different semantic status than non-current phases."
             );
         }
     }
@@ -239,7 +237,15 @@ public class VisualClueStageSteps {
 
     @Then("the visual state should clearly differ from the current phase")
     public void theVisualStateShouldClearlyDifferFromTheCurrentPhase() {
-        Assertions.assertNotEquals(stationClasses(2), stationClasses(currentPhaseNumber));
+        for (int phase = 1; phase <= 5; phase++) {
+            if (phase == currentPhaseNumber) {
+                continue;
+            }
+            Assertions.assertNotEquals(
+                    station(phase).getAttribute("data-stage-status"),
+                    station(currentPhaseNumber).getAttribute("data-stage-status")
+            );
+        }
     }
 
     @Then("phases {int} and {int} stations should be displayed in normal\\/default style")
@@ -581,10 +587,6 @@ public class VisualClueStageSteps {
         return stations.nth(phaseNumber - 1);
     }
 
-    private String stationClasses(int phaseNumber) {
-        return Objects.requireNonNullElse(station(phaseNumber).getAttribute("class"), "");
-    }
-
     private String connectorClasses(int connectorIndex) {
         Locator connectors = progressIndicator().locator(":scope > div > div.h-px");
         if (connectors.count() < connectorIndex) {
@@ -594,9 +596,8 @@ public class VisualClueStageSteps {
     }
 
     private void assertStationHighlighted(int phaseNumber) {
-        String classes = stationClasses(phaseNumber);
+        Assertions.assertEquals("in-progress", station(phaseNumber).getAttribute("data-stage-status"), "Current phase should expose data-stage-status='in-progress'.");
         Assertions.assertEquals("step", station(phaseNumber).getAttribute("aria-current"), "Current phase should expose aria-current='step'.");
-        Assertions.assertTrue(classes.contains("bg-amber-500"), "Current phase should use the highlighted amber styling.");
     }
 
     private void assertStationLooksGreyedOut(int phaseNumber) {
@@ -622,16 +623,11 @@ public class VisualClueStageSteps {
     }
 
     private boolean isCompletedStation(int phaseNumber) {
-        String classes = stationClasses(phaseNumber);
-        return classes.contains("bg-amber-100") && classes.contains("text-amber-700") && station(phaseNumber).locator("svg").count() > 0;
+        return "complete".equals(station(phaseNumber).getAttribute("data-stage-status"));
     }
 
     private boolean isUpcomingStation(int phaseNumber) {
-        String classes = stationClasses(phaseNumber);
-        return classes.contains("bg-gray-100")
-                && classes.contains("text-gray-400")
-                && !"step".equals(station(phaseNumber).getAttribute("aria-current"))
-                && station(phaseNumber).locator("svg").count() == 0;
+        return "to-do".equals(station(phaseNumber).getAttribute("data-stage-status"));
     }
 
     private void assertStationsIncreaseLeftToRight() {

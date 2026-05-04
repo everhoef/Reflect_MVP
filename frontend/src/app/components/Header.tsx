@@ -61,6 +61,7 @@ export default function Header({ currentStage }: HeaderProps) {
                     )}
 
                     <div
+                      data-stage-status={status}
                       className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all ${
                         status === 'complete'
                           ? 'bg-amber-100 text-amber-700'
@@ -99,4 +100,3 @@ export default function Header({ currentStage }: HeaderProps) {
     </header>
   )
 }
-
