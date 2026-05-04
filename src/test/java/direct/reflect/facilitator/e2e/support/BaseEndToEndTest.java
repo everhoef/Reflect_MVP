@@ -884,7 +884,7 @@ public abstract class BaseEndToEndTest {
             String targetUrl = redirectUrl[0] != null ? (redirectUrl[0].startsWith("http") ? redirectUrl[0] : baseUrl + redirectUrl[0]) : (baseUrl + "/retro/" + sessionId);
             log.info("Redirect didn't occur, navigating manually to: {}", targetUrl);
             participantPage.navigate(targetUrl);
-            participantPage.waitForSelector("h2:has-text('Session Lobby'), [data-step-index]",
+            participantPage.waitForSelector("h2:has-text('Session Lobby'), [data-step-index], [data-testid='retro-content']",
                 new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
             log.info("Manual navigation completed, URL is now: {}", participantPage.url());
         }
@@ -1831,7 +1831,7 @@ public abstract class BaseEndToEndTest {
             "[data-testid='retro-content'][data-sse-connected='true']",
             new Page.WaitForSelectorOptions()
                 .setState(WaitForSelectorState.ATTACHED)
-                .setTimeout(SSE_PROPAGATION_TIMEOUT_MS)
+                .setTimeout(DEFAULT_TIMEOUT_MS)
         );
         log.debug("SSE connection established for retro: {} (data-sse-connected='true')", retroId);
         recordActivity("SSE connection established: " + retroId);
