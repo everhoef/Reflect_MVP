@@ -29,7 +29,12 @@ run_audit "No BaseEndToEndTest inheritance in BDD" 'extends BaseEndToEndTest' 's
 run_audit "No committed PendingException in BDD" 'PendingException' 'src/test/java/direct/reflect/facilitator/bdd/'
 run_audit "No raw Playwright waits in stepdefinitions" 'page\.locator|waitForSelector|waitForFunction|waitForTimeout|Thread\.sleep' 'src/test/java/direct/reflect/facilitator/bdd/stepdefinitions/'
 run_audit "No CSS/layout coupling in BDD step definitions or drivers" 'bg-amber|bg-gray|rounded-full|h-px|boundingBox|nth-child' src/test/java/direct/reflect/facilitator/bdd/stepdefinitions/ src/test/java/direct/reflect/facilitator/bdd/support/drivers/
-run_audit "pilot-tag-presence" "Every feature file must declare a pilot tag (@visual-clue-pilot or similar)" "grep -rL '@visual-clue-pilot\|@facilitation' src/test/resources/features/ 2>/dev/null | grep '\.feature$'"
+untagged_features="$(grep -rL '@visual-clue-pilot\|@facilitation' src/test/resources/features/ 2>/dev/null | grep '\.feature$' || true)"
+if [[ -n "$untagged_features" ]]; then
+  printf 'AUDIT FAILED: pilot-tag-presence — feature files missing @visual-clue-pilot or @facilitation tag:\n%s\n' "$untagged_features" >&2
+  exit 1
+fi
+printf 'AUDIT PASSED: pilot-tag-presence\n'
 
 feature_diff="$(git diff --name-only origin/main...HEAD -- 'src/test/resources/features/*.feature' || true)"
 if [[ -n "$feature_diff" ]]; then
