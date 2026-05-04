@@ -54,3 +54,18 @@
 ## [2026-05-04] Pilot tag scoping
 - `visual-clue-stage.feature` is now the only feature tagged with `@visual-clue-pilot`.
 - Pilot verification evidence captured in `.sisyphus/evidence/task-1-pilot-contract.txt` using the required grep command.
+
+## [2026-05-04] Task 2+3 execution learnings
+- Keep BDD support composition-first: scenario state lives in `RetroScenarioContext`, browser lifecycle stays in `PlaywrightWorld`, and semantic waits/session flows move into drivers.
+- New progress-bar assertions should target semantic hooks (`data-stage-index`, `data-connector-index`, `data-connector-status`) instead of Tailwind classes so step glue can stay thin.
+
+## [2026-05-04] Task 5: VisualClueStageSteps refactor
+- Rewriting the step definitions as thin glue worked once every browser concern delegated to `RetroSessionDriver`, `SyncDriver`, and `ProgressBarDriver`, leaving only small assertion loops and text normalization in the glue class.
+- The tricky part was Cucumber expression matching: literal `/` and parenthesized text in step annotations needed regex-safe patterns to avoid undefined steps and incomplete annotation failures.
+- Connector semantics are now aligned with `Header.tsx`: "greyed out" means connector status is anything except `in-progress`, while "upcoming" means anything except `complete`.
+- Pilot result: `./mvnw -q -DskipTests compile` passed and `./mvnw test -Dtest=CucumberTestRunner -Dcucumber.filter.tags='@visual-clue-pilot'` passed with 12 scenarios, 0 failures, 0 errors.
+
+## [2026-05-04] Task 6: Evidence hooks
+- Success screenshots now live beside failure screenshots in `.sisyphus/evidence/bdd-pilot/`, using the same safe scenario naming convention with `_success.png` / `_failure.png` suffixes.
+- Fail-fast hook checks belong in `SyncDriver` so semantic selectors can fail with an immediate contract error instead of a Playwright timeout.
+- Progress bar assertions should ask for semantic hook presence before reading `data-stage-status` / `data-connector-status`; this keeps the pilot readable when the DOM contract breaks.

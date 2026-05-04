@@ -1,0 +1,7 @@
+Failure screenshot behavior remains distinct from success artifacts.
+
+Observed files in `.sisyphus/evidence/bdd-pilot/` include both suffixes:
+- `*_failure.png`
+- `*_success.png`
+
+This confirms the existing failure screenshot path is preserved while success screenshots are added for pilot scenarios only.
