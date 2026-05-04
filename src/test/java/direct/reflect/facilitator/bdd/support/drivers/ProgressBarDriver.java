@@ -77,6 +77,46 @@ public class ProgressBarDriver {
         Assertions.assertEquals(expectedStatus, connector(connectorIndex).getAttribute("data-connector-status"));
     }
 
+    public void assertConnectorLooksGreyedOut(int index) {
+        String status = connector(index).getAttribute("data-connector-status");
+        Assertions.assertNotEquals(
+            "in-progress",
+            status,
+            "Expected connector " + index + " to NOT be in-progress (greyed out means left-side connector, not active boundary)"
+        );
+    }
+
+    public void assertConnectorLooksUpcoming(int index) {
+        String status = connector(index).getAttribute("data-connector-status");
+        Assertions.assertNotEquals(
+            "complete",
+            status,
+            "Expected connector " + index + " to NOT be complete (upcoming means right-side connector, not fully done)"
+        );
+    }
+
+    public void assertStationShowsCompletionAffordance(int phase) {
+        int svgCount = station(phase).locator("svg").count();
+        Assertions.assertTrue(
+            svgCount > 0,
+            "Expected station " + phase + " to show a completion affordance (SVG icon), but found none"
+        );
+    }
+
+    public void assertNoHideCollapseControls() {
+        Locator header = world.getPage().locator("header");
+        Assertions.assertEquals(
+            0,
+            header.locator("button[aria-label*='collapse'], button[aria-label*='hide'], button[aria-label*='minimize']").count(),
+            "Expected no collapse/hide/minimize controls in header"
+        );
+    }
+
+    public void assertConnectorHasStatus(int index) {
+        String status = connector(index).getAttribute("data-connector-status");
+        Assertions.assertNotNull(status, "Expected connector " + index + " to have a data-connector-status attribute");
+    }
+
     public void assertStationsIncreaseLeftToRight() {
         Boolean isOrdered = (Boolean) world.getPage().evaluate(
             "() => {" +
