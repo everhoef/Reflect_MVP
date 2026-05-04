@@ -12,11 +12,4 @@ public class RetroScenarioContext {
     private String sessionId;
     private int currentPhaseNumber;
     private boolean lastAdvanceTriggered;
-
-    public void reset() {
-        retroReady = false;
-        sessionId = null;
-        currentPhaseNumber = 0;
-        lastAdvanceTriggered = false;
-    }
 }

@@ -40,7 +40,12 @@ public class SyncDriver {
                 // Retry until deadline.
             }
 
-            page.waitForTimeout(500);
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
 
         throw new AssertionError("Application server did not become ready in time for the Playwright BDD scenario.");

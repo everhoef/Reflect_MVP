@@ -35,8 +35,11 @@ public class PlaywrightWorld {
     @Getter
     private String baseUrl;
 
-    @Value("${local.server.port:8080}")
-    private int serverPort;
+    private final int serverPort;
+
+    public PlaywrightWorld(@Value("${local.server.port:8080}") int serverPort) {
+        this.serverPort = serverPort;
+    }
 
     private static final int DEFAULT_TIMEOUT_MS = 5000;
     private static final String EVIDENCE_DIR = ".sisyphus/evidence/bdd-pilot";
@@ -102,8 +105,8 @@ public class PlaywrightWorld {
             browser = playwright.chromium().launch(launchOptions);
 
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                try { if (browser != null) browser.close(); } catch (Exception ignored) {}
-                try { if (playwright != null) playwright.close(); } catch (Exception ignored) {}
+                try { if (browser != null) browser.close(); } catch (Exception e) { log.debug("Browser close failed during shutdown: {}", e.getMessage()); }
+                try { if (playwright != null) playwright.close(); } catch (Exception e) { log.debug("Playwright close failed during shutdown: {}", e.getMessage()); }
             }, "playwright-bdd-shutdown"));
 
             log.info("Playwright browser started (headless={})", !debugMode);
