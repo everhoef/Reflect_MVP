@@ -10,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
-import java.util.Objects;
 
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.CREATE_SESSION_BUTTON;
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.DISPLAY_NAME_INPUT;
@@ -106,10 +105,9 @@ public class RetroSessionDriver {
                 throw new AssertionError("Cannot advance to target phase because the facilitator next-step button is not visible.");
             }
 
-            String previousPhaseEnum = currentPhaseEnum();
-            String previousStepIndex = Objects.requireNonNullElse(page.locator(RETRO_CONTENT).getAttribute("data-step-index"), "");
+            SyncDriver.ShellSnapshot previousSnapshot = syncDriver.captureShellSnapshot();
             nextButton.click();
-            syncDriver.waitForPhaseOrStepChange(previousPhaseEnum, previousStepIndex);
+            syncDriver.waitForPhaseOrStepChange(previousSnapshot);
             context.setCurrentPhaseNumber(detectCurrentPhaseNumber());
             context.setLastAdvanceTriggered(true);
             safetyCounter++;

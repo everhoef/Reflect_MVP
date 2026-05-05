@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.List;
 
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.RETRO_CONTENT;
 
@@ -17,7 +16,9 @@ import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.RE
 @Component
 @RequiredArgsConstructor
 public class SyncDriver {
-    private static final int LONG_TIMEOUT_MS = 15_000;
+    private static final int RETRO_CONTENT_TIMEOUT_MS = 5_000;
+    private static final int SYNC_POLL_INTERVAL_MS = 100;
+    private static final int SYNC_WINDOW_MS = 2_500;
 
     private final PlaywrightWorld world;
 
@@ -54,7 +55,7 @@ public class SyncDriver {
     public void assertRetroContentLoaded() {
         world.getPage().waitForSelector(
             RETRO_CONTENT,
-            new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS)
+            new Page.WaitForSelectorOptions().setTimeout(RETRO_CONTENT_TIMEOUT_MS)
         );
     }
 
@@ -64,15 +65,85 @@ public class SyncDriver {
         }
     }
 
-    public void waitForPhaseOrStepChange(String previousPhaseEnum, String previousStepIndex) {
-        world.getPage().waitForFunction(
-            "([prevPhase, prevStepIdx]) => { " +
-                "const retro = document.querySelector('[data-testid=\"retro-content\"]'); " +
-                "if (!retro) return false; " +
-                "return retro.getAttribute('data-phase') !== prevPhase || retro.getAttribute('data-step-index') !== prevStepIdx; " +
-            "}",
-            List.of(previousPhaseEnum, previousStepIndex),
-            new Page.WaitForFunctionOptions().setTimeout(LONG_TIMEOUT_MS)
+    public ShellSnapshot captureShellSnapshot() {
+        Locator retroContent = world.getPage().locator(RETRO_CONTENT);
+        String phase = retroContent.getAttribute("data-phase");
+        String stepIndex = retroContent.getAttribute("data-step-index");
+        String syncState = retroContent.getAttribute("data-sync-state");
+        String sseConnected = retroContent.getAttribute("data-sse-connected");
+
+        return new ShellSnapshot(
+            phase == null ? "<missing>" : phase,
+            stepIndex == null ? "<missing>" : stepIndex,
+            syncState == null ? "<missing>" : syncState,
+            sseConnected == null ? "<missing>" : sseConnected
         );
+    }
+
+    public void waitForPhaseOrStepChange(ShellSnapshot previousSnapshot) {
+        ShellSnapshot currentSnapshot = pollForSettledShellChange(previousSnapshot, SYNC_WINDOW_MS);
+        boolean reloadAttempted = false;
+
+        if (!currentSnapshot.isSettledChangedFrom(previousSnapshot) && currentSnapshot.shouldAttemptReload()) {
+            reloadAttempted = true;
+            reloadAndWaitForRetroContent();
+            currentSnapshot = pollForSettledShellChange(previousSnapshot, SYNC_WINDOW_MS);
+        }
+
+        if (!currentSnapshot.isSettledChangedFrom(previousSnapshot)) {
+            throw new AssertionError(
+                "Retro shell did not reach a settled phase/step change. " +
+                    "previous phase=" + previousSnapshot.phase() +
+                    ", previous step=" + previousSnapshot.stepIndex() +
+                    ", current phase=" + currentSnapshot.phase() +
+                    ", current step=" + currentSnapshot.stepIndex() +
+                    ", current sync-state=" + currentSnapshot.syncState() +
+                    ", current connection=" + currentSnapshot.sseConnected() +
+                    ", refresh attempted=" + reloadAttempted
+            );
+        }
+    }
+
+    private ShellSnapshot pollForSettledShellChange(ShellSnapshot previousSnapshot, int timeoutMs) {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        ShellSnapshot latestSnapshot = captureShellSnapshot();
+
+        while (System.currentTimeMillis() <= deadline) {
+            latestSnapshot = captureShellSnapshot();
+            if (latestSnapshot.isSettledChangedFrom(previousSnapshot)) {
+                return latestSnapshot;
+            }
+            sleep(SYNC_POLL_INTERVAL_MS);
+        }
+
+        return latestSnapshot;
+    }
+
+    private void reloadAndWaitForRetroContent() {
+        world.getPage().reload(new Page.ReloadOptions().setTimeout(RETRO_CONTENT_TIMEOUT_MS));
+        assertRetroContentLoaded();
+    }
+
+    private void sleep(int intervalMs) {
+        try {
+            Thread.sleep(intervalMs);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Interrupted while polling retro shell state.", interruptedException);
+        }
+    }
+
+    public record ShellSnapshot(String phase, String stepIndex, String syncState, String sseConnected) {
+        private boolean phaseOrStepChangedFrom(ShellSnapshot previousSnapshot) {
+            return !phase.equals(previousSnapshot.phase()) || !stepIndex.equals(previousSnapshot.stepIndex());
+        }
+
+        private boolean isSettledChangedFrom(ShellSnapshot previousSnapshot) {
+            return phaseOrStepChangedFrom(previousSnapshot) && "settled".equals(syncState);
+        }
+
+        private boolean shouldAttemptReload() {
+            return "false".equals(sseConnected) || "reconciling".equals(syncState);
+        }
     }
 }
