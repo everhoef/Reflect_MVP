@@ -75,20 +75,26 @@ public class ProgressBarDriver {
     }
 
     public void assertConnectorLooksGreyedOut(int index) {
-        String status = connector(index).getAttribute("data-connector-status");
-        Assertions.assertNotEquals(
-            "in-progress",
-            status,
-            "Expected connector " + index + " to NOT be in-progress (greyed out means left-side connector, not active boundary)"
+        Assertions.assertEquals(
+            "complete",
+            connector(index).getAttribute("data-connector-status"),
+            "Expected connector " + index + " to be fully complete (greyed out/completed journey)."
         );
     }
 
     public void assertConnectorLooksUpcoming(int index) {
-        String status = connector(index).getAttribute("data-connector-status");
-        Assertions.assertNotEquals(
-            "complete",
-            status,
-            "Expected connector " + index + " to NOT be complete (upcoming means right-side connector, not fully done)"
+        Assertions.assertEquals(
+            "to-do",
+            connector(index).getAttribute("data-connector-status"),
+            "Expected connector " + index + " to be upcoming (to-do)."
+        );
+    }
+
+    public void assertConnectorIsActiveBoundary(int index) {
+        Assertions.assertEquals(
+            "in-progress",
+            connector(index).getAttribute("data-connector-status"),
+            "Expected connector " + index + " to be the active boundary (in-progress)."
         );
     }
 
