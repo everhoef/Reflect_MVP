@@ -793,7 +793,7 @@ The diff must contain **only the files the partner intended to change**. Reject 
 | `frontend/node_modules/` | Package install output; should never be tracked |
 | `.opencode/oh-my-opencode.json` | Runtime tooling config; ambient drift from OpenCode sessions |
 
-If forbidden files are present, ask the partner to re-run the skill (or fix the branch yourself per the branch-rewrite pattern in `.sisyphus/notepads/pr-skill-and-pr-hygiene/learnings.md`).
+If forbidden files are present, ask the partner to re-run the skill, or fix the branch by removing the forbidden files manually and force-pushing.
 
 ### Step 2: Test Gate
 
