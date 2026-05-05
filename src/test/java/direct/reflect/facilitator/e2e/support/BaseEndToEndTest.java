@@ -742,23 +742,6 @@ public abstract class BaseEndToEndTest {
         facilitatorPage.waitForSelector("input[name='sessionName']", new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
         log.debug("Session creation form found");
 
-        final String[] redirectUrl = {null};
-        facilitatorPage.onResponse(response -> {
-            if (response.url().contains("/api/retros")) {
-                log.debug("Session create response: status={}", response.status());
-                String hxRedirect = response.headers().get("hx-redirect");
-                if (hxRedirect == null) {
-                    hxRedirect = response.headers().get("HX-Redirect");
-                }
-                if (hxRedirect != null) {
-                    redirectUrl[0] = hxRedirect;
-                    log.debug("Found HX-Redirect header: {}", hxRedirect);
-                } else {
-                    log.warn("No HX-Redirect header found in session creation response");
-                }
-            }
-        });
-
         facilitatorPage.fill("input[name='sessionName']", sessionName);
         facilitatorPage.click("button:has-text('Create Session')");
 
@@ -770,26 +753,20 @@ public abstract class BaseEndToEndTest {
                 );
             } catch (Exception e) {
                 log.warn("waitForURL to /retro/ timed out or failed: {}. Attempting manual navigation.", e.getMessage());
-                if (redirectUrl[0] != null && !redirectUrl[0].isEmpty()) {
-                    String targetUrl = redirectUrl[0].startsWith("http") ? redirectUrl[0] : baseUrl + redirectUrl[0];
-                    log.info("Navigating manually to HX-Redirect URL: {}", targetUrl);
+                String persistedSessionId = retroSessionRepository.findAll().stream()
+                    .filter(session -> sessionName.equals(session.getName()))
+                    .max(Comparator.comparing(session -> session.getCreatedAt()))
+                    .map(session -> session.getId().toString())
+                    .orElse("");
+                if (!persistedSessionId.isEmpty()) {
+                    String targetUrl = baseUrl + "/retro/" + persistedSessionId;
+                    log.info("Navigating manually to persisted session URL: {}", targetUrl);
                     facilitatorPage.navigate(targetUrl);
+                } else if (facilitatorPage.url().contains("/retro/")) {
+                    log.info("URL already at /retro/ despite waitForURL timeout, continuing");
                 } else {
-                    String persistedSessionId = retroSessionRepository.findAll().stream()
-                        .filter(session -> sessionName.equals(session.getName()))
-                        .max(Comparator.comparing(session -> session.getCreatedAt()))
-                        .map(session -> session.getId().toString())
-                        .orElse("");
-                    if (!persistedSessionId.isEmpty()) {
-                        String targetUrl = baseUrl + "/retro/" + persistedSessionId;
-                        log.info("Navigating manually to persisted session URL: {}", targetUrl);
-                        facilitatorPage.navigate(targetUrl);
-                    } else if (facilitatorPage.url().contains("/retro/")) {
-                        log.info("URL already at /retro/ despite waitForURL timeout, continuing");
-                    } else {
-                        log.error("No HX-Redirect URL or persisted session found; cannot recover from waitForURL failure");
-                        throw new RuntimeException("Session creation redirect failed and no session could be recovered", e);
-                    }
+                    log.error("No persisted session found; cannot recover from waitForURL failure");
+                    throw new RuntimeException("Session creation redirect failed and no session could be recovered", e);
                 }
             }
         } else {
@@ -800,15 +777,9 @@ public abstract class BaseEndToEndTest {
         String sessionUrl = facilitatorPage.url();
         log.debug("Facilitator URL after session creation: {}", sessionUrl);
 
-        if (redirectUrl[0] != null && !redirectUrl[0].isEmpty()) {
-            String extractedId = redirectUrl[0].substring(redirectUrl[0].lastIndexOf("/") + 1);
-            log.debug("Extracted session ID from HX-Redirect header: {}", extractedId);
-            return extractedId;
-        } else {
-            String extractedId = sessionUrl.substring(sessionUrl.lastIndexOf("/") + 1);
-            log.debug("Extracted session ID from current URL: {}", extractedId);
-            return extractedId;
-        }
+        String extractedId = sessionUrl.substring(sessionUrl.lastIndexOf("/") + 1);
+        log.debug("Extracted session ID from current URL: {}", extractedId);
+        return extractedId;
     }
 
     /**
@@ -841,25 +812,9 @@ public abstract class BaseEndToEndTest {
                 log.error("❌ Form fill failed! Expected: {}, Actual: {}", sessionId, filledValue);
             }
 
-            final String[] redirectUrl = {null};
             participantPage.onRequest(request -> {
                 if (request.url().contains("/api/retros/") && request.url().contains("/participants") && "POST".equals(request.method())) {
                     log.info("📤 JOIN REQUEST: {} {}", request.method(), request.url());
-                }
-            });
-
-            participantPage.onResponse(response -> {
-                if (response.url().contains("/api/retros/") && response.url().contains("/participants") && "POST".equals(response.request().method())) {
-                    String hxRedirect = response.headers().get("hx-redirect");
-                    if (hxRedirect == null) {
-                        hxRedirect = response.headers().get("HX-Redirect");
-                    }
-                    if (hxRedirect != null) {
-                        log.info("📥 JOIN SUCCESS → {}", hxRedirect);
-                        redirectUrl[0] = hxRedirect;
-                    } else {
-                        log.warn("📥 JOIN RESPONSE ({}): No redirect header", response.status());
-                    }
                 }
             });
 
@@ -881,7 +836,7 @@ public abstract class BaseEndToEndTest {
             }
 
         if (!participantPage.url().contains("/retro/")) {
-            String targetUrl = redirectUrl[0] != null ? (redirectUrl[0].startsWith("http") ? redirectUrl[0] : baseUrl + redirectUrl[0]) : (baseUrl + "/retro/" + sessionId);
+            String targetUrl = baseUrl + "/retro/" + sessionId;
             log.info("Redirect didn't occur, navigating manually to: {}", targetUrl);
             participantPage.navigate(targetUrl);
             participantPage.waitForSelector("h2:has-text('Session Lobby'), [data-step-index], [data-testid='retro-content']",

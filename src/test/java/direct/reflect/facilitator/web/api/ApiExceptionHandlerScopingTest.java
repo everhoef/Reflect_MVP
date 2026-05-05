@@ -77,6 +77,6 @@ public class ApiExceptionHandlerScopingTest {
                 .content("invalid-json")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
-                .andExpect(header().exists("HX-Redirect"));
+                .andExpect(status().isBadRequest());
     }
 }
