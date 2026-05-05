@@ -6,13 +6,31 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchRule;
+import direct.reflect.facilitator.e2e.support.BaseEndToEndTest;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Comparator;
+import java.util.List;
+import java.util.regex.Pattern;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 class ArchitectureGuardrailTest {
+
+    private static final Path PROJECT_ROOT = Paths.get(".").toAbsolutePath().normalize();
+    private static final Path BDD_STEP_DEFINITIONS = PROJECT_ROOT.resolve("src/test/java/direct/reflect/facilitator/bdd/stepdefinitions");
+    private static final Path BDD_SUPPORT_DRIVERS = PROJECT_ROOT.resolve("src/test/java/direct/reflect/facilitator/bdd/support/drivers");
+    private static final Path FEATURE_FILES = PROJECT_ROOT.resolve("src/test/resources/features");
 
     private static final JavaClasses PRODUCTION_CLASSES = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
@@ -150,6 +168,121 @@ class ArchitectureGuardrailTest {
                 .because("session owns flow and lifecycle, while action tracking, clustering, and escalation stay in their own facilitation capabilities.");
 
         rule.check(PRODUCTION_CLASSES);
+    }
+
+    @Test
+    @DisplayName("no bdd class extends BaseEndToEndTest")
+    void noBddClassExtendsBaseEndToEndTest() {
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("..bdd..")
+                .should().beAssignableTo(BaseEndToEndTest.class)
+                .as("no bdd class extends BaseEndToEndTest")
+                .because("BDD support and step definitions must not inherit the Playwright end-to-end base class.");
+
+        rule.check(TEST_CLASSES);
+    }
+
+    @Test
+    @DisplayName("no bdd class uses PendingException")
+    void noBddClassUsesPendingException() {
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("..bdd..")
+                .should().dependOnClassesThat().haveFullyQualifiedName("io.cucumber.java.PendingException")
+                .as("no bdd class uses PendingException")
+                .because("Committed BDD code must not ship placeholder pending steps.");
+
+        rule.check(TEST_CLASSES);
+    }
+
+    @Test
+    @DisplayName("no raw Playwright waits in bdd step definitions")
+    void noRawPlaywrightWaitsInBddStepDefinitions() {
+        List<String> violations = findMatchingLines(
+                List.of(BDD_STEP_DEFINITIONS),
+                "*.java",
+                Pattern.compile("page\\.locator|waitForSelector|waitForFunction|waitForTimeout|Thread\\.sleep"));
+
+        Assertions.assertTrue(
+                violations.isEmpty(),
+                () -> "Found raw Playwright waits in bdd step definitions:\n" + String.join("\n", violations));
+    }
+
+    @Test
+    @DisplayName("no css or layout coupling tokens in bdd step definitions or drivers")
+    void noCssOrLayoutCouplingTokensInBddStepDefinitionsOrDrivers() {
+        List<String> violations = findMatchingLines(
+                List.of(BDD_STEP_DEFINITIONS, BDD_SUPPORT_DRIVERS),
+                "*.java",
+                Pattern.compile("bg-amber|bg-gray|rounded-full|h-px|boundingBox|nth-child"));
+
+        Assertions.assertTrue(
+                violations.isEmpty(),
+                () -> "Found CSS or layout coupling tokens in bdd step definitions or drivers:\n" + String.join("\n", violations));
+    }
+
+    @Test
+    @DisplayName("every feature file has a required pilot or facilitation tag")
+    void everyFeatureFileHasRequiredTag() {
+        List<String> missingTags = findFeatureFilesMissingRequiredTag();
+
+        Assertions.assertTrue(
+                missingTags.isEmpty(),
+                () -> "Feature files missing @facilitation or @visual-clue-pilot:\n" + String.join("\n", missingTags));
+    }
+
+    private List<String> findMatchingLines(List<Path> roots, String fileSuffix, Pattern pattern) {
+        return roots.stream()
+                .flatMap(root -> walkFiles(root, fileSuffix).stream())
+                .sorted()
+                .flatMap(path -> readLines(path).stream()
+                        .flatMap(indexedLine -> pattern.matcher(indexedLine.content()).find()
+                                ? Stream.of(formatViolation(path, indexedLine))
+                                : Stream.empty()))
+                .toList();
+    }
+
+    private List<String> findFeatureFilesMissingRequiredTag() {
+        return walkFiles(FEATURE_FILES, "*.feature").stream()
+                .sorted(Comparator.naturalOrder())
+                .filter(path -> readLines(path).stream().noneMatch(indexedLine ->
+                        indexedLine.content().contains("@facilitation")
+                                || indexedLine.content().contains("@visual-clue-pilot")))
+                .map(PROJECT_ROOT::relativize)
+                .map(Path::toString)
+                .toList();
+    }
+
+    private List<Path> walkFiles(Path root, String glob) {
+        if (Files.notExists(root)) {
+            return List.of();
+        }
+
+        try (Stream<Path> paths = Files.walk(root)) {
+            return paths
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.getFileSystem().getPathMatcher("glob:" + glob).matches(path.getFileName()))
+                    .toList();
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Failed to walk " + root, exception);
+        }
+    }
+
+    private List<IndexedLine> readLines(Path path) {
+        try {
+            List<String> lines = Files.readAllLines(path);
+            return IntStream.range(0, lines.size())
+                    .mapToObj(index -> new IndexedLine(index + 1, lines.get(index)))
+                    .toList();
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Failed to read " + path, exception);
+        }
+    }
+
+    private String formatViolation(Path path, IndexedLine indexedLine) {
+        return PROJECT_ROOT.relativize(path) + ":" + indexedLine.number() + ": " + indexedLine.content();
+    }
+
+    private record IndexedLine(int number, String content) {
     }
 
 }
