@@ -50,17 +50,30 @@ export default function Header({ currentStage }: HeaderProps) {
                 const status = getStageStatus(stage.id, currentStage)
                 return (
                   <div key={stage.id} className="flex items-center">
-                    {index > 0 && (
-                      <div
-                        className={`w-6 h-px mx-1 ${
-                          status === 'complete' || getStageStatus(stage.id - 1, currentStage) === 'in-progress'
-                            ? 'bg-amber-400'
-                            : 'bg-gray-200'
-                        }`}
-                      />
-                    )}
+                    {index > 0 && (() => {
+                      const prevStatus = getStageStatus(stage.id - 1, currentStage)
+                      const connectorStatus =
+                        status === 'complete'
+                          ? 'complete'
+                          : prevStatus === 'in-progress'
+                          ? 'in-progress'
+                          : 'to-do'
+                      return (
+                        <div
+                          data-connector-index={index}
+                          data-connector-status={connectorStatus}
+                          className={`w-6 h-px mx-1 ${
+                            connectorStatus === 'complete' || connectorStatus === 'in-progress'
+                              ? 'bg-amber-400'
+                              : 'bg-gray-200'
+                          }`}
+                        />
+                      )
+                    })()}
 
                     <div
+                      data-stage-index={stage.id}
+                      data-stage-status={status}
                       className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all ${
                         status === 'complete'
                           ? 'bg-amber-100 text-amber-700'
@@ -99,4 +112,3 @@ export default function Header({ currentStage }: HeaderProps) {
     </header>
   )
 }
-

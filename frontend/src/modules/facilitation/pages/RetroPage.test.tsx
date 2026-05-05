@@ -213,6 +213,49 @@ describe('RetroPage SSE routing', () => {
     expect(screen.getByTestId('retro-content')).toHaveAttribute('data-sse-connected', 'false')
   })
 
+  it('renders data-sync-state="unknown" when versions are not available', async () => {
+    mockFetchSuccess()
+    renderRetroPage(buildQueryClient())
+
+    await waitFor(() => {
+      expect(screen.getByTestId('retro-content')).toBeInTheDocument()
+    })
+
+    expect(screen.getByTestId('retro-content')).toHaveAttribute('data-sync-state', 'unknown')
+  })
+
+  it('renders data-sync-state="reconciling" when signaledVersion is ahead of appliedVersion', async () => {
+    mockFetchSuccess()
+    const queryClient = buildQueryClient()
+    const view = renderRetroPage(queryClient)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('retro-content')).toBeInTheDocument()
+    })
+
+    useAppliedVersionStore.setState({ appliedVersionByRetroId: { [RETRO_ID]: 5 } })
+    setCapturedTransportState({ signaledVersion: 6 })
+    view.rerender(retroPageTree(queryClient))
+
+    expect(screen.getByTestId('retro-content')).toHaveAttribute('data-sync-state', 'reconciling')
+  })
+
+  it('renders data-sync-state="settled" when signaledVersion matches appliedVersion', async () => {
+    mockFetchSuccess()
+    const queryClient = buildQueryClient()
+    const view = renderRetroPage(queryClient)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('retro-content')).toBeInTheDocument()
+    })
+
+    useAppliedVersionStore.setState({ appliedVersionByRetroId: { [RETRO_ID]: 5 } })
+    setCapturedTransportState({ signaledVersion: 5 })
+    view.rerender(retroPageTree(queryClient))
+
+    expect(screen.getByTestId('retro-content')).toHaveAttribute('data-sync-state', 'settled')
+  })
+
   it('refetches the bounded bundle on SSE open/reconnect transitions', async () => {
     const fetchCounts = { state: 0, participants: 0, timer: 0, actions: 0, escalations: 0 }
 

@@ -217,6 +217,14 @@
 			<scope>test</scope>
 		</dependency>
 		
+		<!-- SpotBugs annotations (provides @SuppressFBWarnings used in production code) -->
+		<dependency>
+			<groupId>com.github.spotbugs</groupId>
+			<artifactId>spotbugs-annotations</artifactId>
+			<version>4.9.3</version>
+			<optional>true</optional>
+		</dependency>
+
 		<!-- Playwright for browser automation -->
 		<dependency>
 			<groupId>com.microsoft.playwright</groupId>
@@ -229,6 +237,28 @@
 			<artifactId>selenium-remote-driver</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- Cucumber for BDD integration tests -->
+		<dependency>
+			<groupId>io.cucumber</groupId>
+			<artifactId>cucumber-java</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.cucumber</groupId>
+			<artifactId>cucumber-spring</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.cucumber</groupId>
+			<artifactId>cucumber-junit-platform-engine</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.platform</groupId>
+			<artifactId>junit-platform-suite</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 	
 	<dependencyManagement>
@@ -238,6 +268,14 @@
 				<groupId>org.testcontainers</groupId>
 				<artifactId>testcontainers-bom</artifactId>
 				<version>${testcontainers.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<!-- Cucumber BOM -->
+			<dependency>
+				<groupId>io.cucumber</groupId>
+				<artifactId>cucumber-bom</artifactId>
+				<version>7.21.0</version>
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>
@@ -319,6 +357,18 @@
 				</executions>
 			</plugin>
 			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<includes>
+						<include>**/*Test.java</include>
+						<include>**/*Tests.java</include>
+						<include>**/*TestCase.java</include>
+						<include>**/*TestRunner.java</include>
+					</includes>
+				</configuration>
+			</plugin>
+			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 				<configuration>
@@ -350,6 +400,7 @@
 				<artifactId>maven-pmd-plugin</artifactId>
 				<version>3.28.0</version>
 				<configuration>
+					<includeTests>true</includeTests>
 					<failOnViolation>true</failOnViolation>
 					<failurePriority>5</failurePriority>
 					<maxAllowedViolations>${pmd.maxAllowedViolations}</maxAllowedViolations>
