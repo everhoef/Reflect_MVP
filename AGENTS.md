@@ -509,6 +509,45 @@ Do not add new `BrowserRegressionTest`, `BrowserSmokeTest`, or `BrowserTest` cla
 - **Do NOT use `@WithMockUser`** in security-critical tests that test the authorization matrix itself — use `SecurityMockMvcRequestPostProcessors.authentication()` + `MockHttpSession` with `authType`/`authenticatedUser` attributes instead.
 - **`spring.security.enabled: false`** must NOT appear in test config — it silently disables all `@PreAuthorize` checks.
 
+#### Cucumber BDD Architecture
+
+The BDD stack uses Cucumber + Playwright to verify user-facing behavior through semantic interaction. It avoids raw Playwright waits and CSS coupling by observing the semantic shell.
+
+| Package | Role | Key Classes |
+|---|---|---|
+| `bdd/` | Runner + Entry Point | `CucumberTestRunner` |
+| `bdd/support/` | Scenario Lifecycle | `CucumberSpringConfiguration`, `PlaywrightWorld` |
+| `bdd/support/context/` | Scenario State | `RetroScenarioContext` |
+| `bdd/support/selectors/` | Semantic Selectors | `RetroSelectors` |
+| `bdd/support/drivers/` | Behavior Surfaces | `RetroSessionDriver`, `ProgressBarDriver`, `SyncDriver` |
+| `bdd/stepdefinitions/` | Gherkin Glue | `VisualClueStageSteps` |
+
+**Architecture Components:**
+- **`CucumberSpringConfiguration`**: Bootstraps the Spring context with Testcontainers (PostgreSQL, Redis) and test-specific security overrides.
+- **`PlaywrightWorld`**: Manages the Playwright browser lifecycle. It provides isolated `BrowserContext` and `Page` instances for each scenario, supporting multi-user flows via `createAdditionalContext()`.
+- **`RetroScenarioContext`**: A `@ScenarioScope` component that carries shared state (session IDs, phase numbers) across step definitions within a single scenario.
+- **`RetroSelectors`**: A central library of semantic selectors. Step definitions and drivers must use these constants instead of raw CSS or XPath strings.
+- **`SyncDriver`**: Observes the `[data-testid='retro-content']` semantic shell to ensure the UI is in sync with the backend. It polls for state changes based on attributes like `data-phase`, `data-step-index`, and the upcoming `data-sync-state`.
+- **`RetroSessionDriver`**: Handles high-level retrospective lifecycle operations such as guest authentication, session creation, and phase advancement.
+- **`ProgressBarDriver`**: Encapsulates interactions with the stage progress indicator, verifying station status, connectors, and spatial orientation.
+
+**Extension Philosophy:**
+- **New Behavior**: Add a dedicated Driver in `bdd/support/drivers/` for complex component interactions.
+- **New Step**: Add Gherkin steps to existing classes in `bdd/stepdefinitions/` or create a new class for a new feature area.
+- **New Selector**: Always add to `RetroSelectors` first. Never use raw selectors in step definitions.
+- **New State**: Use `RetroScenarioContext` for variables that need to persist across steps in one scenario.
+
+**Synchronization and SSE:**
+The BDD stack does not use a raw SSE event driver. Instead, it observes the rendered shell state. The frontend (`useSSE` -> `RetroPage` reconciliation -> `useAppliedVersionStore`) handles the complexity of `signaledVersion` vs `appliedVersion`. Tests observe the outcome via semantic attributes on the `retro-content` container.
+
+**Architecture Guardrails:**
+`ArchitectureGuardrailTest` enforces BDD hygiene:
+- No BDD class may extend `BaseEndToEndTest`.
+- `PendingException` is forbidden in committed code.
+- Raw Playwright waits (`waitForTimeout`, `Thread.sleep`) are forbidden in step definitions.
+- CSS/Layout coupling tokens (Tailwind classes, bounding boxes) are forbidden in drivers and steps.
+- Every `.feature` file must be tagged with `@facilitation` or `@visual-clue-pilot`.
+
 ### Security Considerations
 - Always validate user permissions before operations
 - Use SecurityContext for authentication checks
