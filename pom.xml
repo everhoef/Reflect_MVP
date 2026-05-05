@@ -400,6 +400,7 @@
 				<artifactId>maven-pmd-plugin</artifactId>
 				<version>3.28.0</version>
 				<configuration>
+					<includeTests>true</includeTests>
 					<failOnViolation>true</failOnViolation>
 					<failurePriority>5</failurePriority>
 					<maxAllowedViolations>${pmd.maxAllowedViolations}</maxAllowedViolations>
