@@ -19,30 +19,34 @@ public class SyncDriver {
     private static final int RETRO_CONTENT_TIMEOUT_MS = 5_000;
     private static final int SYNC_POLL_INTERVAL_MS = 100;
     private static final int SYNC_WINDOW_MS = 2_500;
+    private static final int SERVER_READY_TIMEOUT_MS = 30_000;
+    private static final int SERVER_CONNECT_TIMEOUT_MS = 1_000;
+    private static final int SERVER_READ_TIMEOUT_MS = 3_000;
+    private static final int SERVER_POLL_INTERVAL_MS = 500;
 
     private final PlaywrightWorld world;
 
     public void waitForServerReady() {
         String loginUrl = world.getBaseUrl() + "/login";
-        long deadline = System.currentTimeMillis() + 30_000L;
+        long deadline = System.currentTimeMillis() + SERVER_READY_TIMEOUT_MS;
         Page page = world.getPage();
 
         while (System.currentTimeMillis() < deadline) {
             try {
                 HttpURLConnection connection = (HttpURLConnection) new URL(loginUrl).openConnection();
-                connection.setConnectTimeout(1_000);
-                connection.setReadTimeout(3_000);
+                connection.setConnectTimeout(SERVER_CONNECT_TIMEOUT_MS);
+                connection.setReadTimeout(SERVER_READ_TIMEOUT_MS);
                 int status = connection.getResponseCode();
                 connection.disconnect();
                 if (status < 500) {
                     return;
                 }
             } catch (Exception ignored) {
-                // Retry until deadline.
+                // Retry until deadline; transient startup failures are expected here.
             }
 
             try {
-                Thread.sleep(500);
+                Thread.sleep(SERVER_POLL_INTERVAL_MS);
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
                 break;

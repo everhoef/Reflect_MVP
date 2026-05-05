@@ -197,6 +197,11 @@ class ArchitectureGuardrailTest {
     @Test
     @DisplayName("no raw Playwright waits in bdd step definitions")
     void noRawPlaywrightWaitsInBddStepDefinitions() {
+        long fileCount = walkFiles(BDD_STEP_DEFINITIONS, "*.java").size();
+        Assertions.assertTrue(
+                fileCount > 0,
+                "Expected at least one .java file in BDD step definitions directory, but found none — check path: " + BDD_STEP_DEFINITIONS);
+
         List<String> violations = findMatchingLines(
                 List.of(BDD_STEP_DEFINITIONS),
                 "*.java",
@@ -210,6 +215,16 @@ class ArchitectureGuardrailTest {
     @Test
     @DisplayName("no css or layout coupling tokens in bdd step definitions or drivers")
     void noCssOrLayoutCouplingTokensInBddStepDefinitionsOrDrivers() {
+        long stepDefinitionFileCount = walkFiles(BDD_STEP_DEFINITIONS, "*.java").size();
+        Assertions.assertTrue(
+                stepDefinitionFileCount > 0,
+                "Expected at least one .java file in BDD step definitions directory, but found none — check path: " + BDD_STEP_DEFINITIONS);
+
+        long driverFileCount = walkFiles(BDD_SUPPORT_DRIVERS, "*.java").size();
+        Assertions.assertTrue(
+                driverFileCount > 0,
+                "Expected at least one .java file in BDD support drivers directory, but found none — check path: " + BDD_SUPPORT_DRIVERS);
+
         List<String> violations = findMatchingLines(
                 List.of(BDD_STEP_DEFINITIONS, BDD_SUPPORT_DRIVERS),
                 "*.java",
@@ -223,6 +238,11 @@ class ArchitectureGuardrailTest {
     @Test
     @DisplayName("every feature file has a required pilot or facilitation tag")
     void everyFeatureFileHasRequiredTag() {
+        long fileCount = walkFiles(FEATURE_FILES, "*.feature").size();
+        Assertions.assertTrue(
+                fileCount > 0,
+                "Expected at least one .feature file in feature directory, but found none — check path: " + FEATURE_FILES);
+
         List<String> missingTags = findFeatureFilesMissingRequiredTag();
 
         Assertions.assertTrue(
