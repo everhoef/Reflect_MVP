@@ -334,8 +334,15 @@ function RetroPageInner() {
   }
 
   const state: RetroState = normalizeState(rawState);
-
+  
   const currentStep = state.steps.find((s) => s.id === state.currentStepId) ?? null;
+
+  const syncState =
+    signaledVersion != null && appliedVersion != null
+      ? signaledVersion > appliedVersion
+        ? "reconciling"
+        : "settled"
+      : "unknown";
 
   return (
     <div
@@ -344,6 +351,7 @@ function RetroPageInner() {
       data-step-index={state.currentStepIndex}
       data-phase={state.phase}
       data-sse-connected={connectionState === "open" ? "true" : "false"}
+      data-sync-state={syncState}
     >
 
       {currentStep && (
