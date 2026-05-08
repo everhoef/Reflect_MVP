@@ -91,3 +91,12 @@ Feature: Visual Clue Stage
     And the connecting lines through completed phases should be greyed out
     And the map should visually indicate we are at the final station
 
+  Scenario: Scenario 16: Connecting lines show journey progression
+    Given I am in phase 3 of the retrospective
+    When I view the underground map
+    Then the line from phase 1 to phase 2 should be greyed out (completed journey)
+    And the line from phase 2 to phase 3 should be greyed out (completed journey)
+    And the line from phase 3 to phase 4 should be in normal style (upcoming journey)
+    And the line from phase 4 to phase 5 should be in normal style (upcoming journey)
+    And the lines should visually represent the retrospective's progress
+

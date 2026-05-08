@@ -355,10 +355,9 @@ public class VisualClueStageSteps {
 
     @Then("all connecting lines should be in normal style")
     public void allConnectingLinesShouldBeInNormalStyle() {
-        for (int connector = 2; connector <= 4; connector++) {
+        for (int connector = 1; connector <= 4; connector++) {
             progressBarDriver.assertConnectorLooksUpcoming(connector);
         }
-        progressBarDriver.assertConnectorIsActiveBoundary(1);
     }
 
     @Then("^no phases should be greyed out \\(none completed yet\\)$")
@@ -377,7 +376,7 @@ public class VisualClueStageSteps {
 
     @Then("the connecting lines through completed phases should be greyed out")
     public void theConnectingLinesThroughCompletedPhasesShouldBeGreyedOut() {
-        for (int connector = 1; connector < context.getCurrentPhaseNumber() - 1; connector++) {
+        for (int connector = 1; connector < context.getCurrentPhaseNumber(); connector++) {
             progressBarDriver.assertConnectorLooksGreyedOut(connector);
         }
     }
@@ -385,6 +384,21 @@ public class VisualClueStageSteps {
     @Then("the map should visually indicate we are at the final station")
     public void theMapShouldVisuallyIndicateWeAreAtTheFinalStation() {
         progressBarDriver.assertStationHighlighted(5);
+    }
+
+    @Then("^the line from phase (\\d+) to phase (\\d+) should be greyed out \\(completed journey\\)$")
+    public void theLineFromPhaseToPhaseShouldBeGreyedOutCompletedJourney(int fromPhase, int toPhase) {
+        progressBarDriver.assertConnectorLooksGreyedOut(Math.min(fromPhase, toPhase));
+    }
+
+    @Then("^the line from phase (\\d+) to phase (\\d+) should be in normal style \\(upcoming journey\\)$")
+    public void theLineFromPhaseToPhaseShouldBeInNormalStyleUpcomingJourney(int fromPhase, int toPhase) {
+        progressBarDriver.assertConnectorLooksUpcoming(Math.min(fromPhase, toPhase));
+    }
+
+    @Then("the lines should visually represent the retrospective's progress")
+    public void theLinesShouldVisuallyRepresentTheRetrospectivesProgress() {
+        Assertions.assertEquals(4, progressBarDriver.connectorCount(), "Expected connector lines across the five-stage journey.");
     }
 
 

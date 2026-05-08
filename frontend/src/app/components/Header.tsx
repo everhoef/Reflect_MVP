@@ -51,19 +51,13 @@ export default function Header({ currentStage }: HeaderProps) {
                 return (
                   <div key={stage.id} className="flex items-center">
                     {index > 0 && (() => {
-                      const prevStatus = getStageStatus(stage.id - 1, currentStage)
-                      const connectorStatus =
-                        status === 'complete'
-                          ? 'complete'
-                          : prevStatus === 'in-progress'
-                          ? 'in-progress'
-                          : 'to-do'
+                      const connectorStatus = currentStage !== undefined && stage.id <= currentStage ? 'complete' : 'to-do'
                       return (
                         <div
                           data-connector-index={index}
                           data-connector-status={connectorStatus}
                           className={`w-6 h-px mx-1 ${
-                            connectorStatus === 'complete' || connectorStatus === 'in-progress'
+                            connectorStatus === 'complete'
                               ? 'bg-amber-400'
                               : 'bg-gray-200'
                           }`}

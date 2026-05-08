@@ -86,14 +86,6 @@ public class ProgressBarDriver {
         );
     }
 
-    public void assertConnectorIsActiveBoundary(int index) {
-        Assertions.assertEquals(
-            "in-progress",
-            connector(index).getAttribute("data-connector-status"),
-            "Expected connector " + index + " to be the active boundary (in-progress)."
-        );
-    }
-
     public void assertStationShowsCompletionAffordance(int phase) {
         int svgCount = station(phase).locator("svg").count();
         Assertions.assertTrue(
