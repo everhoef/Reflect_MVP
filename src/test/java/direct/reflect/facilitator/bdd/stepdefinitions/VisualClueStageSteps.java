@@ -387,30 +387,6 @@ public class VisualClueStageSteps {
         progressBarDriver.assertStationHighlighted(5);
     }
 
-    @Then("^the line from phase (\\d+) to phase (\\d+) should be greyed out \\(completed journey\\)$")
-    public void theLineFromPhaseToPhaseShouldBeGreyedOutCompletedJourney(int fromPhase, int toPhase) {
-        progressBarDriver.assertConnectorLooksGreyedOut(Math.min(fromPhase, toPhase));
-    }
-
-    @Then("^the line from phase (\\d+) to phase (\\d+) should be in normal style \\(upcoming journey\\)$")
-    public void theLineFromPhaseToPhaseShouldBeInNormalStyleUpcomingJourney(int fromPhase, int toPhase) {
-        progressBarDriver.assertConnectorLooksUpcoming(Math.min(fromPhase, toPhase));
-    }
-
-    @Then("^the line from phase (\\d+) to phase (\\d+) should be in normal style \\(entry to current phase\\)$")
-    public void theLineFromPhaseToPhaseShouldBeInNormalStyleEntryToCurrentPhase(int fromPhase, int toPhase) {
-        progressBarDriver.assertConnectorLooksUpcoming(Math.min(fromPhase, toPhase));
-    }
-
-    @Then("^the line from phase (\\d+) to phase (\\d+) should be the active boundary \\(current phase exit\\)$")
-    public void theLineFromPhaseToPhaseShouldBeTheActiveBoundaryCurrentPhaseExit(int fromPhase, int toPhase) {
-        progressBarDriver.assertConnectorIsActiveBoundary(Math.min(fromPhase, toPhase));
-    }
-
-    @Then("the lines should visually represent the retrospective's progress")
-    public void theLinesShouldVisuallyRepresentTheRetrospectivesProgress() {
-        Assertions.assertEquals(4, progressBarDriver.connectorCount(), "Expected connector lines across the five-stage journey.");
-    }
 
     private String normalizedText(Locator locator) {
         return Objects.requireNonNullElse(locator.textContent(), "")

@@ -70,10 +70,6 @@ public class ProgressBarDriver {
         return "to-do".equals(station(phaseNumber).getAttribute("data-stage-status"));
     }
 
-    public void assertConnectorStatus(int connectorIndex, String expectedStatus) {
-        Assertions.assertEquals(expectedStatus, connector(connectorIndex).getAttribute("data-connector-status"));
-    }
-
     public void assertConnectorLooksGreyedOut(int index) {
         Assertions.assertEquals(
             "complete",
