@@ -1,8 +1,8 @@
 package direct.reflect.facilitator.bdd.stepdefinitions;
 
+import com.microsoft.playwright.options.Cookie;
 import direct.reflect.facilitator.bdd.support.context.RetroScenarioContext;
 import direct.reflect.facilitator.bdd.support.drivers.RetroSessionDriver;
-import direct.reflect.facilitator.bdd.support.drivers.SyncDriver;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
@@ -18,7 +18,6 @@ import java.util.UUID;
 public class AnonymousLoginSteps {
 
     private final RetroSessionDriver retroSessionDriver;
-    private final SyncDriver syncDriver;
     private final RetroScenarioContext context;
 
     @Given("I am a team member")
@@ -95,10 +94,12 @@ public class AnonymousLoginSteps {
 
     @Then("I should be able to identify my own contributions")
     public void iShouldBeAbleToIdentifyMyOwnContributions() {
-        if (context.getParticipantCookies() != null) {
-            retroSessionDriver.restoreCookies(context.getParticipantCookies());
-            retroSessionDriver.reloadAndWait();
+        List<Cookie> participantCookies = context.getParticipantCookies();
+        if (participantCookies == null) {
+            throw new AssertionError("Participant cookies not captured — cannot verify own contributions.");
         }
+        retroSessionDriver.restoreCookies(participantCookies);
+        retroSessionDriver.reloadAndWait();
         retroSessionDriver.waitForColumnBoardVisible();
         retroSessionDriver.assertOwnNoteVisible(context.getLastNoteContent());
     }
@@ -125,7 +126,7 @@ public class AnonymousLoginSteps {
 
     @When("I rejoin via the unique session link")
     public void iRejoinViaTheUniqueSessionLink() {
-        List<com.microsoft.playwright.options.Cookie> participantCookies = context.getParticipantCookies();
+        List<Cookie> participantCookies = context.getParticipantCookies();
         if (participantCookies == null) {
             throw new AssertionError("Participant cookies not captured for re-entry.");
         }
@@ -220,7 +221,7 @@ public class AnonymousLoginSteps {
     }
 
     private void advanceToRevealStepAsFacilitator() {
-        List<com.microsoft.playwright.options.Cookie> facilitatorCookies = context.getFacilitatorCookies();
+        List<Cookie> facilitatorCookies = context.getFacilitatorCookies();
         if (facilitatorCookies == null) {
             throw new AssertionError("Facilitator cookies not captured.");
         }
@@ -231,7 +232,7 @@ public class AnonymousLoginSteps {
     }
 
     private void rejoinAsParticipantAndAssertAuthor(String displayName) {
-        List<com.microsoft.playwright.options.Cookie> participantCookies = context.getParticipantCookies();
+        List<Cookie> participantCookies = context.getParticipantCookies();
         if (participantCookies == null) {
             throw new AssertionError("Participant cookies not captured.");
         }

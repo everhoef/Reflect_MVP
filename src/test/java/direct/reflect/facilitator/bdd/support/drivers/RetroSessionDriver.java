@@ -9,6 +9,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import com.microsoft.playwright.options.Cookie;
+
+import java.util.List;
 import java.util.Map;
 
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.CREATE_SESSION_BUTTON;
@@ -41,15 +44,7 @@ public class RetroSessionDriver {
     private final SyncDriver syncDriver;
 
     public void ensureActiveRetrospectiveAtPhase(int targetPhase) {
-        if (!context.isRetroReady()) {
-            syncDriver.waitForServerReady();
-            authenticateAsGuest("BDD Visual Clue Tester");
-            createSession("Visual Clue Stage BDD Pilot");
-            startSession();
-            context.setRetroReady(true);
-            context.setCurrentPhaseNumber(detectCurrentPhaseNumber());
-            log.debug("Created retro session {} and detected initial phase {}", context.getSessionId(), context.getCurrentPhaseNumber());
-        }
+        ensureRetroReady();
 
         if (context.getCurrentPhaseNumber() < targetPhase) {
             advanceToPhase(targetPhase);
@@ -114,11 +109,11 @@ public class RetroSessionDriver {
         context.setLastAdvanceTriggered(true);
     }
 
-    public java.util.List<com.microsoft.playwright.options.Cookie> captureCookies() {
+    public List<Cookie> captureCookies() {
         return world.getPage().context().cookies();
     }
 
-    public void restoreCookies(java.util.List<com.microsoft.playwright.options.Cookie> cookies) {
+    public void restoreCookies(List<Cookie> cookies) {
         world.getPage().context().clearCookies();
         world.getPage().context().addCookies(cookies);
     }
@@ -164,17 +159,15 @@ public class RetroSessionDriver {
 
     public void assertErrorPage() {
         Page page = world.getPage();
-        page.waitForFunction(
-            "() => { const text = document.body?.textContent ?? ''; return text.includes('Retrospective not found') || text.includes('Could not load retrospective'); }",
-            null,
-            new Page.WaitForFunctionOptions().setTimeout(LONG_TIMEOUT_MS)
+        page.waitForSelector(
+            "p:text-is('Retrospective not found'), p:text-is('Could not load retrospective')",
+            new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS)
         );
 
         boolean notFoundMessageVisible = page.locator("p:text-is('Retrospective not found')").count() > 0
             && page.locator("p:text-is('The session may have ended or the link is invalid.')").count() > 0;
-        boolean genericErrorVisible = page.locator("p:text-is('Could not load retrospective')").count() > 0;
 
-        if (!notFoundMessageVisible && !genericErrorVisible) {
+        if (!notFoundMessageVisible && page.locator("p:text-is('Could not load retrospective')").count() == 0) {
             String bodyText = page.locator("body").textContent();
             throw new AssertionError(
                 "Expected retrospective unavailable error page. Body text was: " + bodyText
@@ -192,16 +185,20 @@ public class RetroSessionDriver {
     }
 
     public String createRetroAndGetLobbyUrl() {
+        ensureRetroReady();
+        return world.getBaseUrl() + "/retro/" + context.getSessionId() + "/lobby";
+    }
+
+    private void ensureRetroReady() {
         if (!context.isRetroReady()) {
             syncDriver.waitForServerReady();
-            authenticateAsGuest("BDD Anonymous Login Tester");
-            createSession("Anonymous Login BDD Pilot");
+            authenticateAsGuest("BDD Tester");
+            createSession("BDD Session");
             startSession();
             context.setRetroReady(true);
             context.setCurrentPhaseNumber(detectCurrentPhaseNumber());
-            log.debug("Created retro session {} for anonymous login tests", context.getSessionId());
+            log.debug("Created retro session {} and detected initial phase {}", context.getSessionId(), context.getCurrentPhaseNumber());
         }
-        return world.getBaseUrl() + "/retro/" + context.getSessionId() + "/lobby";
     }
 
     private void assertNoElement(String selector, String description) {
@@ -358,15 +355,5 @@ public class RetroSessionDriver {
         }
 
         throw new IllegalArgumentException("Unknown retro phase enum: " + phaseEnum);
-    }
-
-    private String currentPhaseEnum() {
-        String currentPhase = PHASE_ENUMS.get(context.getCurrentPhaseNumber());
-        if (currentPhase != null) {
-            return currentPhase;
-        }
-
-        int detectedPhase = detectCurrentPhaseNumber();
-        return PHASE_ENUMS.get(detectedPhase);
     }
 }
