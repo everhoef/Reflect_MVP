@@ -12,6 +12,7 @@ public final class RetroSelectors {
     public static final String SESSION_NAME_INPUT = "input[name='sessionName']";
     public static final String CREATE_SESSION_BUTTON = "button:has-text('Create Session')";
     public static final String LOGIN_SUBMIT_BUTTON = "button[type='submit']";
+    public static final String COLUMN_BOARD_ITEM = "[data-testid^='column-']";
 
     /** Selects the station element for the given 1-based stage ID. Requires data-stage-index attribute on station divs. */
     public static String stationSelector(int stageId) {
