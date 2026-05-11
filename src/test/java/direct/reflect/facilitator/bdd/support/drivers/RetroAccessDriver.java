@@ -1,5 +1,7 @@
 package direct.reflect.facilitator.bdd.support.drivers;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.Cookie;
 import direct.reflect.facilitator.bdd.support.PlaywrightWorld;
@@ -95,6 +97,35 @@ public class RetroAccessDriver {
         }
         if (!responseText.contains("\"isAuthenticated\":true")) {
             throw new AssertionError("Expected user to be authenticated, but /api/me did not indicate isAuthenticated=true. Response: " + responseText);
+        }
+    }
+
+    public void assertJoinedSession(String sessionId) {
+        Page page = world.getPage();
+        String responseText = (String) page.evaluate(
+            "async () => { const response = await fetch('/api/me/retros/active'); return response.text(); }"
+        );
+
+        if (responseText == null) {
+            throw new AssertionError("Expected active retros response, but received no response while checking session membership for sessionId=" + sessionId);
+        }
+
+        try {
+            JsonNode activeSessions = new ObjectMapper().readTree(responseText);
+            if (!activeSessions.isArray()) {
+                throw new AssertionError("Expected /api/me/retros/active to return an array, but received: " + responseText);
+            }
+
+            for (JsonNode activeSession : activeSessions) {
+                JsonNode activeSessionId = activeSession.get("sessionId");
+                if (activeSessionId != null && sessionId.equals(activeSessionId.asText())) {
+                    return;
+                }
+            }
+
+            throw new AssertionError("Expected sessionId " + sessionId + " to appear in /api/me/retros/active, but it was not found. Response: " + responseText);
+        } catch (Exception e) {
+            throw new AssertionError("Failed to parse /api/me/retros/active while checking session membership for sessionId " + sessionId + ". Response: " + responseText, e);
         }
     }
 

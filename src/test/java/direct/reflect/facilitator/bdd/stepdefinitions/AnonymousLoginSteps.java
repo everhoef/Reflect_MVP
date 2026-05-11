@@ -46,6 +46,7 @@ public class AnonymousLoginSteps {
     @Then("I should be automatically logged into the session")
     public void iShouldBeAutomaticallyLoggedIntoTheSession() {
         retroAccessDriver.assertGuestAuthenticated();
+        retroAccessDriver.assertJoinedSession(context.getSessionId());
     }
 
     @Then("I should not be prompted for username, password, or email")
