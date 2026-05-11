@@ -12,7 +12,19 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.DISPLAY_NAME_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ERROR_PAGE_LOAD_FAILED_MESSAGE;
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ERROR_PAGE_MESSAGE;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ERROR_PAGE_NOT_FOUND_MESSAGE;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ERROR_PAGE_SESSION_ENDED_MESSAGE;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ADDRESS_NAME_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ADDRESS_PLACEHOLDER_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.CAPTCHA_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.EMAIL_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.PASSWORD_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.PHONE_NAME_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.PHONE_PLACEHOLDER_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.TELEPHONE_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.USERNAME_INPUT;
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.JOIN_RETRO_ID_INPUT;
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.JOIN_SESSION_BUTTON;
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.LOGIN_SUBMIT_BUTTON;
@@ -87,20 +99,20 @@ public class RetroAccessDriver {
     }
 
     public void assertNoLoginPrompts() {
-        assertNoElement("input[type='password']", "password field");
-        assertNoElement("input[type='email']", "email field");
-        assertNoElement("input[name='username']", "username field");
-        assertNoElement("input[placeholder*='CAPTCHA' i]", "CAPTCHA field");
+        assertNoElement(PASSWORD_INPUT, "password field");
+        assertNoElement(EMAIL_INPUT, "email field");
+        assertNoElement(USERNAME_INPUT, "username field");
+        assertNoElement(CAPTCHA_INPUT, "CAPTCHA field");
     }
 
     public void assertErrorPage() {
         Page page = world.getPage();
         page.waitForSelector(ERROR_PAGE_MESSAGE, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
 
-        boolean notFoundMessageVisible = page.locator("p:text-is('Retrospective not found')").count() > 0
-            && page.locator("p:text-is('The session may have ended or the link is invalid.')").count() > 0;
+        boolean notFoundMessageVisible = page.locator(ERROR_PAGE_NOT_FOUND_MESSAGE).count() > 0
+            && page.locator(ERROR_PAGE_SESSION_ENDED_MESSAGE).count() > 0;
 
-        if (!notFoundMessageVisible && page.locator("p:text-is('Could not load retrospective')").count() == 0) {
+        if (!notFoundMessageVisible && page.locator(ERROR_PAGE_LOAD_FAILED_MESSAGE).count() == 0) {
             String bodyText = page.locator("body").textContent();
             throw new AssertionError("Expected retrospective unavailable error page. Body text was: " + bodyText);
         }
@@ -130,11 +142,11 @@ public class RetroAccessDriver {
     public void assertNoPersonalInfoFields() {
         Page page = world.getPage();
         String[] selectors = {
-            "input[placeholder*='phone' i]",
-            "input[placeholder*='address' i]",
-            "input[name='phone']",
-            "input[name='address']",
-            "input[type='tel']"
+            PHONE_PLACEHOLDER_INPUT,
+            ADDRESS_PLACEHOLDER_INPUT,
+            PHONE_NAME_INPUT,
+            ADDRESS_NAME_INPUT,
+            TELEPHONE_INPUT
         };
         for (String selector : selectors) {
             if (page.locator(selector).count() > 0) {
