@@ -3,7 +3,7 @@ package direct.reflect.facilitator.bdd.stepdefinitions;
 import com.microsoft.playwright.Locator;
 import direct.reflect.facilitator.bdd.support.context.RetroScenarioContext;
 import direct.reflect.facilitator.bdd.support.drivers.ProgressBarDriver;
-import direct.reflect.facilitator.bdd.support.drivers.RetroSessionDriver;
+import direct.reflect.facilitator.bdd.support.drivers.RetroLifecycleDriver;
 import direct.reflect.facilitator.bdd.support.drivers.SyncDriver;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
@@ -19,62 +19,62 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class VisualClueStageSteps {
 
-    private final RetroSessionDriver retroSessionDriver;
+    private final RetroLifecycleDriver retroLifecycleDriver;
     private final ProgressBarDriver progressBarDriver;
     private final SyncDriver syncDriver;
     private final RetroScenarioContext context;
 
     @Given("I am a team member in an active retrospective")
     public void iAmATeamMemberInAnActiveRetrospective() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(1);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(1);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
     @Given("the underground map is displayed")
     public void theUndergroundMapIsDisplayed() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(1);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(1);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
     @Given("I am in phase {int} of the retrospective")
     public void iAmInPhaseOfTheRetrospective(int phaseNumber) {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(phaseNumber);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(phaseNumber);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
     @Given("I am in phase 2 with phase 2 highlighted on the map")
     public void iAmInPhase2WithPhase2HighlightedOnTheMap() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(2);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(2);
         progressBarDriver.assertStationHighlighted(2);
     }
 
     @Given("I am viewing the underground map")
     public void iAmViewingTheUndergroundMap() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(1);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(1);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
     @Given("I am participating in a retrospective")
     public void iAmParticipatingInARetrospective() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(1);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(1);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
     @Given("I am a team member in any phase of the retrospective")
     public void iAmATeamMemberInAnyPhaseOfTheRetrospective() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(3);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(3);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
     @Given("a retrospective has just started")
     public void aRetrospectiveHasJustStarted() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(1);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(1);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
     @Given("the retrospective has progressed to phase 5: {string}")
     public void theRetrospectiveHasProgressedToPhase5(String ignoredPhaseName) {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(5);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(5);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
@@ -94,13 +94,13 @@ public class VisualClueStageSteps {
 
     @When("the retrospective advances to phase 3")
     public void theRetrospectiveAdvancesToPhase3() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(2);
-        retroSessionDriver.advanceToPhase(3);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(2);
+        retroLifecycleDriver.advanceToPhase(3);
     }
 
     @When("I am in phase 1: {string}")
     public void iAmInPhase1(String ignoredPhaseName) {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(1);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(1);
     }
 
     @Then("^I should see an underground/metro map style progress indicator at the top of the screen$")
