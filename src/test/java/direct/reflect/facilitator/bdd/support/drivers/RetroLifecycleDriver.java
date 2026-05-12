@@ -12,8 +12,6 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.CREATE_SESSION_BUTTON;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.DISPLAY_NAME_INPUT;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.LOGIN_SUBMIT_BUTTON;
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.NEXT_STEP_BUTTON;
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.RETRO_CONTENT;
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.SESSION_NAME_INPUT;
@@ -23,7 +21,7 @@ import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ST
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class RetroSessionDriver {
+public class RetroLifecycleDriver {
     private static final int DEFAULT_TIMEOUT_MS = 5_000;
     private static final int LONG_TIMEOUT_MS = 15_000;
 
@@ -38,41 +36,30 @@ public class RetroSessionDriver {
     private final PlaywrightWorld world;
     private final RetroScenarioContext context;
     private final SyncDriver syncDriver;
+    private final RetroAccessDriver retroAccessDriver;
+    private int currentPhaseNumber;
+
+    public int getCurrentPhaseNumber() {
+        return currentPhaseNumber;
+    }
 
     public void ensureActiveRetrospectiveAtPhase(int targetPhase) {
-        if (!context.isRetroReady()) {
-            syncDriver.waitForServerReady();
-            authenticateAsGuest("BDD Visual Clue Tester");
-            createSession("Visual Clue Stage BDD Pilot");
-            startSession();
-            context.setRetroReady(true);
-            context.setCurrentPhaseNumber(detectCurrentPhaseNumber());
-            log.debug("Created retro session {} and detected initial phase {}", context.getSessionId(), context.getCurrentPhaseNumber());
-        }
+        ensureRetroReady();
 
-        if (context.getCurrentPhaseNumber() < targetPhase) {
+        if (currentPhaseNumber < targetPhase) {
             advanceToPhase(targetPhase);
         }
 
-        if (context.getCurrentPhaseNumber() != targetPhase) {
+        if (currentPhaseNumber != targetPhase) {
             throw new AssertionError("Could not align the retrospective to phase " + targetPhase + " using the current progress-indicator pilot helpers.");
         }
 
         syncDriver.assertRetroContentLoaded();
     }
 
-    public void authenticateAsGuest(String displayName) {
-        Page page = world.getPage();
-        page.context().clearCookies();
-        page.navigate(world.getBaseUrl() + "/login");
-        page.waitForSelector(DISPLAY_NAME_INPUT, new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-        page.fill(DISPLAY_NAME_INPUT, displayName);
-        page.click(LOGIN_SUBMIT_BUTTON);
-        page.waitForURL(
-            url -> url.equals(world.getBaseUrl() + "/") || url.equals(world.getBaseUrl() + "/home") || url.endsWith("/"),
-            new Page.WaitForURLOptions().setTimeout(DEFAULT_TIMEOUT_MS)
-        );
-        page.waitForSelector(SESSION_NAME_INPUT, new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+    public String createRetroAndGetLobbyUrl() {
+        ensureRetroReady();
+        return world.getBaseUrl() + "/retro/" + context.getSessionId() + "/lobby";
     }
 
     public String createSession(String sessionName) {
@@ -95,11 +82,24 @@ public class RetroSessionDriver {
         page.waitForSelector(NEXT_STEP_BUTTON, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
     }
 
+    public void advanceOneStep() {
+        Page page = world.getPage();
+        Locator nextButton = page.locator(NEXT_STEP_BUTTON);
+        if (nextButton.count() == 0) {
+            throw new AssertionError("Cannot advance because the facilitator next-step button is not visible.");
+        }
+        SyncDriver.ShellSnapshot previousSnapshot = syncDriver.captureShellSnapshot();
+        nextButton.click();
+        syncDriver.waitForPhaseOrStepChange(previousSnapshot);
+        currentPhaseNumber = detectCurrentPhaseNumber();
+        context.setLastAdvanceTriggered(true);
+    }
+
     public void advanceToPhase(int targetPhase) {
         Page page = world.getPage();
         int safetyCounter = 0;
 
-        while (context.getCurrentPhaseNumber() < targetPhase && safetyCounter <= 40) {
+        while (currentPhaseNumber < targetPhase && safetyCounter <= 40) {
             Locator nextButton = page.locator(NEXT_STEP_BUTTON);
             if (nextButton.count() == 0) {
                 throw new AssertionError("Cannot advance to target phase because the facilitator next-step button is not visible.");
@@ -108,14 +108,19 @@ public class RetroSessionDriver {
             SyncDriver.ShellSnapshot previousSnapshot = syncDriver.captureShellSnapshot();
             nextButton.click();
             syncDriver.waitForPhaseOrStepChange(previousSnapshot);
-            context.setCurrentPhaseNumber(detectCurrentPhaseNumber());
+            currentPhaseNumber = detectCurrentPhaseNumber();
             context.setLastAdvanceTriggered(true);
             safetyCounter++;
         }
 
-        if (context.getCurrentPhaseNumber() < targetPhase) {
+        if (currentPhaseNumber < targetPhase) {
             throw new AssertionError("Retrospective did not advance to requested phase " + targetPhase + " within the safety limit.");
         }
+    }
+
+    public void reloadAndWait() {
+        world.getPage().reload(new Page.ReloadOptions().setTimeout(LONG_TIMEOUT_MS));
+        syncDriver.assertRetroContentLoaded();
     }
 
     public int detectCurrentPhaseNumber() {
@@ -129,13 +134,15 @@ public class RetroSessionDriver {
         throw new IllegalArgumentException("Unknown retro phase enum: " + phaseEnum);
     }
 
-    private String currentPhaseEnum() {
-        String currentPhase = PHASE_ENUMS.get(context.getCurrentPhaseNumber());
-        if (currentPhase != null) {
-            return currentPhase;
+    private void ensureRetroReady() {
+        if (!context.isRetroReady()) {
+            syncDriver.waitForServerReady();
+            retroAccessDriver.authenticateAsGuest("BDD Tester");
+            createSession("BDD Session");
+            startSession();
+            context.setRetroReady(true);
+            currentPhaseNumber = detectCurrentPhaseNumber();
+            log.debug("Created retro session {} and detected initial phase {}", context.getSessionId(), currentPhaseNumber);
         }
-
-        int detectedPhase = detectCurrentPhaseNumber();
-        return PHASE_ENUMS.get(detectedPhase);
     }
 }

@@ -3,7 +3,7 @@ package direct.reflect.facilitator.bdd.stepdefinitions;
 import com.microsoft.playwright.Locator;
 import direct.reflect.facilitator.bdd.support.context.RetroScenarioContext;
 import direct.reflect.facilitator.bdd.support.drivers.ProgressBarDriver;
-import direct.reflect.facilitator.bdd.support.drivers.RetroSessionDriver;
+import direct.reflect.facilitator.bdd.support.drivers.RetroLifecycleDriver;
 import direct.reflect.facilitator.bdd.support.drivers.SyncDriver;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
@@ -19,62 +19,62 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class VisualClueStageSteps {
 
-    private final RetroSessionDriver retroSessionDriver;
+    private final RetroLifecycleDriver retroLifecycleDriver;
     private final ProgressBarDriver progressBarDriver;
     private final SyncDriver syncDriver;
     private final RetroScenarioContext context;
 
     @Given("I am a team member in an active retrospective")
     public void iAmATeamMemberInAnActiveRetrospective() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(1);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(1);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
     @Given("the underground map is displayed")
     public void theUndergroundMapIsDisplayed() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(1);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(1);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
     @Given("I am in phase {int} of the retrospective")
     public void iAmInPhaseOfTheRetrospective(int phaseNumber) {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(phaseNumber);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(phaseNumber);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
     @Given("I am in phase 2 with phase 2 highlighted on the map")
     public void iAmInPhase2WithPhase2HighlightedOnTheMap() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(2);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(2);
         progressBarDriver.assertStationHighlighted(2);
     }
 
     @Given("I am viewing the underground map")
     public void iAmViewingTheUndergroundMap() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(1);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(1);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
     @Given("I am participating in a retrospective")
     public void iAmParticipatingInARetrospective() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(1);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(1);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
     @Given("I am a team member in any phase of the retrospective")
     public void iAmATeamMemberInAnyPhaseOfTheRetrospective() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(3);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(3);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
     @Given("a retrospective has just started")
     public void aRetrospectiveHasJustStarted() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(1);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(1);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
     @Given("the retrospective has progressed to phase 5: {string}")
     public void theRetrospectiveHasProgressedToPhase5(String ignoredPhaseName) {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(5);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(5);
         progressBarDriver.assertProgressIndicatorPresent();
     }
 
@@ -94,13 +94,13 @@ public class VisualClueStageSteps {
 
     @When("the retrospective advances to phase 3")
     public void theRetrospectiveAdvancesToPhase3() {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(2);
-        retroSessionDriver.advanceToPhase(3);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(2);
+        retroLifecycleDriver.advanceToPhase(3);
     }
 
     @When("I am in phase 1: {string}")
     public void iAmInPhase1(String ignoredPhaseName) {
-        retroSessionDriver.ensureActiveRetrospectiveAtPhase(1);
+        retroLifecycleDriver.ensureActiveRetrospectiveAtPhase(1);
     }
 
     @Then("^I should see an underground/metro map style progress indicator at the top of the screen$")
@@ -164,13 +164,13 @@ public class VisualClueStageSteps {
     @Then("the highlighting should clearly distinguish it from other phases")
     public void theHighlightingShouldClearlyDistinguishItFromOtherPhases() {
         for (int phase = 1; phase <= 5; phase++) {
-            if (phase == context.getCurrentPhaseNumber()) {
+            if (phase == retroLifecycleDriver.getCurrentPhaseNumber()) {
                 continue;
             }
 
             Assertions.assertNotEquals(
                     progressBarDriver.station(phase).getAttribute("data-stage-status"),
-                    progressBarDriver.station(context.getCurrentPhaseNumber()).getAttribute("data-stage-status"),
+                    progressBarDriver.station(retroLifecycleDriver.getCurrentPhaseNumber()).getAttribute("data-stage-status"),
                     "The current phase should use a different semantic status than non-current phases."
             );
         }
@@ -180,7 +180,7 @@ public class VisualClueStageSteps {
     public void itShouldBeObviousThisIsTheCurrentActivePhase() {
         Assertions.assertEquals(
                 "step",
-                progressBarDriver.station(context.getCurrentPhaseNumber()).getAttribute("aria-current"),
+                progressBarDriver.station(retroLifecycleDriver.getCurrentPhaseNumber()).getAttribute("aria-current"),
                 "Current phase should expose aria-current='step'."
         );
     }
@@ -198,7 +198,7 @@ public class VisualClueStageSteps {
 
     @Then("they should visually indicate they are completed")
     public void theyShouldVisuallyIndicateTheyAreCompleted() {
-        for (int phase = 1; phase < context.getCurrentPhaseNumber(); phase++) {
+        for (int phase = 1; phase < retroLifecycleDriver.getCurrentPhaseNumber(); phase++) {
             progressBarDriver.assertStationShowsCompletionAffordance(phase);
         }
     }
@@ -206,13 +206,13 @@ public class VisualClueStageSteps {
     @Then("the visual state should clearly differ from the current phase")
     public void theVisualStateShouldClearlyDifferFromTheCurrentPhase() {
         for (int phase = 1; phase <= 5; phase++) {
-            if (phase == context.getCurrentPhaseNumber()) {
+            if (phase == retroLifecycleDriver.getCurrentPhaseNumber()) {
                 continue;
             }
 
             Assertions.assertNotEquals(
                     progressBarDriver.station(phase).getAttribute("data-stage-status"),
-                    progressBarDriver.station(context.getCurrentPhaseNumber()).getAttribute("data-stage-status")
+                    progressBarDriver.station(retroLifecycleDriver.getCurrentPhaseNumber()).getAttribute("data-stage-status")
             );
         }
     }
@@ -230,21 +230,21 @@ public class VisualClueStageSteps {
 
     @Then("they should not be greyed out")
     public void theyShouldNotBeGreyedOut() {
-        for (int phase = context.getCurrentPhaseNumber() + 1; phase <= 5; phase++) {
+        for (int phase = retroLifecycleDriver.getCurrentPhaseNumber() + 1; phase <= 5; phase++) {
             Assertions.assertFalse(progressBarDriver.isCompletedStation(phase), "Upcoming stages must not look completed.");
         }
     }
 
     @Then("they should not be highlighted like the current phase")
     public void theyShouldNotBeHighlightedLikeTheCurrentPhase() {
-        for (int phase = context.getCurrentPhaseNumber() + 1; phase <= 5; phase++) {
+        for (int phase = retroLifecycleDriver.getCurrentPhaseNumber() + 1; phase <= 5; phase++) {
             Assertions.assertNotEquals("step", progressBarDriver.station(phase).getAttribute("aria-current"));
         }
     }
 
     @Then("they should indicate they are yet to come")
     public void theyShouldIndicateTheyAreYetToCome() {
-        for (int phase = context.getCurrentPhaseNumber() + 1; phase <= 5; phase++) {
+        for (int phase = retroLifecycleDriver.getCurrentPhaseNumber() + 1; phase <= 5; phase++) {
             Assertions.assertTrue(progressBarDriver.isUpcomingStation(phase), "Upcoming stages should use the upcoming styling variant.");
         }
     }
@@ -274,7 +274,7 @@ public class VisualClueStageSteps {
     @Then("the update should happen automatically")
     public void theUpdateShouldHappenAutomatically() {
         Assertions.assertTrue(context.isLastAdvanceTriggered(), "Expected the scenario to advance the retrospective from the UI.");
-        Assertions.assertEquals(3, context.getCurrentPhaseNumber(), "Expected the retrospective to finish on phase 3.");
+        Assertions.assertEquals(3, retroLifecycleDriver.getCurrentPhaseNumber(), "Expected the retrospective to finish on phase 3.");
     }
 
     @Then("I should see a visual representation of the complete retrospective journey from left to right")
@@ -296,7 +296,7 @@ public class VisualClueStageSteps {
 
     @Then("it should provide clear spatial orientation of where we are in the process")
     public void itShouldProvideClearSpatialOrientationOfWhereWeAreInTheProcess() {
-        Assertions.assertEquals("step", progressBarDriver.station(context.getCurrentPhaseNumber()).getAttribute("aria-current"));
+        Assertions.assertEquals("step", progressBarDriver.station(retroLifecycleDriver.getCurrentPhaseNumber()).getAttribute("aria-current"));
     }
 
     @Then("the underground map should remain visible at the top of screen at all times")
@@ -326,13 +326,13 @@ public class VisualClueStageSteps {
 
     @Then("^which phase we are currently in \\(highlighted\\)$")
     public void whichPhaseWeAreCurrentlyInHighlighted() {
-        progressBarDriver.assertStationHighlighted(context.getCurrentPhaseNumber());
+        progressBarDriver.assertStationHighlighted(retroLifecycleDriver.getCurrentPhaseNumber());
     }
 
     @Then("^which phases are still to come \\(normal style\\)$")
     public void whichPhasesAreStillToComeNormalStyle() {
-        Assertions.assertTrue(context.getCurrentPhaseNumber() < 5, "Expected at least one upcoming phase in this scenario.");
-        progressBarDriver.assertStationLooksUpcoming(context.getCurrentPhaseNumber() + 1);
+        Assertions.assertTrue(retroLifecycleDriver.getCurrentPhaseNumber() < 5, "Expected at least one upcoming phase in this scenario.");
+        progressBarDriver.assertStationLooksUpcoming(retroLifecycleDriver.getCurrentPhaseNumber() + 1);
     }
 
     @Then("the overall structure of the retrospective")
@@ -342,8 +342,8 @@ public class VisualClueStageSteps {
 
     @Then("this should be clear from the phase state changes alone")
     public void thisShouldBeClearFromThePhaseStateChangesAlone() {
-        Assertions.assertTrue(context.getCurrentPhaseNumber() >= 1 && context.getCurrentPhaseNumber() <= 5, "Current phase should map to one of the five visible stages.");
-        progressBarDriver.assertStationHighlighted(context.getCurrentPhaseNumber());
+        Assertions.assertTrue(retroLifecycleDriver.getCurrentPhaseNumber() >= 1 && retroLifecycleDriver.getCurrentPhaseNumber() <= 5, "Current phase should map to one of the five visible stages.");
+        progressBarDriver.assertStationHighlighted(retroLifecycleDriver.getCurrentPhaseNumber());
     }
 
     @Then("^phases 2-5 stations should be displayed in normal style \\(upcoming\\)$")
@@ -376,7 +376,7 @@ public class VisualClueStageSteps {
 
     @Then("the connecting lines through completed phases should be greyed out")
     public void theConnectingLinesThroughCompletedPhasesShouldBeGreyedOut() {
-        for (int connector = 1; connector < context.getCurrentPhaseNumber(); connector++) {
+        for (int connector = 1; connector < retroLifecycleDriver.getCurrentPhaseNumber(); connector++) {
             progressBarDriver.assertConnectorLooksGreyedOut(connector);
         }
     }
