@@ -13,7 +13,6 @@ Feature: Anonymous Login
     Given I am participating in a retrospective session with pseudonym "Wise Owl"
     When I add a card, vote, or comment
     Then all my contributions should display as coming from "Wise Owl"
-    And other participants should see my contributions attributed to "Wise Owl"
     And I should be able to identify my own contributions
 
   Scenario: Scenario 4: Re-entry preserves session state

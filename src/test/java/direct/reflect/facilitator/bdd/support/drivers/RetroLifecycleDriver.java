@@ -37,15 +37,20 @@ public class RetroLifecycleDriver {
     private final RetroScenarioContext context;
     private final SyncDriver syncDriver;
     private final RetroAccessDriver retroAccessDriver;
+    private int currentPhaseNumber;
+
+    public int getCurrentPhaseNumber() {
+        return currentPhaseNumber;
+    }
 
     public void ensureActiveRetrospectiveAtPhase(int targetPhase) {
         ensureRetroReady();
 
-        if (context.getCurrentPhaseNumber() < targetPhase) {
+        if (currentPhaseNumber < targetPhase) {
             advanceToPhase(targetPhase);
         }
 
-        if (context.getCurrentPhaseNumber() != targetPhase) {
+        if (currentPhaseNumber != targetPhase) {
             throw new AssertionError("Could not align the retrospective to phase " + targetPhase + " using the current progress-indicator pilot helpers.");
         }
 
@@ -86,7 +91,7 @@ public class RetroLifecycleDriver {
         SyncDriver.ShellSnapshot previousSnapshot = syncDriver.captureShellSnapshot();
         nextButton.click();
         syncDriver.waitForPhaseOrStepChange(previousSnapshot);
-        context.setCurrentPhaseNumber(detectCurrentPhaseNumber());
+        currentPhaseNumber = detectCurrentPhaseNumber();
         context.setLastAdvanceTriggered(true);
     }
 
@@ -94,7 +99,7 @@ public class RetroLifecycleDriver {
         Page page = world.getPage();
         int safetyCounter = 0;
 
-        while (context.getCurrentPhaseNumber() < targetPhase && safetyCounter <= 40) {
+        while (currentPhaseNumber < targetPhase && safetyCounter <= 40) {
             Locator nextButton = page.locator(NEXT_STEP_BUTTON);
             if (nextButton.count() == 0) {
                 throw new AssertionError("Cannot advance to target phase because the facilitator next-step button is not visible.");
@@ -103,12 +108,12 @@ public class RetroLifecycleDriver {
             SyncDriver.ShellSnapshot previousSnapshot = syncDriver.captureShellSnapshot();
             nextButton.click();
             syncDriver.waitForPhaseOrStepChange(previousSnapshot);
-            context.setCurrentPhaseNumber(detectCurrentPhaseNumber());
+            currentPhaseNumber = detectCurrentPhaseNumber();
             context.setLastAdvanceTriggered(true);
             safetyCounter++;
         }
 
-        if (context.getCurrentPhaseNumber() < targetPhase) {
+        if (currentPhaseNumber < targetPhase) {
             throw new AssertionError("Retrospective did not advance to requested phase " + targetPhase + " within the safety limit.");
         }
     }
@@ -136,8 +141,8 @@ public class RetroLifecycleDriver {
             createSession("BDD Session");
             startSession();
             context.setRetroReady(true);
-            context.setCurrentPhaseNumber(detectCurrentPhaseNumber());
-            log.debug("Created retro session {} and detected initial phase {}", context.getSessionId(), context.getCurrentPhaseNumber());
+            currentPhaseNumber = detectCurrentPhaseNumber();
+            log.debug("Created retro session {} and detected initial phase {}", context.getSessionId(), currentPhaseNumber);
         }
     }
 }

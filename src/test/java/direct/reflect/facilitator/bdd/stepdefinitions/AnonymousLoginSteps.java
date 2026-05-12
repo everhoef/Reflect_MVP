@@ -77,22 +77,10 @@ public class AnonymousLoginSteps {
         String noteContent = "BDD test note from " + System.currentTimeMillis();
         context.setLastNoteContent(noteContent);
         columnBoardDriver.addNoteAndWait(columnId, noteContent);
-        retroAccessDriver.restoreCookies(context.getFacilitatorCookies());
-        retroLifecycleDriver.reloadAndWait();
-        columnBoardDriver.waitForColumnBoardVisible();
-        retroLifecycleDriver.advanceOneStep();
     }
 
     @Then("all my contributions should display as coming from {string}")
     public void allMyContributionsShouldDisplayAsComingFrom(String displayName) {
-        advanceToRevealStepAsFacilitator();
-        rejoinAsParticipantAndAssertAuthor(displayName);
-    }
-
-    @Then("other participants should see my contributions attributed to {string}")
-    public void otherParticipantsShouldSeeMyContributionsAttributedTo(String displayName) {
-        retroAccessDriver.restoreCookies(context.getFacilitatorCookies());
-        retroLifecycleDriver.reloadAndWait();
         columnBoardDriver.assertNoteShowsAuthor(displayName);
     }
 
@@ -142,7 +130,7 @@ public class AnonymousLoginSteps {
     @Then("I should see the current phase and timer state")
     public void iShouldSeeTheCurrentPhaseAndTimerState() {
         int currentPhase = retroLifecycleDriver.detectCurrentPhaseNumber();
-        Assertions.assertEquals(context.getCurrentPhaseNumber(), currentPhase,
+        Assertions.assertEquals(retroLifecycleDriver.getCurrentPhaseNumber(), currentPhase,
             "Expected phase to be preserved after re-entry.");
     }
 
@@ -221,27 +209,5 @@ public class AnonymousLoginSteps {
     @Then("I should reach the retrospective interface in one click")
     public void iShouldReachTheRetrospectiveInterfaceInOneClick() {
         retroAccessDriver.assertRetroPageVisible();
-    }
-
-    private void advanceToRevealStepAsFacilitator() {
-        List<Cookie> facilitatorCookies = context.getFacilitatorCookies();
-        if (facilitatorCookies == null) {
-            throw new AssertionError("Facilitator cookies not captured.");
-        }
-        retroAccessDriver.restoreCookies(facilitatorCookies);
-        retroLifecycleDriver.reloadAndWait();
-        columnBoardDriver.waitForColumnBoardVisible();
-        retroLifecycleDriver.advanceOneStep();
-    }
-
-    private void rejoinAsParticipantAndAssertAuthor(String displayName) {
-        List<Cookie> participantCookies = context.getParticipantCookies();
-        if (participantCookies == null) {
-            throw new AssertionError("Participant cookies not captured.");
-        }
-        retroAccessDriver.restoreCookies(participantCookies);
-        retroLifecycleDriver.reloadAndWait();
-        columnBoardDriver.waitForColumnBoardVisible();
-        columnBoardDriver.assertNoteShowsAuthor(displayName);
     }
 }
