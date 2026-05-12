@@ -64,7 +64,6 @@ public class AnonymousLoginSteps {
         retroLifecycleDriver.createRetroAndGetLobbyUrl();
         retroLifecycleDriver.advanceToPhase(2);
         columnBoardDriver.advanceFacilitatorUntilColumnBoardVisible();
-        context.setCurrentPhaseNumber(2);
         context.setFacilitatorCookies(retroAccessDriver.captureCookies());
         retroAccessDriver.clearCookies();
         retroAccessDriver.joinRetroAsGuest(context.getSessionId(), displayName);
@@ -114,7 +113,6 @@ public class AnonymousLoginSteps {
         retroLifecycleDriver.createRetroAndGetLobbyUrl();
         retroLifecycleDriver.advanceToPhase(2);
         columnBoardDriver.advanceFacilitatorUntilColumnBoardVisible();
-        context.setCurrentPhaseNumber(2);
         retroAccessDriver.clearCookies();
         retroAccessDriver.joinRetroAsGuest(context.getSessionId(), "Reconnect User");
         columnBoardDriver.waitForColumnBoardVisible();
