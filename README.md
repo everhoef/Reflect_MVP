@@ -113,7 +113,7 @@ CI runs on every push to `main` and on every pull request targeting `main`.
 - **Image build**: Paketo buildpacks via `./mvnw spring-boot:build-image`
 - **Registry**: GHCR — `ghcr.io/reflect-direct/facilitator`
 - **GitOps source of truth**: `reflect-direct/facilitator-gitops` (acc overlay auto-updated on every `main` merge)
-- **Preview environments**: add the `preview` label to a PR to publish a preview image and trigger an ArgoCD preview app
+- **Preview environments**: add the `preview` label to a PR to publish a preview image (`pr-<PR_NUMBER>-<SHORT_SHA>`) for the ArgoCD ApplicationSet pull request generator; preview deployments are created and pruned dynamically by ArgoCD, not by commits to `facilitator-gitops`
 
 ### Versioning model
 
