@@ -113,6 +113,7 @@ jobs:
 
     outputs:
       image-tag: ${{ steps.tag.outputs.tag }}
+      oci-version: ${{ steps.tag.outputs.oci_version }}
       digest: ${{ steps.push.outputs.digest }}
 
     steps:
@@ -150,11 +151,14 @@ jobs:
             SEMVER="${SEMVER#v}"
             echo "tag=${SEMVER}" >> "$GITHUB_OUTPUT"
             echo "sha_tag=sha-${SHA}" >> "$GITHUB_OUTPUT"
+            echo "oci_version=${SEMVER}" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
             echo "tag=sha-${SHA}" >> "$GITHUB_OUTPUT"
+            echo "oci_version=sha-${SHA}" >> "$GITHUB_OUTPUT"
           else
             PR="${{ github.event.pull_request.number }}"
             echo "tag=pr-${PR}-${SHA}" >> "$GITHUB_OUTPUT"
+            echo "oci_version=pr-${PR}-${SHA}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Log in to GHCR
@@ -169,6 +173,8 @@ jobs:
           ./mvnw spring-boot:build-image \
             -Dspring-boot.build-image.imageName=${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }} \
             -Dspring-boot.build-image.env.BP_JVM_VERSION=25 \
+            -Dspring-boot.build-image.env.BP_OCI_VERSION=${{ steps.tag.outputs.oci_version }} \
+            -Dspring-boot.build-image.env.BP_OCI_REVISION=${{ github.sha }} \
             -Dspring-boot.build-image.env.SPRING_DOCKER_COMPOSE_ENABLED=false \
             --cache-image ghcr.io/reflect-direct/facilitator-build-cache:latest \
             -DskipTests
