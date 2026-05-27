@@ -23,6 +23,7 @@ import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.no
 @Slf4j
 public class ColumnBoardDriver {
     private static final int DEFAULT_TIMEOUT_MS = 5_000;
+    private static final int LONG_TIMEOUT_MS = 15_000;
 
     private final PlaywrightWorld world;
     private final RetroLifecycleDriver retroLifecycleDriver;
@@ -56,9 +57,10 @@ public class ColumnBoardDriver {
 
     public void addNoteAndWait(String columnId, String noteContent) {
         Page page = world.getPage();
+        page.waitForSelector(noteInputSelector(columnId), new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
         page.fill(noteInputSelector(columnId), noteContent);
         page.click(noteSubmitSelector(columnId));
-        page.waitForSelector(noteTextSelector(noteContent), new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+        page.waitForSelector(noteTextSelector(noteContent), new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
     }
 
     public void assertNoteVisible(String noteContent) {
