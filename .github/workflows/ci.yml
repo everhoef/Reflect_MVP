@@ -96,7 +96,46 @@ jobs:
           fi
           echo "✅ All commits follow Conventional Commits format."
 
-  # ── Job 3: build-image ───────────────────────────────────────────────────────
+  # ── Job 3: static-analysis ───────────────────────────────────────────────────
+  # Runs the Maven verify lifecycle so Checkstyle, PMD, and SpotBugs execute
+  # from lifecycle bindings. This currently surfaces the existing baseline debt
+  # and is intentionally independent from image build/publish flow.
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: npm-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            npm-
+
+      - name: Run Maven verify static analysis gate
+        run: ./mvnw $MAVEN_CLI_OPTS -DskipTests verify
+
+  # ── Job 4: build-image ───────────────────────────────────────────────────────
   # Builds the OCI image via Paketo buildpacks (Spring Boot Maven plugin) and,
   # when the publish condition is met, pushes it to GHCR on the same runner.
   # Build and push must run on the same runner — the image only exists in the
@@ -206,7 +245,7 @@ jobs:
                      ${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.sha_tag }}
           docker push ${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.sha_tag }}
 
-  # ── Job 4: update-gitops ─────────────────────────────────────────────────────
+  # ── Job 5: update-gitops ─────────────────────────────────────────────────────
   # Commits the new image tag to the acc overlay in the infra repo.
   # Runs on main branch pushes only (not PRs, not tags).
   # Uses GITOPS_TOKEN (fine-grained PAT) for write access to facilitator-gitops.
@@ -259,7 +298,7 @@ jobs:
           echo "❌ Failed to push GitOps update after 3 attempts."
           exit 1
 
-  # ── Job 5: update-preview-gitops ─────────────────────────────────────────────
+  # ── Job 6: update-preview-gitops ─────────────────────────────────────────────
   # Creates or updates the per-PR preview overlay in facilitator-gitops.
   # Runs when a PR with the 'preview' label is opened, pushed, or labeled.
   # The overlay pins the exact pr-<N>-<sha> image tag so ArgoCD can sync it.
@@ -307,7 +346,7 @@ jobs:
           }
           git push origin main
 
-  # ── Job 6: delete-preview-gitops ─────────────────────────────────────────────
+  # ── Job 7: delete-preview-gitops ─────────────────────────────────────────────
   # Removes the per-PR preview overlay from facilitator-gitops on PR close or
   # when the 'preview' label is removed. ArgoCD prunes the preview app and
   # namespace automatically once the overlay directory is gone.
