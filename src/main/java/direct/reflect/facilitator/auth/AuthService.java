@@ -159,11 +159,21 @@ public class AuthService {
             throw new IllegalArgumentException("Guest display name cannot be empty");
         }
 
+        initializeGuestSession(request, displayName, UUID.randomUUID());
+    }
+
+    public void initializeGuestSession(HttpServletRequest request, String displayName, UUID guestId) {
+        if (displayName == null || displayName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Guest display name cannot be empty");
+        }
+        if (guestId == null) {
+            throw new IllegalArgumentException("Guest ID cannot be null");
+        }
+
         HttpSession session = request.getSession(true);
         String trimmedDisplayName = displayName.trim();
 
         // Generate unique guest ID (acts as the "username" for guests)
-        UUID guestId = UUID.randomUUID();
         String guestUsername = guestId.toString();
 
         // Use SAME session structure as OIDC for consistency

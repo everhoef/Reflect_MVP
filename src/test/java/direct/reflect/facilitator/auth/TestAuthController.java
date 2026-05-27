@@ -5,6 +5,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +28,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/test")
 @Profile("test")
 @Slf4j
+@RequiredArgsConstructor
 public class TestAuthController {
+
+    private final AuthService authService;
 
     @RequestMapping(value = "/login-oauth-user", method = {RequestMethod.POST, RequestMethod.GET})
     public ResponseEntity<String> loginOAuthUser(
@@ -83,25 +88,15 @@ public class TestAuthController {
     public ResponseEntity<String> loginGuestUser(
             HttpServletRequest request,
             HttpServletResponse response,
-            @RequestParam(defaultValue = "Guest User") String displayName) {
+            @RequestParam(defaultValue = "Guest User") String displayName,
+            @RequestParam(required = false) String guestId) {
 
         try {
-            SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
-            securityContext.setAuthentication(
-                new UsernamePasswordAuthenticationToken(
-                    displayName,
-                    null,
-                    Collections.singletonList(new SimpleGrantedAuthority("ROLE_GUEST"))
-                )
-            );
-            SecurityContextHolder.setContext(securityContext);
+            UUID explicitGuestId = guestId == null || guestId.isBlank()
+                ? UUID.randomUUID()
+                : UUID.fromString(guestId);
 
-            HttpSessionSecurityContextRepository repository = new HttpSessionSecurityContextRepository();
-            repository.saveContext(securityContext, request, response);
-
-            request.getSession().setAttribute("guestDisplayName", displayName);
-            request.getSession().setAttribute("authType", "GUEST");
-            request.getSession().removeAttribute("authenticatedUser");
+            authService.initializeGuestSession(request, displayName, explicitGuestId);
 
             return ResponseEntity.ok("Guest authentication set up for: " + displayName);
 
