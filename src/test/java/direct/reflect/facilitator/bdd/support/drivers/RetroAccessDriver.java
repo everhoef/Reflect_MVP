@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
 import java.util.List;
 
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.DISPLAY_NAME_INPUT;
@@ -85,6 +86,23 @@ public class RetroAccessDriver {
 
     public void navigateToRetro(String retroId) {
         world.getPage().navigate(world.getBaseUrl() + "/retro/" + retroId);
+    }
+
+    public void rejoinRetroWithRecoveredGuestSession(String retroId, String displayName) {
+        Page page = world.getPage();
+        try {
+            navigateToRetro(retroId);
+            page.waitForSelector(RETRO_CONTENT, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
+        } catch (RuntimeException e) {
+            if (!isLoginBarrierVisible(page)) {
+                throw e;
+            }
+
+            log.warn("Retro re-entry hit login barrier for session {}. Re-establishing guest session for '{}'.", retroId, displayName);
+            authenticateGuestThroughBackend(page, displayName);
+            navigateToRetro(retroId);
+            page.waitForSelector(RETRO_CONTENT, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
+        }
     }
 
     public void assertGuestAuthenticated() {
@@ -202,6 +220,45 @@ public class RetroAccessDriver {
         int count = world.getPage().locator(selector).count();
         if (count > 0) {
             throw new AssertionError("Found unexpected " + description + " on page");
+        }
+    }
+
+    private boolean isLoginBarrierVisible(Page page) {
+        return page.url().contains("/login") || page.locator(DISPLAY_NAME_INPUT).count() > 0;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void authenticateGuestThroughBackend(Page page, String displayName) {
+        Object result = page.evaluate(
+            """
+                async ({ displayName }) => {
+                    const response = await fetch('/auth/guest', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                        },
+                        body: new URLSearchParams({ displayName }).toString()
+                    });
+
+                    return {
+                        ok: response.ok,
+                        redirected: response.redirected,
+                        url: response.url,
+                        status: response.status
+                    };
+                }
+            """,
+            Map.of("displayName", displayName)
+        );
+
+        if (!(result instanceof Map<?, ?> responseInfo)) {
+            throw new IllegalStateException("Guest backend authentication returned unexpected result: " + result);
+        }
+
+        Object ok = responseInfo.get("ok");
+        if (!(ok instanceof Boolean okValue) || !okValue) {
+            throw new IllegalStateException("Guest backend authentication failed: " + responseInfo);
         }
     }
 }

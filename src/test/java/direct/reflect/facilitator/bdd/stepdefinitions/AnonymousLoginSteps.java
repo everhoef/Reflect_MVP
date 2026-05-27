@@ -123,7 +123,7 @@ public class AnonymousLoginSteps {
         }
         retroAccessDriver.clearCookies();
         retroAccessDriver.restoreCookies(participantCookies);
-        retroAccessDriver.navigateToRetro(context.getSessionId());
+        retroAccessDriver.rejoinRetroWithRecoveredGuestSession(context.getSessionId(), "Reconnect User");
         retroAccessDriver.assertRetroPageVisible();
     }
 
