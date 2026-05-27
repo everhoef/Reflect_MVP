@@ -16,6 +16,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ghcr.io/reflect-direct/facilitator
   MAVEN_CLI_OPTS: --batch-mode --no-transfer-progress
+  PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
 
 jobs:
 
@@ -53,6 +54,20 @@ jobs:
           key: npm-${{ hashFiles('frontend/package-lock.json') }}
           restore-keys: |
             npm-
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('pom.xml') }}
+          restore-keys: |
+            playwright-browsers-${{ runner.os }}-
+
+      - name: Install Playwright host dependencies
+        run: ./mvnw $MAVEN_CLI_OPTS -q exec:java -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install-deps chromium"
+
+      - name: Install Playwright browser binaries
+        run: ./mvnw $MAVEN_CLI_OPTS -q exec:java -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install chromium"
 
       - name: Run Java tests (Maven Surefire + Testcontainers)
         run: ./mvnw $MAVEN_CLI_OPTS clean test
@@ -131,6 +146,14 @@ jobs:
           key: npm-${{ hashFiles('frontend/package-lock.json') }}
           restore-keys: |
             npm-
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('pom.xml') }}
+          restore-keys: |
+            playwright-browsers-${{ runner.os }}-
 
       - name: Run Maven verify static analysis gate
         run: ./mvnw $MAVEN_CLI_OPTS -DskipTests verify
