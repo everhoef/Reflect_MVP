@@ -23,9 +23,12 @@ jobs:
   # ── Job 1: test ──────────────────────────────────────────────────────────────
   # Runs ALL tests: Maven Surefire + Testcontainers (PostgreSQL, Redis) + Vitest
   # ubuntu-latest has Docker pre-installed; required for Testcontainers
+  # PRs can opt out temporarily by adding the 'skip-tests' label while iterating
+  # on later CI stages such as image build/publish.
   test:
     name: Test
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'skip-tests') }}
     permissions:
       contents: read
 
@@ -168,12 +171,15 @@ jobs:
   # - main builds use operational promotion tags: sha-<SHA>
   # - only Git tags vX.Y.Z produce a formal release version X.Y.Z
   # Publish condition: main branch, version tag v*, or PR with 'preview' label.
+  # PRs with the 'skip-tests' label may still run this job to speed up image-stage
+  # iteration after earlier test failures have already been diagnosed.
   # BP_JVM_VERSION=25: required for Paketo Bellsoft Liberica to use Java 25.
   # SPRING_DOCKER_COMPOSE_ENABLED=false: must be disabled in the production image.
   build-image:
     name: Build Image
     runs-on: ubuntu-latest
     needs: [test]
+    if: ${{ always() && (needs.test.result == 'success' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'skip-tests') && needs.test.result == 'skipped')) }}
     permissions:
       contents: read
       packages: write
@@ -246,7 +252,6 @@ jobs:
             -Dspring-boot.build-image.env.BP_OCI_VERSION=${{ steps.tag.outputs.oci_version }} \
             -Dspring-boot.build-image.env.BP_OCI_REVISION=${{ github.sha }} \
             -Dspring-boot.build-image.env.SPRING_DOCKER_COMPOSE_ENABLED=false \
-            --cache-image ghcr.io/reflect-direct/facilitator-build-cache:latest \
             -DskipTests
 
       - name: Push image to GHCR
