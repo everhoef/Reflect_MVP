@@ -100,6 +100,10 @@ jobs:
   # when the publish condition is met, pushes it to GHCR on the same runner.
   # Build and push must run on the same runner — the image only exists in the
   # local Docker daemon and cannot be transferred between jobs without a tar artifact.
+  # Version model:
+  # - PR builds use operational preview tags: pr-<PR>-<SHA>
+  # - main builds use operational promotion tags: sha-<SHA>
+  # - only Git tags vX.Y.Z produce a formal release version X.Y.Z
   # Publish condition: main branch, version tag v*, or PR with 'preview' label.
   # BP_JVM_VERSION=25: required for Paketo Bellsoft Liberica to use Java 25.
   # SPRING_DOCKER_COMPOSE_ENABLED=false: must be disabled in the production image.
@@ -142,21 +146,24 @@ jobs:
           restore-keys: |
             npm-
 
-      - name: Compute image tag
+      - name: Compute deployment image version
         id: tag
         run: |
           SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             SEMVER="${{ github.ref_name }}"
             SEMVER="${SEMVER#v}"
+            # Formal release path: image tag and OCI version both use semver.
             echo "tag=${SEMVER}" >> "$GITHUB_OUTPUT"
             echo "sha_tag=sha-${SHA}" >> "$GITHUB_OUTPUT"
             echo "oci_version=${SEMVER}" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
+            # Main branch path: operational deployment tag only, not a semantic release.
             echo "tag=sha-${SHA}" >> "$GITHUB_OUTPUT"
             echo "oci_version=sha-${SHA}" >> "$GITHUB_OUTPUT"
           else
             PR="${{ github.event.pull_request.number }}"
+            # PR path: ephemeral preview tag only, not a semantic release.
             echo "tag=pr-${PR}-${SHA}" >> "$GITHUB_OUTPUT"
             echo "oci_version=pr-${PR}-${SHA}" >> "$GITHUB_OUTPUT"
           fi
@@ -191,7 +198,7 @@ jobs:
           DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.IMAGE_NAME }}:${TAG} | cut -d@ -f2)
           echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
 
-      - name: Push sha alias (release only)
+      - name: Push sha alias alongside release tag
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           docker tag ${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }} \

@@ -115,6 +115,15 @@ CI runs on every push to `main` and on every pull request targeting `main`.
 - **GitOps source of truth**: `reflect-direct/facilitator-gitops` (acc overlay auto-updated on every `main` merge)
 - **Preview environments**: add the `preview` label to a PR to publish a preview image and trigger an ArgoCD preview app
 
+### Versioning model
+
+- **Maven project version** (`pom.xml`, currently `0.0.1-SNAPSHOT`) is the development/build version for the app source.
+- **Deployment image version** is controlled by Git context in CI:
+  - PR previews: `pr-<PR_NUMBER>-<SHORT_SHA>`
+  - `main` promotions: `sha-<SHORT_SHA>`
+  - formal releases only: Git tag `vX.Y.Z` publishes image `X.Y.Z`
+- The built OCI image metadata is stamped from the CI-derived deployment version, so runtime/deployment identity does not silently depend on the Maven snapshot string.
+
 ## Project structure
 
 ```text
