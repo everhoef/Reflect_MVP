@@ -64,10 +64,10 @@ jobs:
             playwright-browsers-${{ runner.os }}-
 
       - name: Install Playwright host dependencies
-        run: ./mvnw $MAVEN_CLI_OPTS -q exec:java -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install-deps chromium"
+        run: sudo --preserve-env=PLAYWRIGHT_BROWSERS_PATH ./mvnw $MAVEN_CLI_OPTS -q -Dexec.classpathScope=test exec:java -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install-deps chromium"
 
       - name: Install Playwright browser binaries
-        run: ./mvnw $MAVEN_CLI_OPTS -q exec:java -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install chromium"
+        run: ./mvnw $MAVEN_CLI_OPTS -q -Dexec.classpathScope=test exec:java -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install chromium"
 
       - name: Run Java tests (Maven Surefire + Testcontainers)
         run: ./mvnw $MAVEN_CLI_OPTS clean test
