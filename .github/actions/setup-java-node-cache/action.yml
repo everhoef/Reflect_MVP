@@ -1,11 +1,7 @@
 name: Setup Java and dependency caches
-description: Checkout the repo, set up Java 25, and restore shared Maven/npm/Playwright caches.
+description: Set up Java 25 and restore shared Maven/npm/Playwright caches.
 
 inputs:
-  fetch-depth:
-    description: Checkout fetch depth
-    required: false
-    default: '1'
   cache-playwright:
     description: Restore the Playwright browser cache
     required: false
@@ -14,11 +10,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: ${{ inputs.fetch-depth }}
-
     - name: Set up Java 25
       uses: actions/setup-java@v4
       with:

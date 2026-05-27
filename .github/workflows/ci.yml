@@ -33,6 +33,11 @@ jobs:
       contents: read
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Shared test setup
         uses: ./.github/actions/setup-java-node-cache
         with:
@@ -97,6 +102,11 @@ jobs:
       contents: read
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Shared static-analysis setup
         uses: ./.github/actions/setup-java-node-cache
         with:
@@ -134,6 +144,11 @@ jobs:
       digest: ${{ steps.push.outputs.digest }}
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Shared build-image setup
         uses: ./.github/actions/setup-java-node-cache
 
