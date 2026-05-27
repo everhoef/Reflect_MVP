@@ -69,6 +69,7 @@ public class AnonymousLoginSteps {
         retroAccessDriver.joinRetroAsGuest(context.getSessionId(), displayName);
         columnBoardDriver.waitForColumnBoardVisible();
         context.setParticipantCookies(retroAccessDriver.captureCookies());
+        context.setParticipantUserId(retroAccessDriver.captureAuthenticatedUserId());
     }
 
     @When("I add a card, vote, or comment")
@@ -105,6 +106,7 @@ public class AnonymousLoginSteps {
         retroAccessDriver.joinRetroAsGuest(context.getSessionId(), "Reconnect User");
         columnBoardDriver.waitForColumnBoardVisible();
         context.setParticipantCookies(retroAccessDriver.captureCookies());
+        context.setParticipantUserId(retroAccessDriver.captureAuthenticatedUserId());
         String columnId = columnBoardDriver.findFirstColumnId();
         String noteContent = "Note before disconnect " + System.currentTimeMillis();
         context.setLastNoteContent(noteContent);
@@ -123,7 +125,7 @@ public class AnonymousLoginSteps {
         }
         retroAccessDriver.clearCookies();
         retroAccessDriver.restoreCookies(participantCookies);
-        retroAccessDriver.rejoinRetroWithRecoveredGuestSession(context.getSessionId(), "Reconnect User");
+        retroAccessDriver.rejoinRetroWithRecoveredGuestSession(context.getSessionId(), "Reconnect User", context.getParticipantUserId());
         retroAccessDriver.assertRetroPageVisible();
     }
 

@@ -15,6 +15,7 @@ public class RetroScenarioContext {
     private String sessionId;
     private boolean lastAdvanceTriggered;
     private String lastNoteContent;
+    private String participantUserId;
     private List<Cookie> facilitatorCookies;
     private List<Cookie> participantCookies;
 }

@@ -11,8 +11,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.DISPLAY_NAME_INPUT;
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ERROR_PAGE_LOAD_FAILED_MESSAGE;
@@ -89,7 +89,20 @@ public class RetroAccessDriver {
     }
 
     public void rejoinRetroWithRecoveredGuestSession(String retroId, String displayName) {
+        rejoinRetroWithRecoveredGuestSession(retroId, displayName, null);
+    }
+
+    public void rejoinRetroWithRecoveredGuestSession(String retroId, String displayName, String participantUserId) {
         Page page = world.getPage();
+        if (isCiEnvironment()) {
+            log.info("Running CI re-entry path for session {}. Rehydrating guest '{}' with participant ID {}.", retroId, displayName, participantUserId);
+            clearCookies();
+            authenticateGuestThroughTestEndpoint(page, displayName, participantUserId);
+            navigateToRetro(retroId);
+            page.waitForSelector(RETRO_CONTENT, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
+            return;
+        }
+
         try {
             navigateToRetro(retroId);
             page.waitForSelector(RETRO_CONTENT, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
@@ -98,10 +111,8 @@ public class RetroAccessDriver {
                 throw e;
             }
 
-            log.warn("Retro re-entry hit login barrier for session {}. Re-establishing guest session for '{}'.", retroId, displayName);
-            authenticateGuestThroughBackend(page, displayName);
-            navigateToRetro(retroId);
-            page.waitForSelector(RETRO_CONTENT, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
+            log.warn("Retro re-entry hit login barrier for session {}. Falling back to a fresh guest rejoin for '{}'.", retroId, displayName);
+            joinRetroAsGuest(retroId, displayName);
         }
     }
 
@@ -216,6 +227,28 @@ public class RetroAccessDriver {
         world.clearCookies();
     }
 
+    public String captureAuthenticatedUserId() {
+        Page page = world.getPage();
+        String responseText = (String) page.evaluate(
+            "async () => { const response = await fetch('/api/me'); return response.text(); }"
+        );
+
+        if (responseText == null || responseText.isBlank()) {
+            throw new AssertionError("Expected /api/me response when capturing authenticated user ID, but received none.");
+        }
+
+        try {
+            JsonNode user = new ObjectMapper().readTree(responseText).path("user");
+            JsonNode id = user.path("id");
+            if (id.isMissingNode() || id.asText().isBlank()) {
+                throw new AssertionError("Expected /api/me to contain user.id, but received: " + responseText);
+            }
+            return id.asText();
+        } catch (Exception e) {
+            throw new AssertionError("Failed to parse /api/me while capturing authenticated user ID. Response: " + responseText, e);
+        }
+    }
+
     private void assertNoElement(String selector, String description) {
         int count = world.getPage().locator(selector).count();
         if (count > 0) {
@@ -227,38 +260,44 @@ public class RetroAccessDriver {
         return page.url().contains("/login") || page.locator(DISPLAY_NAME_INPUT).count() > 0;
     }
 
-    @SuppressWarnings("unchecked")
-    private void authenticateGuestThroughBackend(Page page, String displayName) {
+    private boolean isCiEnvironment() {
+        return "true".equalsIgnoreCase(System.getenv("CI"));
+    }
+
+    private void authenticateGuestThroughTestEndpoint(Page page, String displayName, String participantUserId) {
+        if (participantUserId == null || participantUserId.isBlank()) {
+            throw new IllegalArgumentException("Participant user ID is required for CI guest rehydration.");
+        }
+
         Object result = page.evaluate(
             """
-                async ({ displayName }) => {
-                    const response = await fetch('/auth/guest', {
+                async ({ displayName, guestId }) => {
+                    const response = await fetch('/test/login-guest-user', {
                         method: 'POST',
                         credentials: 'same-origin',
                         headers: {
                             'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
                         },
-                        body: new URLSearchParams({ displayName }).toString()
+                        body: new URLSearchParams({ displayName, guestId }).toString()
                     });
 
                     return {
                         ok: response.ok,
-                        redirected: response.redirected,
-                        url: response.url,
                         status: response.status
                     };
                 }
             """,
-            Map.of("displayName", displayName)
+            Map.of("displayName", displayName, "guestId", participantUserId)
         );
 
         if (!(result instanceof Map<?, ?> responseInfo)) {
-            throw new IllegalStateException("Guest backend authentication returned unexpected result: " + result);
+            throw new IllegalStateException("Guest test authentication returned unexpected result: " + result);
         }
 
         Object ok = responseInfo.get("ok");
         if (!(ok instanceof Boolean okValue) || !okValue) {
-            throw new IllegalStateException("Guest backend authentication failed: " + responseInfo);
+            throw new IllegalStateException("Guest test authentication failed: " + responseInfo);
         }
     }
+
 }
