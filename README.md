@@ -99,6 +99,22 @@ To run a single test:
 ./mvnw test -Dtest=ClassName#methodName
 ```
 
+To enable the local Conventional Commit hook once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+## CI/CD and GitOps
+
+CI runs on every push to `main` and on every pull request targeting `main`.
+
+- **Test gate**: `./mvnw clean test` (Java + Testcontainers) and `cd frontend && npm test` (Vitest)
+- **Image build**: Paketo buildpacks via `./mvnw spring-boot:build-image`
+- **Registry**: GHCR — `ghcr.io/reflect-direct/facilitator`
+- **GitOps source of truth**: `reflect-direct/facilitator-gitops` (acc overlay auto-updated on every `main` merge)
+- **Preview environments**: add the `preview` label to a PR to publish a preview image and trigger an ArgoCD preview app
+
 ## Project structure
 
 ```text
