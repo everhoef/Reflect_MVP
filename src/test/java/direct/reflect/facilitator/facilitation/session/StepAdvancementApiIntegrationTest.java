@@ -8,9 +8,6 @@ import direct.reflect.facilitator.facilitation.participant.Participant;
 import direct.reflect.facilitator.facilitation.participant.ParticipantRepository;
 import direct.reflect.facilitator.facilitation.participant.ParticipantRole;
 import direct.reflect.facilitator.facilitation.participant.ParticipantStatus;
-import direct.reflect.facilitator.facilitation.session.RetroPhase;
-import direct.reflect.facilitator.facilitation.session.RetroSession;
-import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -30,12 +27,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -112,16 +107,16 @@ class StepAdvancementApiIntegrationTest {
     @WithMockUser(roles = "USER")
     void advanceNext_FromInitialState_MovesToFirstStep() throws Exception {
         RetroSession initial = sessionRepository.findById(testSession.getId()).orElseThrow();
-        assertThat(initial.getCurrentStepIndex()).isEqualTo(-1);
+        org.assertj.core.api.Assertions.assertThat(initial.getCurrentStepIndex()).isEqualTo(-1);
         long initialSyncVersion = initial.getSyncVersion();
 
         mockMvc.perform(post("/api/retros/{retroId}/advance", testSession.getId())
-                        .with(csrf()))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
         RetroSession updated = sessionRepository.findById(testSession.getId()).orElseThrow();
-        assertThat(updated.getCurrentStepIndex()).isEqualTo(0);
-        assertThat(updated.getSyncVersion()).isGreaterThan(initialSyncVersion);
+        org.assertj.core.api.Assertions.assertThat(updated.getCurrentStepIndex()).isEqualTo(0);
+        org.assertj.core.api.Assertions.assertThat(updated.getSyncVersion()).isGreaterThan(initialSyncVersion);
     }
 
     @Test
@@ -129,11 +124,11 @@ class StepAdvancementApiIntegrationTest {
     void advanceNext_MultipleTimesSequentially_IncrementsStepIndex() throws Exception {
         for (int expectedStepIndex = 0; expectedStepIndex <= 4; expectedStepIndex++) {
             mockMvc.perform(post("/api/retros/{retroId}/advance", testSession.getId())
-                            .with(csrf()))
+                            .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
                     .andExpect(status().isOk());
 
             RetroSession updated = sessionRepository.findById(testSession.getId()).orElseThrow();
-            assertThat(updated.getCurrentStepIndex())
+            org.assertj.core.api.Assertions.assertThat(updated.getCurrentStepIndex())
                     .as("Expected currentStepIndex=%d after %d advance(s)", expectedStepIndex, expectedStepIndex + 1)
                     .isEqualTo(expectedStepIndex);
         }
@@ -146,7 +141,7 @@ class StepAdvancementApiIntegrationTest {
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(unknownParticipantId);
 
         mockMvc.perform(post("/api/retros/{retroId}/advance", testSession.getId())
-                        .with(csrf()))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isForbidden());
     }
 }
