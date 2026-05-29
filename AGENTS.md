@@ -630,6 +630,16 @@ Additional REQUIRED rules for feature delivery:
 - If Notion MCP is unavailable: delivery proceeds, agent MUST inform user to update Notion status manually
 - **Tool call pattern**: `mcp_notion-hosted_notion-update-page(page_id, command: update_properties, properties: {Status: 'Needs review'})`
 
+### Commit Message Policy
+
+- Use **Conventional Commits** for all commit messages: `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`, `ci:`, and `build:`.
+- Treat Conventional Commits as the basis for release/version semantics when CI/CD automation needs to infer change type.
+- Prefer **early local enforcement** through a repo-managed `commit-msg` git hook so contributors get feedback before pushing.
+- Also enforce the same policy in **CI and branch protection** as a backstop; local hooks alone are not sufficient because they can be bypassed or missing.
+- Tooling such as Commitizen, Husky, Lefthook, or a plain shell `commit-msg` hook is acceptable. Choose the lightest option that the repository can maintain consistently.
+- At minimum, require a CI check that validates either commit messages, PR titles, or both before merge, even if local hooks are present.
+- Do not merge work that bypasses the Conventional Commit policy unless the repo owner explicitly approves an exception.
+
 ### Edge Cases
 
 - **Story with no BDD scenarios**: MUST NOT build. Agent MUST flag this to user. BDD is the acceptance contract.

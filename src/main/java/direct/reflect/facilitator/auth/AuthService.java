@@ -163,8 +163,7 @@ public class AuthService {
         String trimmedDisplayName = displayName.trim();
 
         // Generate unique guest ID (acts as the "username" for guests)
-        UUID guestId = UUID.randomUUID();
-        String guestUsername = guestId.toString();
+        String guestUsername = UUID.randomUUID().toString();
 
         // Use SAME session structure as OIDC for consistency
         session.setAttribute("authenticatedUser", guestUsername);     // Unique UUID

@@ -1,0 +1,14 @@
+#!/bin/sh
+
+MSG_FILE="$1"
+PATTERN='^(feat|fix|refactor|docs|test|ci|build|chore)(\([^)]+\))?: .+'
+
+if ! grep -qE "$PATTERN" "$MSG_FILE"; then
+  MSG=$(cat "$MSG_FILE")
+  printf '%s\n' "ERROR: Commit message does not follow Conventional Commits format."
+  printf '%s\n' "Expected: <type>(<scope>): <description>"
+  printf '%s\n' "Types: feat, fix, refactor, docs, test, ci, build, chore"
+  printf '%s\n' "Example: feat(auth): add guest login flow"
+  printf '%s\n' "Got: $MSG"
+  exit 1
+fi

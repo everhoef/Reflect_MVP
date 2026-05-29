@@ -122,7 +122,7 @@ export function Coachmark({
       role="note"
       aria-label={`Coachmark: ${label}`}
     >
-      <div className="pointer-events-auto rounded-lg bg-gray-800/95 border border-amber-500/30 shadow-lg shadow-black/30 px-3.5 py-3 text-sm backdrop-blur-sm">
+      <div className="pointer-events-none rounded-lg bg-gray-800/95 border border-amber-500/30 shadow-lg shadow-black/30 px-3.5 py-3 text-sm backdrop-blur-sm">
         <div className="flex items-center justify-between mb-1.5 gap-3">
           <span className="text-[9px] font-semibold uppercase tracking-widest text-amber-400/80">
             {label}
@@ -131,7 +131,7 @@ export function Coachmark({
             type="button"
             data-testid={`${testId}-close`}
             onClick={handleDismiss}
-            className="shrink-0 text-gray-500 hover:text-gray-200 transition-colors leading-none text-[11px]"
+            className="pointer-events-auto shrink-0 text-gray-500 hover:text-gray-200 transition-colors leading-none text-[11px]"
             aria-label="Dismiss coachmark"
           >
             ✕

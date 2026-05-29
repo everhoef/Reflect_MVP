@@ -182,16 +182,14 @@ describe('Coachmark primitive', () => {
       expect(container.className).toContain('pointer-events-none')
     })
 
-    it('inner bubble has pointer-events-auto (close button is reachable)', () => {
+    it('close button stays clickable even when the bubble ignores pointer events', () => {
       mountAnchor('guidance-sidebar')
       render(
         <Coachmark anchorId="guidance-sidebar" onDismiss={() => undefined}>
           Hello
         </Coachmark>
       )
-      const container = screen.getByTestId('coachmark')
-      const inner = container.firstElementChild
-      expect(inner?.className).toContain('pointer-events-auto')
+      expect(screen.getByTestId('coachmark-close').className).toContain('pointer-events-auto')
     })
 
     it('has role="note" (not role="dialog" — non-modal)', () => {

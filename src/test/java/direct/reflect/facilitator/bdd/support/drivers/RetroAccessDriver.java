@@ -12,7 +12,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.DISPLAY_NAME_INPUT;
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ERROR_PAGE_LOAD_FAILED_MESSAGE;
 import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ERROR_PAGE_MESSAGE;
@@ -85,6 +84,21 @@ public class RetroAccessDriver {
 
     public void navigateToRetro(String retroId) {
         world.getPage().navigate(world.getBaseUrl() + "/retro/" + retroId);
+    }
+
+    public void rejoinRetroWithRecoveredGuestSession(String retroId, String displayName) {
+        Page page = world.getPage();
+        try {
+            navigateToRetro(retroId);
+            page.waitForSelector(RETRO_CONTENT, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
+        } catch (RuntimeException e) {
+            if (!isLoginBarrierVisible(page)) {
+                throw e;
+            }
+
+            log.warn("Retro re-entry hit login barrier for session {}. Falling back to a fresh guest rejoin for '{}'.", retroId, displayName);
+            joinRetroAsGuest(retroId, displayName);
+        }
     }
 
     public void assertGuestAuthenticated() {
@@ -204,4 +218,9 @@ public class RetroAccessDriver {
             throw new AssertionError("Found unexpected " + description + " on page");
         }
     }
+
+    private boolean isLoginBarrierVisible(Page page) {
+        return page.url().contains("/login") || page.locator(DISPLAY_NAME_INPUT).count() > 0;
+    }
+
 }

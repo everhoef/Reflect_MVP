@@ -160,7 +160,6 @@ public class SecurityConfig {
 
                 // Clear any guest session data
                 session.removeAttribute("guestDisplayName");
-                session.removeAttribute("guestId");
 
                 // Create new authentication token with ROLE_USER
                 OAuth2User userPrincipal = oauth2Token.getPrincipal();

@@ -116,7 +116,8 @@ public abstract class BaseEndToEndTest {
 
     // Test failure reporting infrastructure
     private List<ConsoleMessage> consoleErrors = new ArrayList<>();
-    private List<String> networkFailures = new ArrayList<>();
+    private Map<String, Integer> consoleErrorCounts = new HashMap<>();
+    private Map<String, Integer> networkFailureCounts = new HashMap<>();
 
     /**
      * CDN domains intentionally blocked in tests via blockExternalCdnResources().
@@ -268,11 +269,15 @@ public abstract class BaseEndToEndTest {
     private void setupConsoleAndNetworkMonitoring(BrowserContext context) {
         // Clear previous test's errors
         consoleErrors.clear();
-        networkFailures.clear();
+        consoleErrorCounts.clear();
+        networkFailureCounts.clear();
         // Console error listener — captures browser-side JavaScript errors
         context.onConsoleMessage(msg -> {
             if (msg.type().equals("error")) {
-                log.warn("[BROWSER_MONITOR] Browser console error: {}", msg.text());
+                int occurrences = consoleErrorCounts.merge(msg.text(), 1, Integer::sum);
+                if (occurrences == 1) {
+                    log.warn("[BROWSER_MONITOR] Browser console error: {}", msg.text());
+                }
                 consoleErrors.add(msg);
             }
         });
@@ -287,8 +292,10 @@ public abstract class BaseEndToEndTest {
             }
             String failure = String.format("%s %s - %s",
                 request.method(), request.url(), request.failure());
-            log.warn("[BROWSER_MONITOR] Network failure: {}", failure);
-            networkFailures.add(failure);
+            int occurrences = networkFailureCounts.merge(failure, 1, Integer::sum);
+            if (occurrences == 1) {
+                log.warn("[BROWSER_MONITOR] Network failure: {}", failure);
+            }
         });
 
         // HTTP error response listener — captures 4xx/5xx status codes
@@ -298,8 +305,10 @@ public abstract class BaseEndToEndTest {
                     response.status(),
                     response.request().method(),
                     response.url());
-                log.warn("[BROWSER_MONITOR] {}", failure);
-                networkFailures.add(failure);
+                int occurrences = networkFailureCounts.merge(failure, 1, Integer::sum);
+                if (occurrences == 1) {
+                    log.warn("[BROWSER_MONITOR] {}", failure);
+                }
             }
         });
     }
@@ -313,10 +322,15 @@ public abstract class BaseEndToEndTest {
             log.error("[TEST_FAILURE_REPORT] ╔═══════════════════════════════════════════════════════════");
             log.error("[TEST_FAILURE_REPORT] ║ BROWSER CONSOLE ERRORS SUMMARY:");
             log.error("[TEST_FAILURE_REPORT] ╠═══════════════════════════════════════════════════════════");
-            for (ConsoleMessage msg : consoleErrors) {
-                log.error("[TEST_FAILURE_REPORT] ║ {}", msg.text());
-                if (msg.location() != null) {
-                    log.error("[TEST_FAILURE_REPORT] ║   at {}:{}", msg.location(), msg.location());
+            for (Map.Entry<String, Integer> entry : consoleErrorCounts.entrySet()) {
+                String suffix = entry.getValue() > 1 ? " (repeated " + entry.getValue() + "x)" : "";
+                log.error("[TEST_FAILURE_REPORT] ║ {}{}", entry.getKey(), suffix);
+                ConsoleMessage sample = consoleErrors.stream()
+                    .filter(msg -> msg.text().equals(entry.getKey()))
+                    .findFirst()
+                    .orElse(null);
+                if (sample != null && sample.location() != null) {
+                    log.error("[TEST_FAILURE_REPORT] ║   at {}:{}", sample.location(), sample.location());
                 }
             }
             log.error("[TEST_FAILURE_REPORT] ╚═══════════════════════════════════════════════════════════");
@@ -328,12 +342,13 @@ public abstract class BaseEndToEndTest {
      * Called from comprehensive error reporter on test failure.
      */
     private void logNetworkFailures() {
-        if (!networkFailures.isEmpty()) {
+        if (!networkFailureCounts.isEmpty()) {
             log.error("[TEST_FAILURE_REPORT] ╔═══════════════════════════════════════════════════════════");
             log.error("[TEST_FAILURE_REPORT] ║ NETWORK FAILURES SUMMARY:");
             log.error("[TEST_FAILURE_REPORT] ╠═══════════════════════════════════════════════════════════");
-            for (String failure : networkFailures) {
-                log.error("[TEST_FAILURE_REPORT] ║ {}", failure);
+            for (Map.Entry<String, Integer> entry : networkFailureCounts.entrySet()) {
+                String suffix = entry.getValue() > 1 ? " (repeated " + entry.getValue() + "x)" : "";
+                log.error("[TEST_FAILURE_REPORT] ║ {}{}", entry.getKey(), suffix);
             }
             log.error("[TEST_FAILURE_REPORT] ╚═══════════════════════════════════════════════════════════");
         }
@@ -1312,7 +1327,7 @@ public abstract class BaseEndToEndTest {
 
         // 3. Network Failures - HTTP errors and connection failures
         logNetworkFailures();
-        if (!networkFailures.isEmpty()) {
+        if (!networkFailureCounts.isEmpty()) {
             log.error("");
         }
 
