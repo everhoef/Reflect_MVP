@@ -8,7 +8,6 @@ import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.RetroStage;
 import direct.reflect.facilitator.configurator.RetroStepQueryService;
-import direct.reflect.facilitator.facilitation.response.InputLimitExceededException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,13 +24,9 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = {
@@ -40,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @Import({
     direct.reflect.facilitator.config.TestSecurityOverride.class,
-    direct.reflect.facilitator.auth.AuthService.class
+    AuthService.class
 })
 @EnableAutoConfiguration(exclude = {
     DataSourceAutoConfiguration.class,
@@ -91,7 +86,7 @@ public class ResponseApiControllerTest {
         Long stepId = 1L;
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("columnId", "Mad")
                 .param("content", "Too many meetings"))
                 .andExpect(status().isOk())
@@ -105,7 +100,7 @@ public class ResponseApiControllerTest {
         Long stepId = 1L;
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("columnId", "Glad")
                 .param("content", "Great collaboration"))
                 .andExpect(status().isOk())
@@ -119,7 +114,7 @@ public class ResponseApiControllerTest {
         Long stepId = 1L;
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("columnId", "Mad")
                 .param("content", ""))
                 .andExpect(status().isBadRequest())
@@ -134,7 +129,7 @@ public class ResponseApiControllerTest {
         String tooLongContent = "a".repeat(501);
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("columnId", "Mad")
                 .param("content", tooLongContent))
                 .andExpect(status().isBadRequest())
@@ -148,7 +143,7 @@ public class ResponseApiControllerTest {
         Long stepId = 1L;
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("content", "Some content"))
                 .andExpect(status().isBadRequest());
     }
@@ -160,7 +155,7 @@ public class ResponseApiControllerTest {
         Long stepId = 1L;
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId)
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("rating", "8")
                 .param("comment", "Good sprint overall"))
                 .andExpect(status().isOk())
@@ -174,7 +169,7 @@ public class ResponseApiControllerTest {
         Long stepId = 1L;
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId)
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("rating", "7"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("HX-Trigger", "responseSubmitted"));
@@ -187,7 +182,7 @@ public class ResponseApiControllerTest {
         Long stepId = 1L;
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId)
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("rating", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Validation failed")));
@@ -200,7 +195,7 @@ public class ResponseApiControllerTest {
         Long stepId = 1L;
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId)
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("rating", "11"))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Validation failed")));
@@ -213,7 +208,7 @@ public class ResponseApiControllerTest {
         Long stepId = 1L;
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId)
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("comment", "Some comment"))
                 .andExpect(status().isBadRequest());
     }
@@ -224,8 +219,8 @@ public class ResponseApiControllerTest {
         Long stepId = 1L;
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
-                .with(anonymous())
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("columnId", "Mad")
                 .param("content", "Should not work"))
                 .andExpect(status().isUnauthorized());
@@ -237,8 +232,8 @@ public class ResponseApiControllerTest {
         Long stepId = 1L;
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId)
-                .with(anonymous())
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("rating", "8"))
                 .andExpect(status().isUnauthorized());
     }
@@ -276,7 +271,7 @@ public class ResponseApiControllerTest {
             .thenThrow(new InputLimitExceededException(10, 10));
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("columnId", "Mad")
                 .param("content", "This is my 11th input"))
                 .andExpect(status().isBadRequest());
@@ -297,7 +292,7 @@ public class ResponseApiControllerTest {
             .thenReturn(mockResponse);
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("columnId", "Mad")
                 .param("content", "Valid input under limit"))
                 .andExpect(status().isOk())
@@ -321,7 +316,7 @@ public class ResponseApiControllerTest {
             .thenReturn(mockResponse);
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/column", retroId, stepId)
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("columnId", "Mad")
                 .param("content", "Valid response"))
                 .andExpect(status().isOk())
@@ -347,7 +342,7 @@ public class ResponseApiControllerTest {
             .thenReturn(mockResponse);
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId)
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("rating", "7"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("HX-Trigger", "responseSubmitted"))
@@ -369,7 +364,7 @@ public class ResponseApiControllerTest {
             .thenReturn(mockResponse);
 
         mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote", retroId, responseId)
-                .with(csrf()))
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("HX-Trigger", "voteToggled"))
                 .andExpect(jsonPath("$.responseId").value(responseId.toString()))
@@ -395,7 +390,7 @@ public class ResponseApiControllerTest {
             .thenReturn(mockResponse);
 
         mockMvc.perform(put("/api/retros/{retroId}/responses/{responseId}", retroId, responseId)
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("content", updatedContent))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.responseId").value(responseId.toString()))
@@ -416,7 +411,7 @@ public class ResponseApiControllerTest {
         when(retroSessionService.getSessionById(retroId)).thenReturn(mockSession);
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/reveal", retroId, stepId)
-                .with(csrf()))
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("HX-Trigger", "responsesRevealed"))
                 .andExpect(jsonPath("$.stepId").value(stepId))
@@ -433,7 +428,7 @@ public class ResponseApiControllerTest {
             .thenReturn(false);
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/responses/reveal", retroId, stepId)
-                .with(csrf()))
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isForbidden());
     }
 
@@ -455,7 +450,7 @@ public class ResponseApiControllerTest {
         when(responseService.getResponsesForStageComponentType(session, stage, direct.reflect.facilitator.configurator.ComponentType.RATING_SCALE))
             .thenReturn(java.util.List.of());
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+        mockMvc.perform(get(
                 "/api/retros/{retroId}/steps/{stepId}/responses/rating", retroId, stepId))
             .andExpect(status().isOk())
             .andExpect(content().json("[]"));
