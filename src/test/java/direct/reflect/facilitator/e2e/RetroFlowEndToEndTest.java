@@ -72,7 +72,12 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
                     conn.disconnect();
                     if (status < 500) break;
                 } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
 
             // ── 1. Authenticate ────────────────────────────────────────────────────
@@ -176,7 +181,12 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
                     conn.disconnect();
                     if (status < 500) break;
                 } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
 
             logTestProgress("SETUP", 1, 4, "Authenticating facilitator");
@@ -256,7 +266,12 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
                     conn.disconnect();
                     if (status < 500) break;
                 } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
 
             logTestProgress("SETUP", 1, 5, "Authenticating facilitator and participant");
@@ -345,7 +360,12 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
                     conn.disconnect();
                     if (status < 500) break;
                 } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
 
             logTestProgress("SETUP", 1, 4, "Authenticating facilitator and participant");
@@ -427,7 +447,12 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
                     conn.disconnect();
                     if (status < 500) break;
                 } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
 
             logTestProgress("SETUP", 1, 3, "Authenticating facilitator");
@@ -475,7 +500,12 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
                     conn.disconnect();
                     if (status < 500) break;
                 } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
 
             logTestProgress("SETUP", 1, 3, "Authenticating facilitator");
@@ -541,7 +571,12 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
                     conn.disconnect();
                     if (status < 500) break;
                 } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
 
             logTestProgress("SETUP", 1, 6, "Authenticate facilitator and create session");
@@ -617,7 +652,12 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
                     conn.disconnect();
                     if (status < 500) break;
                 } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
 
             logTestProgress("SETUP", 1, 3, "Authenticating facilitator");

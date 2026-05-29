@@ -51,8 +51,14 @@ public class SmartActionBuilderEndToEndTest extends BaseEndToEndTest {
                     int status = conn.getResponseCode();
                     conn.disconnect();
                     if (status < 500) break;
-                } catch (Exception ignored) { }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+                } catch (Exception ignored) {
+                }
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
 
             // 1. Authenticate
