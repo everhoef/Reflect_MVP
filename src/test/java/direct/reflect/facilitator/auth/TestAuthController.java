@@ -5,7 +5,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -72,7 +71,6 @@ public class TestAuthController {
             request.getSession().setAttribute("userDisplayName", displayName);
             request.getSession().setAttribute("authType", "OIDC");
             request.getSession().removeAttribute("guestDisplayName");
-            request.getSession().removeAttribute("guestId");
 
             return ResponseEntity.status(302)
                 .header("Location", "/")
@@ -81,28 +79,6 @@ public class TestAuthController {
         } catch (Exception e) {
             log.error("Failed to set up OAuth2 test authentication", e);
             return ResponseEntity.internalServerError().body("Authentication setup failed");
-        }
-    }
-
-    @PostMapping("/login-guest-user")
-    public ResponseEntity<String> loginGuestUser(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            @RequestParam(defaultValue = "Guest User") String displayName,
-            @RequestParam(required = false) String guestId) {
-
-        try {
-            UUID explicitGuestId = guestId == null || guestId.isBlank()
-                ? UUID.randomUUID()
-                : UUID.fromString(guestId);
-
-            authService.initializeGuestSession(request, displayName, explicitGuestId);
-
-            return ResponseEntity.ok("Guest authentication set up for: " + displayName);
-
-        } catch (Exception e) {
-            log.error("Failed to set up guest test authentication", e);
-            return ResponseEntity.internalServerError().body("Guest authentication setup failed");
         }
     }
 
