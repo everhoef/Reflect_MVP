@@ -432,7 +432,9 @@
 				</executions>
 				<configuration>
 					<configLocation>checkstyle.xml</configLocation>
+					<includeTestSourceDirectory>true</includeTestSourceDirectory>
 					<failOnViolation>true</failOnViolation>
+					<violationSeverity>warning</violationSeverity>
 					<consoleOutput>true</consoleOutput>
 					<maxAllowedViolations>${checkstyle.maxAllowedViolations}</maxAllowedViolations>
 				</configuration>
