@@ -411,7 +411,7 @@
 				<configuration>
 					<includeTests>true</includeTests>
 					<rulesets>
-						<ruleset>${project.basedir}/config/pmd/custom-ruleset.xml</ruleset>
+						<ruleset>${project.basedir}/pmd-ruleset.xml</ruleset>
 					</rulesets>
 					<failOnViolation>true</failOnViolation>
 					<failurePriority>5</failurePriority>
