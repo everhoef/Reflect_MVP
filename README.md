@@ -112,8 +112,8 @@ CI runs on every push to `main` and on every pull request targeting `main`.
 - **Test gate**: `./mvnw clean test` (Java + Testcontainers) and `cd frontend && npm test` (Vitest)
 - **Image build**: Paketo buildpacks via `./mvnw spring-boot:build-image`
 - **Registry**: GHCR — `ghcr.io/reflect-direct/facilitator`
-- **GitOps source of truth**: `reflect-direct/facilitator-gitops` (acc overlay auto-updated on every `main` merge)
-- **Preview environments**: add the `preview` label to a PR to publish a preview image (`pr-<PR_NUMBER>-<SHORT_SHA>`) for the ArgoCD ApplicationSet pull request generator; preview deployments are created and pruned dynamically by ArgoCD, not by commits to `facilitator-gitops`
+- **GitOps source of truth**: `Reflect-Direct/reflect-direct-gitops` (organization-wide GitOps repo; `main` promotions update long-lived environments there)
+- **Preview environments**: add the `preview` label to a PR to publish a preview image (`pr-<PR_NUMBER>-<SHORT_SHA>`) for Flux Operator ResourceSet-based GitHub PR preview environments; previews are created from a `ResourceSetInputProvider` (`spec.type: GitHubPullRequest`) feeding a `ResourceSet`, not by commits to the GitOps repo
 
 ### Versioning model
 
