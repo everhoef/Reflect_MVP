@@ -120,8 +120,20 @@ public class PlaywrightWorld {
             browser = playwright.chromium().launch(launchOptions);
 
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                try { if (browser != null) browser.close(); } catch (Exception e) { log.debug("Browser close failed during shutdown: {}", e.getMessage()); }
-                try { if (playwright != null) playwright.close(); } catch (Exception e) { log.debug("Playwright close failed during shutdown: {}", e.getMessage()); }
+                try {
+                    if (browser != null) {
+                        browser.close();
+                    }
+                } catch (Exception e) {
+                    log.debug("Browser close failed during shutdown: {}", e.getMessage());
+                }
+                try {
+                    if (playwright != null) {
+                        playwright.close();
+                    }
+                } catch (Exception e) {
+                    log.debug("Playwright close failed during shutdown: {}", e.getMessage());
+                }
             }, "playwright-bdd-shutdown"));
 
             log.info("Playwright browser started (headless={})", !debugMode);

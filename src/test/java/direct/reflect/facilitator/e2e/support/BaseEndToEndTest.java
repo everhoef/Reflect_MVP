@@ -594,8 +594,18 @@ public abstract class BaseEndToEndTest {
         browser = playwright.chromium().launch(launchOptions);
         // Register shutdown hook so the single shared instance is always cleaned up
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            if (browser != null) { try { browser.close(); } catch (Exception ignored) {} }
-            if (playwright != null) { try { playwright.close(); } catch (Exception ignored) {} }
+            if (browser != null) {
+                try {
+                    browser.close();
+                } catch (Exception ignored) {
+                }
+            }
+            if (playwright != null) {
+                try {
+                    playwright.close();
+                } catch (Exception ignored) {
+                }
+            }
         }));
     }
 
@@ -1888,5 +1898,6 @@ public abstract class BaseEndToEndTest {
 
     // ==================== HELPER CLASSES ====================
 
-    public record UserPage(Page page, String displayName) {}
+    public record UserPage(Page page, String displayName) {
+    }
 }
