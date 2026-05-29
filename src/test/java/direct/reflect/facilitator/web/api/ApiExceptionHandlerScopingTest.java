@@ -21,14 +21,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.security.test.context.support.WithMockUser;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = {AuthApiController.class, AuthController.class, SessionApiController.class})
 @EnableAutoConfiguration(exclude = {
@@ -63,7 +59,7 @@ public class ApiExceptionHandlerScopingTest {
             .when(authService).initializeGuestSession(any(), eq("Test User"));
 
         mockMvc.perform(post("/auth/guest")
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .param("displayName", "Test User"))
                 .andExpect(status().isFound())
                 .andExpect(redirectedUrl("/login?error=guest_auth_failed"));
@@ -73,7 +69,7 @@ public class ApiExceptionHandlerScopingTest {
     @WithMockUser
     void shouldInterceptRestControllerExceptions() throws Exception {
         mockMvc.perform(post("/api/retros")
-                .with(csrf())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .content("invalid-json")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
