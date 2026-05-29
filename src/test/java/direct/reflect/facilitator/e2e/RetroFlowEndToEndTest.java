@@ -713,7 +713,7 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
                 .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
         session.setPhase(RetroPhase.GATHER_DATA);
         session.setCurrentStepIndex(stepIndex);
-        session.setStepStartedAt(java.time.LocalDateTime.now());
+        session.setStepStartedAt(LocalDateTime.now());
         session.setTimerPausedAt(null);
         session.setAccumulatedPauseSeconds(0L);
         retroSessionRepository.save(session);

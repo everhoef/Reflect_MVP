@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.exc.InvalidFormatException;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -120,13 +121,12 @@ public class ApiExceptionHandler {
         log.warn("JSON deserialization failed: {}", ex.getMessage());
 
         // Check if this is a UUID format error specifically
-        if (ex.getCause() instanceof InvalidFormatException ife) {
-            if (ife.getTargetType().equals(java.util.UUID.class)) {
-                log.warn("UUID format error for value: {}", ife.getValue());
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .header("HX-Redirect", "/home?error=invalid_input")
-                    .body("Invalid session ID format");
-            }
+        if (ex.getCause() instanceof InvalidFormatException ife
+                && ife.getTargetType().equals(UUID.class)) {
+            log.warn("UUID format error for value: {}", ife.getValue());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .header("HX-Redirect", "/home?error=invalid_input")
+                .body("Invalid session ID format");
         }
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)

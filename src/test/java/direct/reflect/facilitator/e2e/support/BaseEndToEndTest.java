@@ -833,8 +833,17 @@ public abstract class BaseEndToEndTest {
                 }
             });
 
-            log.info("🖱️ Clicking 'Join Session' button...");
-            participantPage.click("button:has-text('Join Session')");
+            String joinButtonSelector = "form:has(input[name='retroId']) button[type='submit']";
+            log.info("Waiting for join submit button to become enabled...");
+            participantPage.waitForFunction(
+                "selector => { const button = document.querySelector(selector); return !!button && !button.disabled; }",
+                joinButtonSelector,
+                new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS)
+            );
+
+            String buttonText = participantPage.textContent(joinButtonSelector);
+            log.info("🖱️ Submitting join form via {} (label='{}')", joinButtonSelector, buttonText);
+            participantPage.locator(joinButtonSelector).click(new Locator.ClickOptions().setTimeout(DEFAULT_TIMEOUT_MS));
 
             try {
                 participantPage.waitForURL(url -> url.contains("/retro/") || url.contains("error="),
@@ -920,7 +929,7 @@ public abstract class BaseEndToEndTest {
             log.debug("Lobby disappeared - retro content visible");
         } catch (Exception e) {
             log.warn("UI did not transition out of lobby (POST aborted, confirmed={}). Using service fallback.", startConfirmed[0]);
-            java.util.UUID retroId = java.util.UUID.fromString(sessionId);
+            UUID retroId = UUID.fromString(sessionId);
             if (retroSessionRepository.findById(retroId)
                     .map(s -> s.getPhase() == direct.reflect.facilitator.facilitation.session.RetroPhase.LOBBY)
                     .orElse(false)) {
@@ -1150,7 +1159,7 @@ public abstract class BaseEndToEndTest {
 
         if (!facilitatorLeftLobby) {
             log.warn("POST to /start may have been aborted (confirmed={}). Using service fallback.", startConfirmed[0]);
-            java.util.UUID retroId = java.util.UUID.fromString(sessionId);
+            UUID retroId = UUID.fromString(sessionId);
             if (retroSessionRepository.findById(retroId)
                     .map(s -> s.getPhase() == direct.reflect.facilitator.facilitation.session.RetroPhase.LOBBY)
                     .orElse(false)) {
