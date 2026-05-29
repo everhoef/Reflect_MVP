@@ -29,7 +29,6 @@ public class SyncDriver {
     public void waitForServerReady() {
         String loginUrl = world.getBaseUrl() + "/login";
         long deadline = System.currentTimeMillis() + SERVER_READY_TIMEOUT_MS;
-        Page page = world.getPage();
 
         while (System.currentTimeMillis() < deadline) {
             try {
