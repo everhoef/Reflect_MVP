@@ -93,7 +93,7 @@ class EscalationDataModelTest {
                 teamId,
                 "Cross-team API dependency is blocking releases",
                 EscalationThresholdPolicy.calculateVoteThreshold(5),
-                item -> {}));
+                item -> { }));
         entityManager.clear();
 
         EscalatedItem loadedEscalatedItem = escalatedItemRepository.findById(escalatedItem.getId()).orElseThrow();
@@ -112,9 +112,9 @@ class EscalationDataModelTest {
         RetroSession retroSession = teamBackedRetroFixture.createTeamBackedSession("Delivery");
         UUID teamId = retroSession.getTeamId();
 
-        assertInvalid(buildEscalatedItem(retroSession, teamId, null, 2, item -> {}));
-        assertInvalid(buildEscalatedItem(retroSession, teamId, "   ", 2, item -> {}));
-        assertInvalid(buildEscalatedItem(retroSession, teamId, "Manager support needed", 0, item -> {}));
+        assertInvalid(buildEscalatedItem(retroSession, teamId, null, 2, item -> { }));
+        assertInvalid(buildEscalatedItem(retroSession, teamId, "   ", 2, item -> { }));
+        assertInvalid(buildEscalatedItem(retroSession, teamId, "Manager support needed", 0, item -> { }));
         assertInvalid(buildEscalatedItem(retroSession, teamId, "Manager support needed", 2, item -> item.setTeamId(null)));
         assertInvalid(buildEscalatedItem(retroSession, teamId, "Manager support needed", 2, item -> item.setRetroSession(null)));
     }
@@ -144,13 +144,13 @@ class EscalationDataModelTest {
                 teamId,
                 "Shared deployment process needs manager support",
                 EscalationThresholdPolicy.calculateVoteThreshold(2),
-                item -> {}));
+                item -> { }));
         EscalatedItem secondEscalatedItem = escalatedItemRepository.saveAndFlush(buildEscalatedItem(
                 retroSession,
                 teamId,
                 "Cross-team release coordination needs escalation",
                 EscalationThresholdPolicy.calculateVoteThreshold(2),
-                item -> {}));
+                item -> { }));
 
         escalatedItemVoteRepository.saveAndFlush(buildVote(firstEscalatedItem, participantId));
         escalatedItemVoteRepository.saveAndFlush(buildVote(firstEscalatedItem, otherParticipantId));

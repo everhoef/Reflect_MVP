@@ -116,7 +116,7 @@ class ActionItemDataModelTest {
         RetroSession sessionB = saveSession("Session B");
 
         ActionItem sessionAOpen = actionItemRepository.saveAndFlush(
-                buildActionItem(sessionA, "Daily sync", "Alice", LocalDate.of(2026, 5, 1), item -> {}));
+                buildActionItem(sessionA, "Daily sync", "Alice", LocalDate.of(2026, 5, 1), item -> { }));
         actionItemRepository.saveAndFlush(buildActionItem(
                 sessionA,
                 "Review incidents",
@@ -124,7 +124,7 @@ class ActionItemDataModelTest {
                 LocalDate.of(2026, 5, 8),
                 item -> item.setStatus(ActionItemStatus.DONE)));
         actionItemRepository.saveAndFlush(
-                buildActionItem(sessionB, "Trim backlog", "Carol", LocalDate.of(2026, 5, 15), item -> {}));
+                buildActionItem(sessionB, "Trim backlog", "Carol", LocalDate.of(2026, 5, 15), item -> { }));
 
         entityManager.clear();
 
