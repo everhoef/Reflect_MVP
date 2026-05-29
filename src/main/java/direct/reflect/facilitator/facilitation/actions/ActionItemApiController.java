@@ -4,7 +4,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
 import direct.reflect.facilitator.facilitation.dto.SyncVersionedResponse;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -28,14 +27,8 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Action Item API", description = "SMART action item CRUD operations")
 public class ActionItemApiController {
 
-    @SuppressFBWarnings(
-        value = "EI_EXPOSE_REP2",
-        justification = "Spring manages service lifecycle — reference is stable")
     private final ActionItemService actionItemService;
 
-    @SuppressFBWarnings(
-        value = "EI_EXPOSE_REP2",
-        justification = "Spring manages service lifecycle — reference is stable")
     private final RetroSyncVersionService retroSyncVersionService;
 
     @PostMapping
