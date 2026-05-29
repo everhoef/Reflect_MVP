@@ -1,6 +1,5 @@
 package direct.reflect.facilitator.facilitation.participant;
 
-import direct.reflect.facilitator.facilitation.participant.dto.JoinRetroRequest;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
 import direct.reflect.facilitator.facilitation.session.RetroSessionService;
 import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
@@ -14,7 +13,6 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
 import org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -23,13 +21,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = {
@@ -38,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @Import({
     direct.reflect.facilitator.config.TestSecurityOverride.class,
-    direct.reflect.facilitator.auth.AuthService.class
+    AuthService.class
 })
 @EnableAutoConfiguration(exclude = {
     DataSourceAutoConfiguration.class,
@@ -86,7 +80,7 @@ public class ParticipantApiControllerTest {
             .thenReturn(mockParticipant);
 
         mockMvc.perform(post("/api/retros/{retroId}/participants", retroId)
-                .with(csrf()))
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.retroId").value(retroId.toString()))
                 .andExpect(jsonPath("$.redirectUrl").value("/retro/" + retroId));
@@ -96,7 +90,7 @@ public class ParticipantApiControllerTest {
     @WithMockUser(roles = "USER")
     void leaveActiveSessions_ShouldReturnJsonWithSuccessTrue() throws Exception {
         mockMvc.perform(delete("/api/me/retros/active")
-                .with(csrf()))
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }

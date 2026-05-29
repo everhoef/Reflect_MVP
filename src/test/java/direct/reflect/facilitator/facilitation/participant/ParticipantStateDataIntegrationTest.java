@@ -3,9 +3,6 @@ package direct.reflect.facilitator.facilitation.participant;
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.config.TestSecurityOverride;
-import direct.reflect.facilitator.facilitation.participant.Participant;
-import direct.reflect.facilitator.facilitation.participant.ParticipantRepository;
-import direct.reflect.facilitator.facilitation.participant.ParticipantStatus;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
 import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,13 +30,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -76,7 +70,7 @@ class ParticipantStateDataIntegrationTest {
     @MockitoBean
     private AuthService authService;
 
-    /** Pre-built authentication token injected into each request via authentication() post-processor. */
+    /** Pre-built authentication token injected into each request via org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication() post-processor. */
     private UsernamePasswordAuthenticationToken testAuth;
 
     @BeforeEach
@@ -103,14 +97,14 @@ class ParticipantStateDataIntegrationTest {
 
         // ── Step 1: Create first session ──────────────────────────────────────────
         mockMvc.perform(post("/api/retros")
-                        .with(authentication(testAuth))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sessionName\": \"First Session\"}")
-                        .with(csrf()))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
         List<Participant> afterFirstCreate = participantRepository.findByParticipantId(fixedParticipantId);
-        assertThat(afterFirstCreate).hasSize(1);
+        org.assertj.core.api.Assertions.assertThat(afterFirstCreate).hasSize(1);
 
         Participant firstParticipant = afterFirstCreate.get(0);
         UUID firstSessionId = firstParticipant.getSession().getId();
@@ -119,21 +113,21 @@ class ParticipantStateDataIntegrationTest {
                 .getSyncVersion();
 
         // Business rule 2: new participant starts ACTIVE
-        assertThat(firstParticipant.getStatus())
+        org.assertj.core.api.Assertions.assertThat(firstParticipant.getStatus())
                 .as("First session participant should be ACTIVE immediately after creation")
                 .isEqualTo(ParticipantStatus.ACTIVE);
 
         // Business rule 3: participantId matches the mocked identity
-        assertThat(firstParticipant.getParticipantId())
+        org.assertj.core.api.Assertions.assertThat(firstParticipant.getParticipantId())
                 .as("Participant ID should match the mocked identity")
                 .isEqualTo(fixedParticipantId);
 
         // ── Step 2: Create second session (same user) ──────────────────────────────
         mockMvc.perform(post("/api/retros")
-                        .with(authentication(testAuth))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sessionName\": \"Second Session\"}")
-                        .with(csrf()))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
         // ── Step 3: Assert domain state ────────────────────────────────────────────
@@ -141,26 +135,26 @@ class ParticipantStateDataIntegrationTest {
         List<Participant> allParticipantsForUser = participantRepository.findByParticipantId(fixedParticipantId);
 
         // Business rule 6: user has exactly 2 participant records (history preserved, not deleted)
-        assertThat(allParticipantsForUser)
+        org.assertj.core.api.Assertions.assertThat(allParticipantsForUser)
                 .as("User should have 2 participant records (one per session, history preserved — rule 6)")
                 .hasSize(2);
 
         // Business rule 1: old participant is marked LEFT (not deleted)
         List<Participant> firstSessionParticipants = participantRepository.findBySession_Id(firstSessionId);
-        assertThat(firstSessionParticipants).hasSize(1);
+        org.assertj.core.api.Assertions.assertThat(firstSessionParticipants).hasSize(1);
 
         Participant updatedFirstParticipant = firstSessionParticipants.get(0);
-        assertThat(updatedFirstParticipant.getStatus())
+        org.assertj.core.api.Assertions.assertThat(updatedFirstParticipant.getStatus())
                 .as("Old session participant should be marked LEFT, not deleted (rule 1)")
                 .isEqualTo(ParticipantStatus.LEFT);
 
         // Business rule 5: lastSeen is set when participant is marked LEFT
-        assertThat(updatedFirstParticipant.getLastSeen())
+        org.assertj.core.api.Assertions.assertThat(updatedFirstParticipant.getLastSeen())
                 .as("lastSeen should be set when participant is marked LEFT (rule 5)")
                 .isNotNull();
 
         // Business rule 3: same participantId used across both sessions
-        assertThat(allParticipantsForUser)
+        org.assertj.core.api.Assertions.assertThat(allParticipantsForUser)
                 .as("Same participantId must be used across both sessions — same user identity (rule 3)")
                 .allMatch(p -> fixedParticipantId.equals(p.getParticipantId()));
 
@@ -174,11 +168,11 @@ class ParticipantStateDataIntegrationTest {
                 .count();
 
         // Business rule 7: exactly 1 ACTIVE and 1 LEFT
-        assertThat(activeCount)
+        org.assertj.core.api.Assertions.assertThat(activeCount)
                 .as("Exactly 1 ACTIVE participant record after creating 2 sessions (rule 7)")
                 .isEqualTo(1L);
 
-        assertThat(leftCount)
+        org.assertj.core.api.Assertions.assertThat(leftCount)
                 .as("Exactly 1 LEFT participant record after creating 2 sessions (rule 7)")
                 .isEqualTo(1L);
 
@@ -191,11 +185,11 @@ class ParticipantStateDataIntegrationTest {
         RetroSession updatedFirstSession = retroSessionRepository.findById(firstSessionId).orElseThrow();
         RetroSession updatedActiveSession = retroSessionRepository.findById(activeParticipant.getSession().getId()).orElseThrow();
 
-        assertThat(activeParticipant.getSession().getId())
+        org.assertj.core.api.Assertions.assertThat(activeParticipant.getSession().getId())
                 .as("New session participant should be ACTIVE and in the second session (rule 2)")
                 .isNotEqualTo(firstSessionId);
-        assertThat(updatedFirstSession.getSyncVersion()).isGreaterThan(firstSessionSyncVersionAfterCreate);
-        assertThat(updatedActiveSession.getSyncVersion()).isPositive();
+        org.assertj.core.api.Assertions.assertThat(updatedFirstSession.getSyncVersion()).isGreaterThan(firstSessionSyncVersionAfterCreate);
+        org.assertj.core.api.Assertions.assertThat(updatedActiveSession.getSyncVersion()).isPositive();
 
         log.debug("All 7 business rules verified: both sessions exist, old=LEFT with lastSeen set, new=ACTIVE, same participantId");
     }
