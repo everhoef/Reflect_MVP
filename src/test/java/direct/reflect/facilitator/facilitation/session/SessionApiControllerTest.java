@@ -20,6 +20,7 @@ import org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfigur
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import jakarta.servlet.http.HttpServletRequest;
@@ -88,7 +89,7 @@ public class SessionApiControllerTest {
             .thenReturn(mockSession);
 
         mockMvc.perform(post("/api/retros")
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .with(SecurityMockMvcRequestPostProcessors.csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"sessionName\":\"Test Session\"}"))
                 .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
@@ -110,7 +111,7 @@ public class SessionApiControllerTest {
             .thenReturn(mockSession);
 
         mockMvc.perform(post("/api/retros")
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .with(SecurityMockMvcRequestPostProcessors.csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"sessionName\":\"Test Session\"}"))
                 .andExpect(status().isOk())
@@ -127,7 +128,7 @@ public class SessionApiControllerTest {
             .thenReturn(true);
 
         mockMvc.perform(post("/api/retros/{retroId}/advance", retroId)
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.retroId").value(retroId.toString()))
                 .andExpect(jsonPath("$.advanced").value(true));
@@ -142,7 +143,7 @@ public class SessionApiControllerTest {
             .thenReturn(false);
 
         mockMvc.perform(post("/api/retros/{retroId}/advance", retroId)
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isForbidden());
     }
 
@@ -192,7 +193,7 @@ public class SessionApiControllerTest {
         UUID retroId = UUID.randomUUID();
 
         mockMvc.perform(get("/api/retros/{retroId}/timer", retroId)
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous()))
+                .with(SecurityMockMvcRequestPostProcessors.anonymous()))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -205,7 +206,7 @@ public class SessionApiControllerTest {
             .thenReturn(true);
 
         mockMvc.perform(post("/api/retros/{retroId}/timer/pause", retroId)
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
     }
 
@@ -218,7 +219,7 @@ public class SessionApiControllerTest {
             .thenReturn(false);
 
         mockMvc.perform(post("/api/retros/{retroId}/timer/pause", retroId)
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isForbidden());
     }
 
@@ -227,8 +228,8 @@ public class SessionApiControllerTest {
         UUID retroId = UUID.randomUUID();
 
         mockMvc.perform(post("/api/retros/{retroId}/timer/pause", retroId)
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous())
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .with(SecurityMockMvcRequestPostProcessors.anonymous())
+                .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -250,7 +251,7 @@ public class SessionApiControllerTest {
             .thenReturn(true);
 
         mockMvc.perform(post("/api/retros/{retroId}/timer/resume", retroId)
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
     }
 
@@ -263,7 +264,7 @@ public class SessionApiControllerTest {
             .thenReturn(false);
 
         mockMvc.perform(post("/api/retros/{retroId}/timer/resume", retroId)
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isForbidden());
     }
 
@@ -272,8 +273,8 @@ public class SessionApiControllerTest {
         UUID retroId = UUID.randomUUID();
 
         mockMvc.perform(post("/api/retros/{retroId}/timer/resume", retroId)
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous())
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .with(SecurityMockMvcRequestPostProcessors.anonymous())
+                .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -295,7 +296,7 @@ public class SessionApiControllerTest {
             .thenReturn(true);
 
         mockMvc.perform(post("/api/retros/{retroId}/timer/pause", retroId)
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
     }
 
@@ -308,7 +309,7 @@ public class SessionApiControllerTest {
             .thenReturn(true);
 
         mockMvc.perform(post("/api/retros/{retroId}/timer/resume", retroId)
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
     }
 
@@ -362,15 +363,15 @@ public class SessionApiControllerTest {
         UUID retroId = UUID.randomUUID();
 
         mockMvc.perform(get("/api/retros/{retroId}", retroId)
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous()))
+                .with(SecurityMockMvcRequestPostProcessors.anonymous()))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void shouldRequireAuthenticationForSessionCreation() throws Exception {
         mockMvc.perform(post("/api/retros")
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous()) 
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .with(SecurityMockMvcRequestPostProcessors.anonymous()) 
+                .with(SecurityMockMvcRequestPostProcessors.csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"sessionName\":\"Test Session\"}"))
                 .andExpect(status().isUnauthorized());
@@ -389,7 +390,7 @@ public class SessionApiControllerTest {
     void guestAuth_ValidDisplayName_ShouldRedirectToHome() throws Exception {
         mockMvc.perform(post("/auth/guest")
                 .param("displayName", "Test Guest User")
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isFound())
                 .andExpect(redirectedUrl("/"));
     }
@@ -398,7 +399,7 @@ public class SessionApiControllerTest {
     void guestAuth_EmptyDisplayName_ShouldRedirectToLoginWithError() throws Exception {
         mockMvc.perform(post("/auth/guest")
                 .param("displayName", "")
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isFound())
                 .andExpect(redirectedUrl("/login?error=missing_display_name"));
     }

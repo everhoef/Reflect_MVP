@@ -14,6 +14,7 @@ import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
 import org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import jakarta.servlet.http.HttpServletRequest;
@@ -84,7 +85,7 @@ public class ParticipantApiControllerTest {
             .thenReturn(mockParticipant);
 
         mockMvc.perform(post("/api/retros/{retroId}/participants", retroId)
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.retroId").value(retroId.toString()))
                 .andExpect(jsonPath("$.redirectUrl").value("/retro/" + retroId));
@@ -94,7 +95,7 @@ public class ParticipantApiControllerTest {
     @WithMockUser(roles = "USER")
     void leaveActiveSessions_ShouldReturnJsonWithSuccessTrue() throws Exception {
         mockMvc.perform(delete("/api/me/retros/active")
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }

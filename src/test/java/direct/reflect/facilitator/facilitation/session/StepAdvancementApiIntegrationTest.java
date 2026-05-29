@@ -19,6 +19,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -27,6 +28,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -107,16 +109,16 @@ class StepAdvancementApiIntegrationTest {
     @WithMockUser(roles = "USER")
     void advanceNext_FromInitialState_MovesToFirstStep() throws Exception {
         RetroSession initial = sessionRepository.findById(testSession.getId()).orElseThrow();
-        org.assertj.core.api.Assertions.assertThat(initial.getCurrentStepIndex()).isEqualTo(-1);
+        assertThat(initial.getCurrentStepIndex()).isEqualTo(-1);
         long initialSyncVersion = initial.getSyncVersion();
 
         mockMvc.perform(post("/api/retros/{retroId}/advance", testSession.getId())
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
         RetroSession updated = sessionRepository.findById(testSession.getId()).orElseThrow();
-        org.assertj.core.api.Assertions.assertThat(updated.getCurrentStepIndex()).isEqualTo(0);
-        org.assertj.core.api.Assertions.assertThat(updated.getSyncVersion()).isGreaterThan(initialSyncVersion);
+        assertThat(updated.getCurrentStepIndex()).isEqualTo(0);
+        assertThat(updated.getSyncVersion()).isGreaterThan(initialSyncVersion);
     }
 
     @Test
@@ -124,11 +126,11 @@ class StepAdvancementApiIntegrationTest {
     void advanceNext_MultipleTimesSequentially_IncrementsStepIndex() throws Exception {
         for (int expectedStepIndex = 0; expectedStepIndex <= 4; expectedStepIndex++) {
             mockMvc.perform(post("/api/retros/{retroId}/advance", testSession.getId())
-                            .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                            .with(SecurityMockMvcRequestPostProcessors.csrf()))
                     .andExpect(status().isOk());
 
             RetroSession updated = sessionRepository.findById(testSession.getId()).orElseThrow();
-            org.assertj.core.api.Assertions.assertThat(updated.getCurrentStepIndex())
+            assertThat(updated.getCurrentStepIndex())
                     .as("Expected currentStepIndex=%d after %d advance(s)", expectedStepIndex, expectedStepIndex + 1)
                     .isEqualTo(expectedStepIndex);
         }
@@ -141,7 +143,7 @@ class StepAdvancementApiIntegrationTest {
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(unknownParticipantId);
 
         mockMvc.perform(post("/api/retros/{retroId}/advance", testSession.getId())
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isForbidden());
     }
 }

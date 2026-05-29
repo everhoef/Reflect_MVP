@@ -1,5 +1,6 @@
 package direct.reflect.facilitator.facilitation.response;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.configurator.RetroStage;
@@ -22,6 +23,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -153,13 +155,13 @@ class VotingIntegrationTest {
 
         mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
         ParticipantResponse loaded = responseRepository.findById(response.getId()).orElseThrow();
         List<String> votes = getVotes(loaded);
-        org.assertj.core.api.Assertions.assertThat(votes).hasSize(1);
-        org.assertj.core.api.Assertions.assertThat(votes).contains(participantAUuid.toString());
+        assertThat(votes).hasSize(1);
+        assertThat(votes).contains(participantAUuid.toString());
     }
 
     @Test
@@ -169,17 +171,17 @@ class VotingIntegrationTest {
 
         mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
-        org.assertj.core.api.Assertions.assertThat(getVotes(responseRepository.findById(response.getId()).orElseThrow())).hasSize(1);
+        assertThat(getVotes(responseRepository.findById(response.getId()).orElseThrow())).hasSize(1);
 
         mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
-        org.assertj.core.api.Assertions.assertThat(getVotes(responseRepository.findById(response.getId()).orElseThrow())).isEmpty();
+        assertThat(getVotes(responseRepository.findById(response.getId()).orElseThrow())).isEmpty();
     }
 
     @Test
@@ -192,13 +194,13 @@ class VotingIntegrationTest {
         for (UUID responseId : List.of(r1.getId(), r2.getId(), r3.getId())) {
             mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                             testSession.getId(), responseId)
-                            .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                            .with(SecurityMockMvcRequestPostProcessors.csrf()))
                     .andExpect(status().isOk());
         }
 
-        org.assertj.core.api.Assertions.assertThat(getVotes(responseRepository.findById(r1.getId()).orElseThrow())).hasSize(1);
-        org.assertj.core.api.Assertions.assertThat(getVotes(responseRepository.findById(r2.getId()).orElseThrow())).hasSize(1);
-        org.assertj.core.api.Assertions.assertThat(getVotes(responseRepository.findById(r3.getId()).orElseThrow())).hasSize(1);
+        assertThat(getVotes(responseRepository.findById(r1.getId()).orElseThrow())).hasSize(1);
+        assertThat(getVotes(responseRepository.findById(r2.getId()).orElseThrow())).hasSize(1);
+        assertThat(getVotes(responseRepository.findById(r3.getId()).orElseThrow())).hasSize(1);
     }
 
     @Test
@@ -212,13 +214,13 @@ class VotingIntegrationTest {
         for (int i = 0; i < 5; i++) {
             mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                             testSession.getId(), responses.get(i).getId())
-                            .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                            .with(SecurityMockMvcRequestPostProcessors.csrf()))
                     .andExpect(status().isOk());
         }
 
         mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), responses.get(5).getId())
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -239,28 +241,28 @@ class VotingIntegrationTest {
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(participantAUuid);
         mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
-        org.assertj.core.api.Assertions.assertThat(getVotes(responseRepository.findById(response.getId()).orElseThrow())).hasSize(1);
+        assertThat(getVotes(responseRepository.findById(response.getId()).orElseThrow())).hasSize(1);
 
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(participantBUuid);
         mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
-        org.assertj.core.api.Assertions.assertThat(getVotes(responseRepository.findById(response.getId()).orElseThrow())).hasSize(2);
+        assertThat(getVotes(responseRepository.findById(response.getId()).orElseThrow())).hasSize(2);
 
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(participantAUuid);
         mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
         List<String> finalVotes = getVotes(responseRepository.findById(response.getId()).orElseThrow());
-        org.assertj.core.api.Assertions.assertThat(finalVotes).hasSize(1);
-        org.assertj.core.api.Assertions.assertThat(finalVotes).contains(participantBUuid.toString());
-        org.assertj.core.api.Assertions.assertThat(finalVotes).doesNotContain(participantAUuid.toString());
+        assertThat(finalVotes).hasSize(1);
+        assertThat(finalVotes).contains(participantBUuid.toString());
+        assertThat(finalVotes).doesNotContain(participantAUuid.toString());
     }
 }
