@@ -37,16 +37,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -92,7 +86,7 @@ class ClusteringApiIntegrationTest {
     private Participant testParticipant;
     private RetroStep testStep;
 
-    /** Pre-built authentication token injected into each request via authentication() post-processor. */
+    /** Pre-built authentication token injected into each request via org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication() post-processor. */
     private UsernamePasswordAuthenticationToken testAuth;
 
     @BeforeEach
@@ -137,8 +131,8 @@ class ClusteringApiIntegrationTest {
         // When: POST merge
         String responseJson = mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/clusters/merge",
                         testSession.getId(), testStep.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mergeBody))
                 .andExpect(status().isOk())
@@ -150,8 +144,8 @@ class ClusteringApiIntegrationTest {
 
         ParticipantResponse loaded1 = responseRepository.findById(r1.getId()).orElseThrow();
         ParticipantResponse loaded2 = responseRepository.findById(r2.getId()).orElseThrow();
-        assertThat(loaded1.getClusterId()).isEqualTo(clusterId);
-        assertThat(loaded2.getClusterId()).isEqualTo(clusterId);
+        org.assertj.core.api.Assertions.assertThat(loaded1.getClusterId()).isEqualTo(clusterId);
+        org.assertj.core.api.Assertions.assertThat(loaded2.getClusterId()).isEqualTo(clusterId);
     }
 
     @Test
@@ -170,8 +164,8 @@ class ClusteringApiIntegrationTest {
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/clusters/unmerge",
                         testSession.getId(), testStep.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(unmergeBody))
                 .andExpect(status().isOk());
@@ -179,9 +173,9 @@ class ClusteringApiIntegrationTest {
         // Then: r1 has no cluster, r2 still has cluster
         ParticipantResponse loaded1 = responseRepository.findById(r1.getId()).orElseThrow();
         ParticipantResponse loaded2 = responseRepository.findById(r2.getId()).orElseThrow();
-        assertThat(loaded1.getClusterId()).isNull();
-        assertThat(loaded1.getClusterName()).isNull();
-        assertThat(loaded2.getClusterId()).isEqualTo(clusterId);
+        org.assertj.core.api.Assertions.assertThat(loaded1.getClusterId()).isNull();
+        org.assertj.core.api.Assertions.assertThat(loaded1.getClusterName()).isNull();
+        org.assertj.core.api.Assertions.assertThat(loaded2.getClusterId()).isEqualTo(clusterId);
     }
 
     @Test
@@ -200,8 +194,8 @@ class ClusteringApiIntegrationTest {
 
         mockMvc.perform(put("/api/retros/{retroId}/steps/{stepId}/clusters/{clusterId}/name",
                         testSession.getId(), testStep.getId(), clusterId)
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(renameBody))
                 .andExpect(status().isOk());
@@ -209,8 +203,8 @@ class ClusteringApiIntegrationTest {
         // Then: both responses have updated cluster name
         ParticipantResponse loaded1 = responseRepository.findById(r1.getId()).orElseThrow();
         ParticipantResponse loaded2 = responseRepository.findById(r2.getId()).orElseThrow();
-        assertThat(loaded1.getClusterName()).isEqualTo("Code Review Issues");
-        assertThat(loaded2.getClusterName()).isEqualTo("Code Review Issues");
+        org.assertj.core.api.Assertions.assertThat(loaded1.getClusterName()).isEqualTo("Code Review Issues");
+        org.assertj.core.api.Assertions.assertThat(loaded2.getClusterName()).isEqualTo("Code Review Issues");
     }
 
     @Test
@@ -229,7 +223,7 @@ class ClusteringApiIntegrationTest {
         // When: GET clusters
         mockMvc.perform(get("/api/retros/{retroId}/steps/{stepId}/clusters",
                         testSession.getId(), testStep.getId())
-                        .with(authentication(testAuth)))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.clustered").isMap())
                 .andExpect(jsonPath("$.unclustered").isArray())
