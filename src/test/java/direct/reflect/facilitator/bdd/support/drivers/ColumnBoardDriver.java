@@ -8,7 +8,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.*;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.COLUMN_BOARD_ITEM;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.NEXT_STEP_BUTTON;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.OWN_NOTE_EDITABLE;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.RETRO_CONTENT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.authorTextSelector;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.noteInputSelector;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.noteSubmitSelector;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.noteTextSelector;
 
 @ScenarioScope
 @Component

@@ -11,7 +11,6 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import direct.reflect.facilitator.e2e.support.BaseEndToEndTest;
 
-import static org.junit.jupiter.api.Assertions.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -19,6 +18,12 @@ import java.util.UUID;
 import direct.reflect.facilitator.facilitation.session.RetroPhase;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
 import lombok.extern.slf4j.Slf4j;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Broad retrospective flow integration tests.

@@ -12,7 +12,26 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.*;
+
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ADDRESS_NAME_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ADDRESS_PLACEHOLDER_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.CAPTCHA_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.DISPLAY_NAME_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.EMAIL_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ERROR_PAGE_LOAD_FAILED_MESSAGE;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ERROR_PAGE_MESSAGE;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ERROR_PAGE_NOT_FOUND_MESSAGE;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ERROR_PAGE_SESSION_ENDED_MESSAGE;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.JOIN_RETRO_ID_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.JOIN_SESSION_BUTTON;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.LOGIN_SUBMIT_BUTTON;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.PASSWORD_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.PHONE_NAME_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.PHONE_PLACEHOLDER_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.RETRO_CONTENT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.SESSION_NAME_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.TELEPHONE_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.USERNAME_INPUT;
 
 @ScenarioScope
 @Component

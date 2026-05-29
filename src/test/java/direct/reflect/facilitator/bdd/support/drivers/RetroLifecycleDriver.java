@@ -11,7 +11,11 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.*;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.CREATE_SESSION_BUTTON;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.NEXT_STEP_BUTTON;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.RETRO_CONTENT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.SESSION_NAME_INPUT;
+import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.START_RETRO_BUTTON;
 
 @ScenarioScope
 @Component
