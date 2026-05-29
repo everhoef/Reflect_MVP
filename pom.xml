@@ -410,6 +410,9 @@
 				</executions>
 				<configuration>
 					<includeTests>true</includeTests>
+					<rulesets>
+						<ruleset>${project.basedir}/config/pmd/custom-ruleset.xml</ruleset>
+					</rulesets>
 					<failOnViolation>true</failOnViolation>
 					<failurePriority>5</failurePriority>
 					<maxAllowedViolations>${pmd.maxAllowedViolations}</maxAllowedViolations>
