@@ -1,19 +1,9 @@
 package direct.reflect.facilitator.facilitation.actions;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.auth.AuthService;
@@ -21,10 +11,6 @@ import direct.reflect.facilitator.config.TestRedisConfig;
 import direct.reflect.facilitator.config.TestSecurityOverride;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
-import direct.reflect.facilitator.facilitation.actions.ActionItem;
-import direct.reflect.facilitator.facilitation.actions.ActionItemDto;
-import direct.reflect.facilitator.facilitation.actions.ActionItemRepository;
-import direct.reflect.facilitator.facilitation.actions.ActionItemStatus;
 import direct.reflect.facilitator.facilitation.participant.Participant;
 import direct.reflect.facilitator.facilitation.participant.ParticipantRepository;
 import direct.reflect.facilitator.facilitation.participant.ParticipantRole;
@@ -129,8 +115,8 @@ class ActionItemApiIntegrationTest {
     @Test
     void createActionItem_validRequest_returnsCreatedAndPublishesActionCreatedEvent() throws Exception {
         mockMvc.perform(post("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -150,37 +136,37 @@ class ActionItemApiIntegrationTest {
                 .andExpect(jsonPath("$.status").value("OPEN"))
                 .andExpect(jsonPath("$.escalated").value(false));
 
-        assertThat(actionItemRepository.findByRetroSessionId(testSession.getId()))
+        org.assertj.core.api.Assertions.assertThat(actionItemRepository.findByRetroSessionId(testSession.getId()))
                 .singleElement()
                 .satisfies(actionItem -> {
-                    assertThat(actionItem.getWhat()).isEqualTo("Daily sync with design team");
-                    assertThat(actionItem.getWho()).isEqualTo("Alice");
-                    assertThat(actionItem.getDueDate()).isEqualTo(LocalDate.of(2026, 5, 1));
-                    assertThat(actionItem.getSuccessCriteria()).isEqualTo("Attendance logged five days per week");
-                    assertThat(actionItem.getStatus()).isEqualTo(ActionItemStatus.OPEN);
-                    assertThat(actionItem.getCreatedByParticipantId()).isEqualTo(sessionParticipant.getParticipantId());
+                    org.assertj.core.api.Assertions.assertThat(actionItem.getWhat()).isEqualTo("Daily sync with design team");
+                    org.assertj.core.api.Assertions.assertThat(actionItem.getWho()).isEqualTo("Alice");
+                    org.assertj.core.api.Assertions.assertThat(actionItem.getDueDate()).isEqualTo(LocalDate.of(2026, 5, 1));
+                    org.assertj.core.api.Assertions.assertThat(actionItem.getSuccessCriteria()).isEqualTo("Attendance logged five days per week");
+                    org.assertj.core.api.Assertions.assertThat(actionItem.getStatus()).isEqualTo(ActionItemStatus.OPEN);
+                    org.assertj.core.api.Assertions.assertThat(actionItem.getCreatedByParticipantId()).isEqualTo(sessionParticipant.getParticipantId());
                 });
 
         ArgumentCaptor<RetroEvent> eventCaptor = ArgumentCaptor.forClass(RetroEvent.class);
         verify(eventService).publish(eventCaptor.capture());
 
         RetroEvent<?> publishedEvent = eventCaptor.getValue();
-        assertThat(publishedEvent.type()).isEqualTo(RetroEvent.EventType.ACTION_CREATED);
-        assertThat(publishedEvent.retroId()).isEqualTo(testSession.getId());
-        assertThat(publishedEvent.sourceId()).isEqualTo(sessionParticipant.getParticipantId().toString());
+        org.assertj.core.api.Assertions.assertThat(publishedEvent.type()).isEqualTo(RetroEvent.EventType.ACTION_CREATED);
+        org.assertj.core.api.Assertions.assertThat(publishedEvent.retroId()).isEqualTo(testSession.getId());
+        org.assertj.core.api.Assertions.assertThat(publishedEvent.sourceId()).isEqualTo(sessionParticipant.getParticipantId().toString());
 
         ActionItemDto payload = (ActionItemDto) publishedEvent.payload();
-        assertThat(payload.what()).isEqualTo("Daily sync with design team");
-        assertThat(payload.who()).isEqualTo("Alice");
-        assertThat(payload.dueDate()).isEqualTo(LocalDate.of(2026, 5, 1));
-        assertThat(payload.status()).isEqualTo(ActionItemStatus.OPEN);
+        org.assertj.core.api.Assertions.assertThat(payload.what()).isEqualTo("Daily sync with design team");
+        org.assertj.core.api.Assertions.assertThat(payload.who()).isEqualTo("Alice");
+        org.assertj.core.api.Assertions.assertThat(payload.dueDate()).isEqualTo(LocalDate.of(2026, 5, 1));
+        org.assertj.core.api.Assertions.assertThat(payload.status()).isEqualTo(ActionItemStatus.OPEN);
     }
 
     @Test
     void createActionItem_missingRequiredFields_returnsBadRequest() throws Exception {
         mockMvc.perform(post("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -191,8 +177,8 @@ class ActionItemApiIntegrationTest {
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -203,8 +189,8 @@ class ActionItemApiIntegrationTest {
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -214,7 +200,7 @@ class ActionItemApiIntegrationTest {
                                 """))
                 .andExpect(status().isBadRequest());
 
-        assertThat(actionItemRepository.findByRetroSessionId(testSession.getId())).isEmpty();
+        org.assertj.core.api.Assertions.assertThat(actionItemRepository.findByRetroSessionId(testSession.getId())).isEmpty();
         verifyNoInteractions(eventService);
     }
 
@@ -226,7 +212,7 @@ class ActionItemApiIntegrationTest {
         saveActionItem("Review incidents weekly", "Bob", LocalDate.of(2026, 5, 8), null);
 
         mockMvc.perform(get("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth)))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth)))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.syncVersion").value(5))
@@ -246,7 +232,7 @@ class ActionItemApiIntegrationTest {
         sessionRepository.saveAndFlush(testSession);
 
         mockMvc.perform(get("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth)))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth)))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.syncVersion").value(7))
@@ -261,8 +247,8 @@ class ActionItemApiIntegrationTest {
         ActionItem actionItem = saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), null);
 
         mockMvc.perform(patch("/api/retros/{retroId}/actions/{actionId}", testSession.getId(), actionItem.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -278,19 +264,19 @@ class ActionItemApiIntegrationTest {
                 .andExpect(jsonPath("$.successCriteria").value("Attendance logged every weekday"));
 
         ActionItem updatedActionItem = actionItemRepository.findById(actionItem.getId()).orElseThrow();
-        assertThat(updatedActionItem.getWhat()).isEqualTo("Daily 15-minute sync with design team");
-        assertThat(updatedActionItem.getWho()).isEqualTo("Alice");
-        assertThat(updatedActionItem.getSuccessCriteria()).isEqualTo("Attendance logged every weekday");
+        org.assertj.core.api.Assertions.assertThat(updatedActionItem.getWhat()).isEqualTo("Daily 15-minute sync with design team");
+        org.assertj.core.api.Assertions.assertThat(updatedActionItem.getWho()).isEqualTo("Alice");
+        org.assertj.core.api.Assertions.assertThat(updatedActionItem.getSuccessCriteria()).isEqualTo("Attendance logged every weekday");
 
         ArgumentCaptor<RetroEvent> eventCaptor = ArgumentCaptor.forClass(RetroEvent.class);
         verify(eventService).publish(eventCaptor.capture());
 
         RetroEvent<?> publishedEvent = eventCaptor.getValue();
-        assertThat(publishedEvent.type()).isEqualTo(RetroEvent.EventType.ACTION_UPDATED);
+        org.assertj.core.api.Assertions.assertThat(publishedEvent.type()).isEqualTo(RetroEvent.EventType.ACTION_UPDATED);
         ActionItemDto payload = (ActionItemDto) publishedEvent.payload();
-        assertThat(payload.id()).isEqualTo(actionItem.getId());
-        assertThat(payload.what()).isEqualTo("Daily 15-minute sync with design team");
-        assertThat(payload.successCriteria()).isEqualTo("Attendance logged every weekday");
+        org.assertj.core.api.Assertions.assertThat(payload.id()).isEqualTo(actionItem.getId());
+        org.assertj.core.api.Assertions.assertThat(payload.what()).isEqualTo("Daily 15-minute sync with design team");
+        org.assertj.core.api.Assertions.assertThat(payload.successCriteria()).isEqualTo("Attendance logged every weekday");
     }
 
     @Test
@@ -298,8 +284,8 @@ class ActionItemApiIntegrationTest {
         long initialSyncVersion = sessionRepository.findById(testSession.getId()).orElseThrow().getSyncVersion();
 
         mockMvc.perform(post("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -311,7 +297,7 @@ class ActionItemApiIntegrationTest {
                 .andExpect(status().isCreated());
 
         RetroSession updatedSession = sessionRepository.findById(testSession.getId()).orElseThrow();
-        assertThat(updatedSession.getSyncVersion()).isGreaterThan(initialSyncVersion);
+        org.assertj.core.api.Assertions.assertThat(updatedSession.getSyncVersion()).isGreaterThan(initialSyncVersion);
     }
 
     @Test
@@ -319,20 +305,20 @@ class ActionItemApiIntegrationTest {
         ActionItem actionItem = saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), null);
 
         mockMvc.perform(delete("/api/retros/{retroId}/actions/{actionId}", testSession.getId(), actionItem.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf()))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isNoContent());
 
-        assertThat(actionItemRepository.findById(actionItem.getId())).isEmpty();
+        org.assertj.core.api.Assertions.assertThat(actionItemRepository.findById(actionItem.getId())).isEmpty();
 
         ArgumentCaptor<RetroEvent> eventCaptor = ArgumentCaptor.forClass(RetroEvent.class);
         verify(eventService).publish(eventCaptor.capture());
 
         RetroEvent<?> publishedEvent = eventCaptor.getValue();
-        assertThat(publishedEvent.type()).isEqualTo(RetroEvent.EventType.ACTION_DELETED);
+        org.assertj.core.api.Assertions.assertThat(publishedEvent.type()).isEqualTo(RetroEvent.EventType.ACTION_DELETED);
         ActionItemDto payload = (ActionItemDto) publishedEvent.payload();
-        assertThat(payload.id()).isEqualTo(actionItem.getId());
-        assertThat(payload.what()).isEqualTo("Daily sync with design team");
+        org.assertj.core.api.Assertions.assertThat(payload.id()).isEqualTo(actionItem.getId());
+        org.assertj.core.api.Assertions.assertThat(payload.what()).isEqualTo("Daily sync with design team");
     }
 
     @Test
@@ -340,8 +326,8 @@ class ActionItemApiIntegrationTest {
         ActionItem actionItem = saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), null);
 
         mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/status", testSession.getId(), actionItem.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -354,11 +340,11 @@ class ActionItemApiIntegrationTest {
                 .andExpect(jsonPath("$.status").value("DONE"));
 
         ActionItem updatedActionItem = actionItemRepository.findById(actionItem.getId()).orElseThrow();
-        assertThat(updatedActionItem.getStatus()).isEqualTo(ActionItemStatus.DONE);
+        org.assertj.core.api.Assertions.assertThat(updatedActionItem.getStatus()).isEqualTo(ActionItemStatus.DONE);
 
         ArgumentCaptor<RetroEvent> eventCaptor = ArgumentCaptor.forClass(RetroEvent.class);
         verify(eventService).publish(eventCaptor.capture());
-        assertThat(eventCaptor.getValue().type()).isEqualTo(RetroEvent.EventType.ACTION_UPDATED);
+        org.assertj.core.api.Assertions.assertThat(eventCaptor.getValue().type()).isEqualTo(RetroEvent.EventType.ACTION_UPDATED);
     }
 
     @Test
@@ -366,7 +352,7 @@ class ActionItemApiIntegrationTest {
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(UUID.randomUUID());
 
         mockMvc.perform(get("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth)))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(testAuth)))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"error\":\"Access denied\"}"));
