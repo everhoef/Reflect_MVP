@@ -55,7 +55,7 @@ public class MultiUserRetroEndToEndTest extends BaseEndToEndTest {
     @Order(7)
     @Timeout(600) // 10 minutes max - flow test has many steps with multi-page sync
     @DisplayName("Should validate complete retro flow with columnId isolation")
-    void shouldValidateCompleteRetroFlowWithColumnIsolation() throws InterruptedException {
+    void shouldValidateCompleteRetroFlowWithColumnIsolation() {
         BrowserContext facilitatorContext = createMonitoredContext();
         Page facilitatorPage = facilitatorContext.newPage();
 

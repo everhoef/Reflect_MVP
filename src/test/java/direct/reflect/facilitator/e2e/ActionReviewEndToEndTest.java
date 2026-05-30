@@ -166,32 +166,6 @@ public class ActionReviewEndToEndTest extends BaseEndToEndTest {
         }
     }
 
-    private void waitForServerReady() {
-        long deadline = System.currentTimeMillis() + 30_000;
-        while (System.currentTimeMillis() < deadline) {
-            try {
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
-                    new java.net.URL(baseUrl + "/login").openConnection();
-                conn.setConnectTimeout(1000);
-                conn.setReadTimeout(3000);
-                int status = conn.getResponseCode();
-                conn.disconnect();
-                if (status < 500) {
-                    return;
-                }
-            } catch (Exception ignored) {
-                // server not ready yet, retry
-            }
-
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException interruptedException) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-        }
-    }
-
     private void moveSessionToPhase(String sessionId, RetroPhase phase, int stepIndex) {
         RetroSession session = retroSessionRepository.findById(UUID.fromString(sessionId))
                 .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));

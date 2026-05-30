@@ -27,6 +27,8 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import com.redis.testcontainers.RedisContainer;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.UUID;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -82,6 +84,10 @@ public abstract class BaseEndToEndTest {
     protected static final int DEFAULT_TIMEOUT_MS = 5000;   // Navigation, elements, SSE - use for 95% of cases
     protected static final int SHORT_TIMEOUT_MS = 2000;     // Quick checks when element should already exist
     protected static final int SSE_PROPAGATION_TIMEOUT_MS = 15000;  // SSE events may need time to propagate across multiple browser contexts
+    protected static final int SERVER_READY_TIMEOUT_MS = 30000;
+    private static final int SERVER_READY_CONNECT_TIMEOUT_MS = 1000;
+    private static final int SERVER_READY_READ_TIMEOUT_MS = 3000;
+    private static final int SERVER_READY_POLL_INTERVAL_MS = 100;
 
     @LocalServerPort
     protected int port;
@@ -199,6 +205,38 @@ public abstract class BaseEndToEndTest {
      */
     protected void clearActivityTrail() {
         activityBreadcrumbs.get().clear();
+    }
+
+    protected void waitForServerReady() {
+        recordActivity("waitForServerReady");
+        long deadline = System.currentTimeMillis() + SERVER_READY_TIMEOUT_MS;
+        Exception lastFailure = null;
+
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                HttpURLConnection connection = (HttpURLConnection) new URL(baseUrl + "/login").openConnection();
+                connection.setConnectTimeout(SERVER_READY_CONNECT_TIMEOUT_MS);
+                connection.setReadTimeout(SERVER_READY_READ_TIMEOUT_MS);
+                int status = connection.getResponseCode();
+                connection.disconnect();
+                if (status < 500) {
+                    recordActivity("Server ready");
+                    return;
+                }
+            } catch (Exception readinessFailure) {
+                lastFailure = readinessFailure;
+            }
+
+            try {
+                Thread.sleep(SERVER_READY_POLL_INTERVAL_MS);
+            } catch (InterruptedException interruptedException) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError("Interrupted while waiting for application server readiness.", interruptedException);
+            }
+        }
+
+        throw new AssertionError("Application server did not become ready in time"
+            + (lastFailure == null ? "" : ": " + lastFailure.getMessage()));
     }
 
     // ==================== FORM STATE CAPTURE ====================
@@ -865,7 +903,15 @@ public abstract class BaseEndToEndTest {
                 participantPage.waitForURL(url -> url.contains("/retro/") || url.contains("error="),
                     new Page.WaitForURLOptions().setTimeout(DEFAULT_TIMEOUT_MS));
             } catch (Exception e) {
-                participantPage.waitForTimeout(500);
+                try {
+                    participantPage.waitForFunction(
+                        "() => window.location.pathname.includes('/retro/') || window.location.search.includes('error=') || document.readyState === 'complete'",
+                        null,
+                        new Page.WaitForFunctionOptions().setTimeout(SHORT_TIMEOUT_MS)
+                    );
+                } catch (Exception ignored) {
+                    log.debug("Join redirect did not settle before fallback inspection for session {}", sessionId);
+                }
             }
 
             String finalUrl = participantPage.url();
@@ -987,7 +1033,8 @@ public abstract class BaseEndToEndTest {
                         "if (bodyText.includes('Loading retrospective')) return false; " +
                         "const retro = document.querySelector('[data-testid=\"retro-content\"]'); " +
                         "if (!retro) return false; " +
-                        "return !phase || retro.getAttribute('data-phase') === phase; " +
+                        "const syncState = retro.getAttribute('data-sync-state'); " +
+                        "return (!phase || retro.getAttribute('data-phase') === phase) && syncState !== 'reconciling'; " +
                     "}",
                     expectedPhase,
                     new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS)
@@ -1011,83 +1058,139 @@ public abstract class BaseEndToEndTest {
 
 
     protected boolean clickNextAndWait(Page facilitatorPage, int timeoutMs, Page... participantPages) {
-        try {
-            Locator nextButton = facilitatorPage.locator("[data-testid='next-step-button']");
-            if (nextButton.count() == 0) {
-                log.debug("Next button not found, assuming end of flow");
-                return false;
-            }
+        Locator nextButton = facilitatorPage.locator("[data-testid='next-step-button']");
+        if (nextButton.count() == 0) {
+            log.debug("Next button not found, assuming end of flow");
+            return false;
+        }
 
-            Integer currentStepIndex = getCurrentStepIndex(facilitatorPage);
-            String currentPhase = getCurrentPhase(facilitatorPage);
-            if (currentStepIndex == null) {
-                log.warn("Could not determine current step index, using fallback approach");
-                nextButton.click(new Locator.ClickOptions().setTimeout(timeoutMs));
-                facilitatorPage.waitForLoadState(LoadState.DOMCONTENTLOADED,
-                    new Page.WaitForLoadStateOptions().setTimeout(timeoutMs));
-                return true;
-            }
+        Integer currentStepIndex = getCurrentStepIndex(facilitatorPage);
+        String currentPhase = getCurrentPhase(facilitatorPage);
+        if (currentStepIndex == null) {
+            log.warn("Could not determine current step index, using fallback approach");
+            nextButton.click(new Locator.ClickOptions().setTimeout(timeoutMs));
+            facilitatorPage.waitForLoadState(LoadState.DOMCONTENTLOADED,
+                new Page.WaitForLoadStateOptions().setTimeout(timeoutMs));
+            return true;
+        }
 
-            log.debug("Before click: step={}, phase={}", currentStepIndex, currentPhase);
+        log.debug("Before click: step={}, phase={}", currentStepIndex, currentPhase);
 
-            List<Page> allPages = new ArrayList<>();
-            allPages.add(facilitatorPage);
-            Collections.addAll(allPages, participantPages);
+        List<Page> allPages = new ArrayList<>();
+        allPages.add(facilitatorPage);
+        Collections.addAll(allPages, participantPages);
 
             Response nextResponse = facilitatorPage.waitForResponse(
-                response -> response.url().contains("/next") && response.request().method().equals("POST"),
-                new Page.WaitForResponseOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS),
+                response -> response.url().contains("/advance") && response.request().method().equals("POST"),
+                new Page.WaitForResponseOptions().setTimeout(DEFAULT_TIMEOUT_MS),
                 () -> {
                     nextButton.click(new Locator.ClickOptions().setTimeout(timeoutMs));
-                    log.debug("Next button clicked, waiting for /next POST response...");
+                    log.debug("Next button clicked, waiting for /advance POST response...");
                 }
             );
-            log.debug("/next POST response received with status: {}", nextResponse.status());
+        log.debug("/next POST response received with status: {}", nextResponse.status());
 
-            waitForStepChange(currentStepIndex, currentPhase, SSE_PROPAGATION_TIMEOUT_MS, allPages.toArray(new Page[0]));
-            
-            Integer newStepIndex = getCurrentStepIndex(facilitatorPage);
-            String newPhase = getCurrentPhase(facilitatorPage);
-            log.debug("After click: step={}, phase={}", newStepIndex, newPhase);
+        waitForStepChange(currentStepIndex, currentPhase, allPages.toArray(new Page[0]));
+
+        Integer newStepIndex = getCurrentStepIndex(facilitatorPage);
+        String newPhase = getCurrentPhase(facilitatorPage);
+        log.debug("After click: step={}, phase={}", newStepIndex, newPhase);
+        return true;
+    }
+
+    /**
+     * Fast, event-driven step synchronization with short-timeout + refresh recovery.
+     *
+     * <p>Strategy (per user request):
+     * <ol>
+     *   <li>Wait for step/phase change with a short timeout (3s).</li>
+     *   <li>If timed out → the page missed the SSE event. Refresh the page to force a full state re-fetch.</li>
+     *   <li>After refresh, wait again with a longer fallback timeout (10s).</li>
+     *   <li>If still failing, throw {@link AssertionError} with frontend sync diagnostics
+     *       ({@code data-sync-state}, {@code data-sse-connected}) for debugging.</li>
+     * </ol>
+     *
+     * <p>Does NOT inspect cookies or other implementation details — assertions are on
+     * user-visible DOM state only.
+     */
+    protected void waitForStepChange(int previousStepIndex, String previousPhase, Page... pages) {
+        final int FAST_TIMEOUT_MS = 3000;
+        final int FALLBACK_TIMEOUT_MS = 10000;
+
+        log.debug("Waiting for step change from step={}, phase={} on {} pages", previousStepIndex, previousPhase, pages.length);
+
+        for (int i = 0; i < pages.length; i++) {
+            Page page = pages[i];
+            boolean changed = waitForStepChangeOnPage(page, previousStepIndex, previousPhase, FAST_TIMEOUT_MS);
+
+            if (!changed) {
+                log.warn("Page {}/{} did not change within {}ms — refreshing to recover missed SSE event", i + 1, pages.length, FAST_TIMEOUT_MS);
+                page.reload(new Page.ReloadOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+                changed = waitForStepChangeOnPage(page, previousStepIndex, previousPhase, FALLBACK_TIMEOUT_MS);
+            }
+
+            if (!changed) {
+                Map<String, Object> diagnostics = gatherSyncDiagnostics(page);
+                Integer actualIndex = getCurrentStepIndex(page);
+                String actualPhase = getCurrentPhase(page);
+                log.error("Page {}/{} STILL no change after refresh: step={}, phase={}, diagnostics={}",
+                    i + 1, pages.length, actualIndex, actualPhase, diagnostics);
+                throw new AssertionError(String.format(
+                    "Page %d/%d no step change after refresh (still step=%d, phase=%s, syncState=%s, sseConnected=%s)",
+                    i + 1, pages.length, actualIndex, actualPhase,
+                    diagnostics.get("syncState"), diagnostics.get("sseConnected")));
+            }
+
+            log.debug("Page {}/{} detected step/phase change", i + 1, pages.length);
+        }
+    }
+
+    private boolean waitForStepChangeOnPage(Page page, int previousStepIndex, String previousPhase, int timeoutMs) {
+        try {
+            page.waitForFunction(
+                String.format(
+                    "() => { " +
+                    "  const el = document.querySelector('[data-step-index]'); " +
+                    "  if (!el) return false; " +
+                    "  const stepIdx = parseInt(el.getAttribute('data-step-index')); " +
+                    "  const phase = el.getAttribute('data-phase'); " +
+                    "  return stepIdx !== %d || phase !== '%s'; " +
+                    "}",
+                    previousStepIndex, previousPhase
+                ),
+                null,
+                new Page.WaitForFunctionOptions().setTimeout(timeoutMs)
+            );
             return true;
-            
         } catch (Exception e) {
-            log.warn("clickNextAndWait failed: {}", e.getMessage());
             return false;
         }
     }
-    
-    protected void waitForStepChange(int previousStepIndex, String previousPhase, int timeoutMs, Page... pages) {
-        log.debug("Waiting for step change from step={}, phase={} on {} pages", previousStepIndex, previousPhase, pages.length);
-        
-        for (int i = 0; i < pages.length; i++) {
-            Page page = pages[i];
-            try {
-                page.waitForFunction(
-                    String.format(
-                        "() => { " +
-                        "  const el = document.querySelector('[data-step-index]'); " +
-                        "  if (!el) return false; " +
-                        "  const stepIdx = parseInt(el.getAttribute('data-step-index')); " +
-                        "  const phase = el.getAttribute('data-phase'); " +
-                        "  return stepIdx !== %d || phase !== '%s'; " +
-                        "}",
-                        previousStepIndex, previousPhase
-                    ),
-                    null,
-                    new Page.WaitForFunctionOptions().setTimeout(timeoutMs)
-                );
-                log.debug("Page {}/{} detected step/phase change", i + 1, pages.length);
-            } catch (Exception e) {
-                Integer actualIndex = getCurrentStepIndex(page);
-                String actualPhase = getCurrentPhase(page);
-                log.error("Page {}/{} no change detected: step={}, phase={}", 
-                    i + 1, pages.length, actualIndex, actualPhase);
-                throw new AssertionError(String.format(
-                    "Page %d/%d no step change after %dms (still step=%d, phase=%s)",
-                    i + 1, pages.length, timeoutMs, actualIndex, actualPhase), e);
+
+    /**
+     * Gathers frontend sync diagnostics from the page for debugging.
+     * Reads user-visible DOM attributes, not cookies or internal state.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> gatherSyncDiagnostics(Page page) {
+        try {
+            Object result = page.evaluate("() => {"
+                + "  const retro = document.querySelector('[data-testid=\"retro-content\"]');"
+                + "  if (!retro) return { error: 'no retro-content element' };"
+                + "  return {"
+                + "    stepIndex: retro.getAttribute('data-step-index'),"
+                + "    phase: retro.getAttribute('data-phase'),"
+                + "    syncState: retro.getAttribute('data-sync-state'),"
+                + "    sseConnected: retro.getAttribute('data-sse-connected')"
+                + "  };"
+                + "}");
+            if (result instanceof Map) {
+                return (Map<String, Object>) result;
             }
+        } catch (Exception e) {
+            log.warn("Failed to gather sync diagnostics: {}", e.getMessage());
         }
+        return Map.of("error", "diagnostics unavailable");
     }
 
     // ==================== MULTI-USER SESSION SETUP ====================
@@ -1270,7 +1373,7 @@ public abstract class BaseEndToEndTest {
                         new Page.WaitForResponseOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS),
                         () -> nextBtn.click(new Locator.ClickOptions().setTimeout(DEFAULT_TIMEOUT_MS))
                     );
-                    waitForStepChange(currentIndex, currentPhase, SSE_PROPAGATION_TIMEOUT_MS, facilitatorPage);
+                    waitForStepChange(currentIndex, currentPhase, facilitatorPage);
                 } else {
                     clickElement(facilitatorPage, "[data-testid='next-step-button']");
                     facilitatorPage.waitForLoadState(LoadState.DOMCONTENTLOADED,
@@ -1549,7 +1652,8 @@ public abstract class BaseEndToEndTest {
                       dom: {
                         phase: retro?.getAttribute('data-phase') ?? null,
                         stepIndex: retro?.getAttribute('data-step-index') ?? null,
-                        sseConnected: retro?.getAttribute('data-sse-connected') ?? null
+                        sseConnected: retro?.getAttribute('data-sse-connected') ?? null,
+                        syncState: retro?.getAttribute('data-sync-state') ?? null
                       },
                       transport: {
                         connectionState: diagnostics.connectionState ?? null,
@@ -1831,7 +1935,6 @@ public abstract class BaseEndToEndTest {
         log.debug("SSE connection established for retro: {} (data-sse-connected='true')", retroId);
         recordActivity("SSE connection established: " + retroId);
     }
-
 
     protected void navigateToHome(Page page) {
         recordActivity("navigateToHome");

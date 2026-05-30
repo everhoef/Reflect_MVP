@@ -164,37 +164,6 @@ class EscalationVotingEndToEndTest extends BaseEndToEndTest {
         }
     }
 
-    private void waitForServerReady() {
-        recordActivity("waitForServerReady");
-        long deadline = System.currentTimeMillis() + 30_000;
-        Exception lastFailure = null;
-        while (System.currentTimeMillis() < deadline) {
-            try {
-                HttpURLConnection connection = (HttpURLConnection) new URL(baseUrl + "/login").openConnection();
-                connection.setConnectTimeout(1_000);
-                connection.setReadTimeout(3_000);
-                int status = connection.getResponseCode();
-                connection.disconnect();
-                if (status < 500) {
-                    recordActivity("✓ Server ready");
-                    return;
-                }
-            } catch (Exception readinessFailure) {
-                lastFailure = readinessFailure;
-            }
-
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException interruptedException) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
-
-        throw new AssertionError("Server did not become ready within 30 seconds"
-                + (lastFailure == null ? "" : ": " + lastFailure.getMessage()));
-    }
-
     private Team createManagedTeamForUsername(String teamName, String username) {
         recordActivity("createManagedTeamForUsername: " + teamName + " -> " + username);
 

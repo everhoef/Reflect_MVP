@@ -127,7 +127,7 @@ public class SseEndToEndTest extends BaseEndToEndTest {
                 waitForSseConnection(participantPage, UUID.fromString(sessionId));
                 log.info("Both SSE connections established");
 
-                Thread.sleep(500);
+                waitForParticipantList(facilitatorPage, "Facilitator", "Participant");
 
                 startRetroSession(facilitatorPage, sessionId);
                 log.info("Retro started");
