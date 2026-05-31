@@ -1114,19 +1114,19 @@ public abstract class BaseEndToEndTest {
      * user-visible DOM state only.
      */
     protected void waitForStepChange(int previousStepIndex, String previousPhase, Page... pages) {
-        final int FAST_TIMEOUT_MS = 3000;
-        final int FALLBACK_TIMEOUT_MS = 10000;
+        final int fastTimeoutMs = 3000;
+        final int fallbackTimeoutMs = 10000;
 
         log.debug("Waiting for step change from step={}, phase={} on {} pages", previousStepIndex, previousPhase, pages.length);
 
         for (int i = 0; i < pages.length; i++) {
             Page page = pages[i];
-            boolean changed = waitForStepChangeOnPage(page, previousStepIndex, previousPhase, FAST_TIMEOUT_MS);
+            boolean changed = waitForStepChangeOnPage(page, previousStepIndex, previousPhase, fastTimeoutMs);
 
             if (!changed) {
-                log.warn("Page {}/{} did not change within {}ms — refreshing to recover missed SSE event", i + 1, pages.length, FAST_TIMEOUT_MS);
+                log.warn("Page {}/{} did not change within {}ms — refreshing to recover missed SSE event", i + 1, pages.length, fastTimeoutMs);
                 page.reload(new Page.ReloadOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-                changed = waitForStepChangeOnPage(page, previousStepIndex, previousPhase, FALLBACK_TIMEOUT_MS);
+                changed = waitForStepChangeOnPage(page, previousStepIndex, previousPhase, fallbackTimeoutMs);
             }
 
             if (!changed) {

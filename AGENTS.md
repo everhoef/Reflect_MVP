@@ -569,7 +569,7 @@ Every feature delivery MUST follow this 5-step process:
 2. **BUILD**: AI agents execute the plan autonomously. No user involvement during this phase. Agent writes BOTH implementation code AND test code, integration tests and Playwright end-to-end tests.
 
 3. **VERIFY**: Automated gate — ALL of the following MUST pass:
-   - `./mvnw clean test` — zero failures. This single command runs ALL tests: unit tests, integration tests, and Playwright end-to-end tests. There is no separate Playwright step.
+   - `./mvnw clean verify` — zero failures. This single command runs ALL tests (unit, integration, Playwright) AND static analysis (Checkstyle, PMD, SpotBugs). There is no separate Playwright step.
    - BDD "Critical" scenarios from the Notion story guide test coverage (but NOT 1:1 mapping — see BDD Verification subsection below)
    - After all tests pass, AI agent MUST update the Notion story status to `Needs review` via MCP tool call: `mcp_notion-hosted_notion-update-page` with `command: update_properties`, property `Status: Needs review`
 
@@ -588,7 +588,7 @@ A feature is READY FOR REVIEW when ALL of the following conditions are true:
 - [ ] All BDD "Critical" scenarios from the Notion story are covered by tests (NOT necessarily 1:1 — a single test may cover multiple scenarios)
 - [ ] Every new API/View/Event endpoint has an integration test
 - [ ] All frontend functionality is verified via Playwright end-to-end tests (tests MUST live in `src/test/java/direct/reflect/facilitator/e2e/`)
-- [ ] `./mvnw clean test` passes with zero failures (this runs everything: unit + integration + Playwright)
+- [ ] `./mvnw clean verify` passes with zero failures (this runs everything: unit + integration + Playwright + static analysis)
 - [ ] No `@Disabled`, `@Ignore`, or `@Tag("flaky")` annotations added
 - [ ] No suppressed errors (`@SuppressWarnings`, empty catch blocks, `as any`)
 - [ ] Notion story status updated to `Needs review`
@@ -603,7 +603,7 @@ Additional REQUIRED rules for feature delivery:
 
 - **Integration tests**: REQUIRED for every new endpoint (API, View, or Event controller). Use `@SpringBootTest` + Testcontainers. Follow patterns in existing test classes.
 - **Playwright end-to-end tests**: REQUIRED for every user-facing feature. Tests MUST live in `src/test/java/direct/reflect/facilitator/e2e/` alongside the existing browser journeys, for example `RetroFlowEndToEndTest`. They MUST capture screenshot evidence.
-- **Regression gate**: `./mvnw clean test` MUST show zero failures TOTAL — not just new tests passing, but ALL existing tests still passing.
+- **Regression gate**: `./mvnw clean verify` MUST show zero failures TOTAL — not just new tests passing, but ALL existing tests still passing.
 
 **Definitions**:
 - **User-facing feature**: Any change visible in the browser UI, new page, new component, changed behavior, new interaction. REQUIRES Playwright end-to-end tests.
@@ -850,12 +850,12 @@ Checkout the branch and run:
 
 ```bash
 git checkout <branch-name>
-./mvnw clean test
+./mvnw clean verify
 ```
 
 Expected: `Tests run: N, Failures: 0, Errors: 0, Skipped: 0` — BUILD SUCCESS.
 
-Zero tolerance. If any test fails, the PR is not ready.
+Zero tolerance. If any test fails or static analysis reports violations, the PR is not ready.
 
 After running tests, restore any drift the Maven build produces. Maven regenerates static assets (new hashed JS/CSS bundles as untracked files) and generated TypeScript types — `git restore` alone is insufficient because new untracked files won't be removed by it:
 
@@ -879,7 +879,7 @@ A clean diff is necessary but not sufficient. The change still needs to be corre
 
 **Merge when all of the following are true:**
 - Diff scope contains only the intended files (no forbidden classes above)
-- `./mvnw clean test` passes with zero failures
+- `./mvnw clean verify` passes with zero failures
 - The content of the change matches the partner's stated intent
 - `gh pr view <N> --json mergeStateStatus` returns `"CLEAN"`
 
@@ -904,8 +904,8 @@ git diff origin/main...<branch> --name-only
 gh pr view <N> --json number,title,state,headRefName,reviews,reviewDecision
 gh api repos/<owner>/<repo>/pulls/<N>/comments
 
-# Run full test suite
-./mvnw clean test
+# Run full regression gate
+./mvnw clean verify
 
 # Check merge eligibility
 gh pr view <N> --json mergeStateStatus
