@@ -18,7 +18,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 
-import direct.reflect.facilitator.common.config.RedisConfig;
+import direct.reflect.facilitator.eventing.infrastructure.redis.RedisPubSubConfig;
 
 @Configuration(proxyBeanMethods = false)
 public class TestRedisConfig {
@@ -38,7 +38,7 @@ public class TestRedisConfig {
      * (capturedBackOff.start()) to super, discarding the accumulated nested chain.
      *
      * The message listener (EventService.onPubSubMessage via MessageListenerAdapter) is
-     * wired here explicitly, matching the production RedisConfig bean.
+     * wired here explicitly, matching the production RedisPubSubConfig bean.
      */
     @Bean
     @Primary
@@ -49,7 +49,7 @@ public class TestRedisConfig {
         NonNestingRedisMessageListenerContainer container =
                 new NonNestingRedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
-        container.addMessageListener(messageListener, new PatternTopic(RedisConfig.ALL_RETROS_PATTERN));
+        container.addMessageListener(messageListener, new PatternTopic(RedisPubSubConfig.ALL_RETROS_PATTERN));
         container.setRecoveryBackoff(new FixedBackOff(200, FixedBackOff.UNLIMITED_ATTEMPTS));
         container.setMaxSubscriptionRegistrationWaitingTime(15000);
         ScheduledThreadPoolExecutor subExecutor = new ScheduledThreadPoolExecutor(1, r -> {

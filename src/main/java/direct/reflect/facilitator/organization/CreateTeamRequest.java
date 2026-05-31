@@ -7,4 +7,4 @@ public record CreateTeamRequest(
         @NotBlank(message = "Team name is required")
         @Size(max = 100, message = "Team name must be at most 100 characters")
         String name
-) {}
+) { }

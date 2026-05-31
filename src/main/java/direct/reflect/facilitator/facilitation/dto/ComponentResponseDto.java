@@ -25,7 +25,7 @@ public sealed interface ComponentResponseDto
     permits ColumnResponseDto, RatingResponseDto {
 
     /**
-     * Unique identifier for this response
+     * Unique identifier for this response.
      */
     UUID id();
 
@@ -37,7 +37,7 @@ public sealed interface ComponentResponseDto
     Boolean visible();
 
     /**
-     * Display name of the participant who submitted this response
+     * Display name of the participant who submitted this response.
      */
     String participantName();
 

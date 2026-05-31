@@ -2,12 +2,13 @@ package direct.reflect.facilitator.facilitation.actions;
 
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
+import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
 import direct.reflect.facilitator.facilitation.dto.SyncVersionedResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,19 +22,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/retro/{retroId}/actions")
+@RequestMapping("/api/retros/{retroId}/actions")
+@RequiredArgsConstructor
 @Tag(name = "Action Item API", description = "SMART action item CRUD operations")
 public class ActionItemApiController {
 
     private final ActionItemService actionItemService;
-    private final RetroSyncVersionService retroSyncVersionService;
 
-    public ActionItemApiController(
-            ActionItemService actionItemService,
-            RetroSyncVersionService retroSyncVersionService) {
-        this.actionItemService = actionItemService;
-        this.retroSyncVersionService = retroSyncVersionService;
-    }
+    private final RetroSyncVersionService retroSyncVersionService;
 
     @PostMapping
     @PreAuthorize("@participantService.canAccessRetro(#retroId)")

@@ -22,7 +22,7 @@ public class RetroStage {
     private Duration duration; // Expected duration
 
     // Overwrite setter for id
-    public void setId(Long id) {
-        return; // No-op to prevent setting id directly
+    public void setId(Long ignored) {
+        // No-op to prevent setting id directly
     }
 }

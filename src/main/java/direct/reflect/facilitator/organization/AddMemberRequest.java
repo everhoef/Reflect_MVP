@@ -9,4 +9,4 @@ public record AddMemberRequest(
 
         @NotNull(message = "Role is required")
         TeamRole role
-) {}
+) { }

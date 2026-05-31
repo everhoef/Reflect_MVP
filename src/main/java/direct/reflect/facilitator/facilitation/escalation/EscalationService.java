@@ -1,21 +1,20 @@
 package direct.reflect.facilitator.facilitation.escalation;
 
 import direct.reflect.facilitator.auth.AuthService;
-import direct.reflect.facilitator.common.exception.ResourceNotFoundException;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
-import direct.reflect.facilitator.facilitation.Participant;
-import direct.reflect.facilitator.facilitation.ParticipantRepository;
-import direct.reflect.facilitator.facilitation.ParticipantRole;
-import direct.reflect.facilitator.facilitation.ParticipantStatus;
-import direct.reflect.facilitator.facilitation.ParticipantService;
-import direct.reflect.facilitator.facilitation.RetroSession;
-import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
+import direct.reflect.facilitator.facilitation.participant.Participant;
+import direct.reflect.facilitator.facilitation.participant.ParticipantRepository;
+import direct.reflect.facilitator.facilitation.participant.ParticipantRole;
+import direct.reflect.facilitator.facilitation.participant.ParticipantStatus;
+import direct.reflect.facilitator.facilitation.participant.ParticipantService;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
+import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
 import direct.reflect.facilitator.facilitation.actions.ActionItem;
+import direct.reflect.facilitator.facilitation.actions.ActionItemNotFoundException;
 import direct.reflect.facilitator.facilitation.actions.ActionItemRepository;
 import direct.reflect.facilitator.facilitation.escalation.domain.EscalationThresholdPolicy;
-import direct.reflect.facilitator.organization.TeamMemberRepository;
-import direct.reflect.facilitator.organization.TeamRole;
+import direct.reflect.facilitator.organization.ManagerTeamAccess;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -41,7 +40,7 @@ public class EscalationService {
     private final ParticipantRepository participantRepository;
     private final EventService eventService;
     private final RetroSyncVersionService retroSyncVersionService;
-    private final TeamMemberRepository teamMemberRepository;
+    private final ManagerTeamAccess managerTeamAccess;
     private final AuthService authService;
 
     public EscalatedItemDto escalateAction(
@@ -52,21 +51,21 @@ public class EscalationService {
         participantService.getParticipantForSession(request, retroId);
 
         ActionItem actionItem = actionItemRepository.findByIdAndRetroSessionId(actionId, retroId)
-                .orElseThrow(() -> new ResourceNotFoundException("Action item not found"));
+                .orElseThrow(() -> new ActionItemNotFoundException(actionId));
 
         if (Boolean.TRUE.equals(actionItem.getEscalated())) {
             throw new IllegalArgumentException("Action item already escalated");
         }
 
         RetroSession retroSession = actionItem.getRetroSession();
-        if (retroSession.getTeam() == null) {
+        if (retroSession.getTeamId() == null) {
             throw new IllegalArgumentException("Retro session must belong to a team before escalation");
         }
 
         int participantCount = participantService.getSessionParticipants(retroId).size();
         EscalatedItem escalatedItem = new EscalatedItem();
         escalatedItem.setRetroSession(retroSession);
-        escalatedItem.setTeam(retroSession.getTeam());
+        escalatedItem.setTeamId(retroSession.getTeamId());
         escalatedItem.setProblemDescription(problemDescription);
         escalatedItem.setVoteThreshold(EscalationThresholdPolicy.calculateVoteThreshold(participantCount));
 
@@ -88,7 +87,7 @@ public class EscalationService {
     public EscalationVoteResultDto toggleVote(UUID retroId, UUID escalationId, HttpServletRequest request) {
         Participant participant = participantService.getParticipantForSession(request, retroId);
         EscalatedItem escalatedItem = escalatedItemRepository.findByIdAndRetroSession_Id(escalationId, retroId)
-                .orElseThrow(() -> new ResourceNotFoundException("Escalated item not found"));
+                .orElseThrow(() -> new EscalatedItemNotFoundException(escalationId));
 
         EscalatedItemVote existingVote = escalatedItemVoteRepository
                 .findByEscalatedItemIdAndParticipantId(escalationId, participant.getParticipantId())
@@ -145,7 +144,7 @@ public class EscalationService {
             return List.of();
         }
 
-        List<EscalatedItem> escalatedItems = escalatedItemRepository.findByTeam_IdInOrderByCreatedAtAsc(managedTeamIds);
+        List<EscalatedItem> escalatedItems = escalatedItemRepository.findByTeamIdInOrderByCreatedAtAsc(managedTeamIds);
 
         return toEscalatedItemDtos(escalatedItems).stream()
                 .filter(EscalatedItemDto::thresholdMet)
@@ -156,15 +155,15 @@ public class EscalationService {
     public EscalatedItemDto getManagerEscalation(UUID escalationId, Authentication authentication) {
         List<UUID> managedTeamIds = getManagedTeamIds(authentication);
         if (managedTeamIds.isEmpty()) {
-            throw new ResourceNotFoundException("Escalated item not found");
+            throw new EscalatedItemNotFoundException(escalationId);
         }
 
-        EscalatedItem escalatedItem = escalatedItemRepository.findByIdAndTeam_IdIn(escalationId, managedTeamIds)
-                .orElseThrow(() -> new ResourceNotFoundException("Escalated item not found"));
+        EscalatedItem escalatedItem = escalatedItemRepository.findByIdAndTeamIdIn(escalationId, managedTeamIds)
+                .orElseThrow(() -> new EscalatedItemNotFoundException(escalationId));
 
         EscalatedItemDto dto = toEscalatedItemDto(escalatedItem);
         if (!dto.thresholdMet()) {
-            throw new ResourceNotFoundException("Escalated item not found");
+            throw new EscalatedItemNotFoundException(escalationId);
         }
 
         return dto;
@@ -181,7 +180,8 @@ public class EscalationService {
         }
 
         Map<UUID, Long> voteCountsByEscalationId = getVoteCountsByEscalationId(escalatedItems);
-        Map<UUID, List<Participant>> participantsBySessionId = getParticipantsBySessionIdForTieBreaks(escalatedItems, voteCountsByEscalationId);
+        Map<UUID, List<Participant>> participantsBySessionId = getParticipantsBySessionIdForTieBreaks(
+            escalatedItems, voteCountsByEscalationId);
 
         return escalatedItems.stream()
                 .map(escalatedItem -> {
@@ -192,9 +192,22 @@ public class EscalationService {
                     return EscalatedItemDto.from(
                             escalatedItem,
                             voteCount,
-                            isThresholdMet(voteCount, participants, escalatedItem.getId()));
+                            isThresholdMet(escalatedItem, voteCount, participants));
                 })
                 .toList();
+    }
+
+    private boolean isThresholdMet(EscalatedItem escalatedItem, long voteCount, List<Participant> participants) {
+        int threshold = escalatedItem.getVoteThreshold();
+        if (EscalationThresholdPolicy.hasReachedThreshold(voteCount, threshold)) {
+            return true;
+        }
+
+        if (!EscalationThresholdPolicy.isTieBreakScenario(voteCount, threshold)) {
+            return false;
+        }
+
+        return isThresholdMet(participants, escalatedItem.getId());
     }
 
     private boolean isThresholdMet(EscalatedItem escalatedItem, long voteCount) {
@@ -208,10 +221,10 @@ public class EscalationService {
         }
 
         List<Participant> participants = participantService.getSessionParticipants(escalatedItem.getRetroSession().getId());
-        return isThresholdMet(voteCount, participants, escalatedItem.getId());
+        return isThresholdMet(participants, escalatedItem.getId());
     }
 
-    private boolean isThresholdMet(long voteCount, List<Participant> participants, UUID escalationId) {
+    private boolean isThresholdMet(List<Participant> participants, UUID escalationId) {
         boolean facilitatorVoted = facilitatorHasVoted(escalationId, participants);
 
         return EscalationThresholdPolicy.facilitatorTieBreakApplies(participants.size(), facilitatorVoted);
@@ -272,8 +285,6 @@ public class EscalationService {
         }
 
         UUID userId = authService.toOidcUserId(authentication.getName());
-        return teamMemberRepository.findByUserIdAndRole(userId, TeamRole.MANAGER).stream()
-                .map(teamMember -> teamMember.getTeam().getId())
-                .toList();
+        return managerTeamAccess.findManagedTeamIds(userId);
     }
 }

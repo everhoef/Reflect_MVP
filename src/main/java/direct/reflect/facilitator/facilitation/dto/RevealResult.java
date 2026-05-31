@@ -9,4 +9,4 @@ public record RevealResult(
 
     @Schema(description = "Always true — indicates reveal was successful")
     boolean revealed
-) {}
+) { }

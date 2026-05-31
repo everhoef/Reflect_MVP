@@ -10,4 +10,13 @@ public record StepSummaryDto(
     Integer durationSeconds,
     Map<String, Object> componentConfig,
     String guidance
-) {}
+) {
+    public StepSummaryDto {
+        componentConfig = componentConfig != null ? Map.copyOf(componentConfig) : null;
+    }
+
+    @Override
+    public Map<String, Object> componentConfig() {
+        return componentConfig != null ? Map.copyOf(componentConfig) : null;
+    }
+}

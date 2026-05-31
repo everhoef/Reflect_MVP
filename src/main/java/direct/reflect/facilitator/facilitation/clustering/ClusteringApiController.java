@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/retro/{retroId}/step/{stepId}")
+@RequestMapping("/api/retros/{retroId}/steps/{stepId}")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Clustering API", description = "Response clustering and merging operations")
@@ -31,13 +31,22 @@ public class ClusteringApiController {
 
     private final ClusteringService clusteringService;
 
-    public record MergeRequest(@NotEmpty List<UUID> responseIds) {}
+    public record MergeRequest(@NotEmpty List<UUID> responseIds) {
+        public MergeRequest {
+            responseIds = responseIds != null ? List.copyOf(responseIds) : null;
+        }
 
-    public record UnmergeRequest(@NotNull UUID responseId) {}
+        @Override
+        public List<UUID> responseIds() {
+            return responseIds != null ? List.copyOf(responseIds) : null;
+        }
+    }
 
-    public record RenameClusterRequest(@NotBlank @Size(max = 100) String name) {}
+    public record UnmergeRequest(@NotNull UUID responseId) { }
 
-    @PostMapping("/cluster/merge")
+    public record RenameClusterRequest(@NotBlank @Size(max = 100) String name) { }
+
+    @PostMapping("/clusters/merge")
     @PreAuthorize("@participantService.canAccessRetro(#retroId)")
     public ResponseEntity<Map<String, UUID>> merge(
             @PathVariable UUID retroId,
@@ -47,7 +56,7 @@ public class ClusteringApiController {
         return ResponseEntity.ok(Map.of("clusterId", clusterId));
     }
 
-    @PostMapping("/cluster/unmerge")
+    @PostMapping("/clusters/unmerge")
     @PreAuthorize("@participantService.canAccessRetro(#retroId)")
     public ResponseEntity<Void> unmerge(
             @PathVariable UUID retroId,
@@ -57,7 +66,7 @@ public class ClusteringApiController {
         return ResponseEntity.ok().build();
     }
 
-    @PutMapping("/cluster/{clusterId}/name")
+    @PutMapping("/clusters/{clusterId}/name")
     @PreAuthorize("@participantService.canAccessRetro(#retroId)")
     public ResponseEntity<Void> renameCluster(
             @PathVariable UUID retroId,

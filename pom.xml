@@ -33,6 +33,11 @@
 		<org.projectlombok.version>1.18.42</org.projectlombok.version>
 		<org.mapstruct.version>1.6.2</org.mapstruct.version>
 		<testcontainers.version>2.0.2</testcontainers.version>
+		<spotbugs.version>4.9.8.3</spotbugs.version>
+<pmd.maxAllowedViolations>0</pmd.maxAllowedViolations>
+<checkstyle.maxAllowedViolations>0</checkstyle.maxAllowedViolations>
+		<spotbugs.skip>false</spotbugs.skip>
+		<spotbugs.failOnError>true</spotbugs.failOnError>
 	</properties>
 	
 	<dependencies>
@@ -212,6 +217,14 @@
 			<scope>test</scope>
 		</dependency>
 		
+		<!-- SpotBugs annotations (provides @SuppressFBWarnings used in production code) -->
+		<dependency>
+			<groupId>com.github.spotbugs</groupId>
+			<artifactId>spotbugs-annotations</artifactId>
+			<version>4.9.3</version>
+			<optional>true</optional>
+		</dependency>
+
 		<!-- Playwright for browser automation -->
 		<dependency>
 			<groupId>com.microsoft.playwright</groupId>
@@ -224,6 +237,28 @@
 			<artifactId>selenium-remote-driver</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- Cucumber for BDD integration tests -->
+		<dependency>
+			<groupId>io.cucumber</groupId>
+			<artifactId>cucumber-java</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.cucumber</groupId>
+			<artifactId>cucumber-spring</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.cucumber</groupId>
+			<artifactId>cucumber-junit-platform-engine</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.platform</groupId>
+			<artifactId>junit-platform-suite</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 	
 	<dependencyManagement>
@@ -233,6 +268,14 @@
 				<groupId>org.testcontainers</groupId>
 				<artifactId>testcontainers-bom</artifactId>
 				<version>${testcontainers.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<!-- Cucumber BOM -->
+			<dependency>
+				<groupId>io.cucumber</groupId>
+				<artifactId>cucumber-bom</artifactId>
+				<version>7.21.0</version>
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>
@@ -314,6 +357,18 @@
 				</executions>
 			</plugin>
 			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<includes>
+						<include>**/*Test.java</include>
+						<include>**/*Tests.java</include>
+						<include>**/*TestCase.java</include>
+						<include>**/*TestRunner.java</include>
+					</includes>
+				</configuration>
+			</plugin>
+			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 				<configuration>
@@ -339,6 +394,81 @@
 						</path>
 					</annotationProcessorPaths>
 				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-pmd-plugin</artifactId>
+				<version>3.28.0</version>
+				<executions>
+					<execution>
+						<id>pmd-verify</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<includeTests>true</includeTests>
+					<rulesets>
+						<ruleset>${project.basedir}/pmd-ruleset.xml</ruleset>
+					</rulesets>
+					<failOnViolation>true</failOnViolation>
+					<failurePriority>5</failurePriority>
+					<maxAllowedViolations>${pmd.maxAllowedViolations}</maxAllowedViolations>
+					<printFailingErrors>true</printFailingErrors>
+					<verbose>true</verbose>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-checkstyle-plugin</artifactId>
+				<version>3.6.0</version>
+				<executions>
+					<execution>
+						<id>checkstyle-verify</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<configLocation>checkstyle.xml</configLocation>
+					<includeTestSourceDirectory>true</includeTestSourceDirectory>
+					<failOnViolation>true</failOnViolation>
+					<violationSeverity>warning</violationSeverity>
+					<consoleOutput>true</consoleOutput>
+					<maxAllowedViolations>${checkstyle.maxAllowedViolations}</maxAllowedViolations>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>com.github.spotbugs</groupId>
+				<artifactId>spotbugs-maven-plugin</artifactId>
+				<version>${spotbugs.version}</version>
+				<executions>
+					<execution>
+						<id>spotbugs-verify</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<effort>Max</effort>
+					<threshold>Low</threshold>
+					<skip>${spotbugs.skip}</skip>
+					<failOnError>${spotbugs.failOnError}</failOnError>
+					<excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
+				</configuration>
+				<dependencies>
+					<dependency>
+						<groupId>com.h3xstream.findsecbugs</groupId>
+						<artifactId>findsecbugs-plugin</artifactId>
+						<version>1.13.0</version>
+					</dependency>
+				</dependencies>
 			</plugin>
 		</plugins>
 	</build>

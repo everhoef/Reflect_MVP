@@ -99,6 +99,31 @@ To run a single test:
 ./mvnw test -Dtest=ClassName#methodName
 ```
 
+To enable the local Conventional Commit hook once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+## CI/CD and GitOps
+
+CI runs on every push to `main` and on every pull request targeting `main`.
+
+- **Test gate**: `./mvnw clean test` (Java + Testcontainers) and `cd frontend && npm test` (Vitest)
+- **Image build**: Paketo buildpacks via `./mvnw spring-boot:build-image`
+- **Registry**: GHCR — `ghcr.io/reflect-direct/facilitator`
+- **GitOps source of truth**: `Reflect-Direct/reflect-direct-gitops` (organization-wide GitOps repo; `main` promotions update long-lived environments there)
+- **Preview environments**: add the `preview` label to a PR to publish a preview image (`pr-<PR_NUMBER>-<SHORT_SHA>`) for Flux Operator ResourceSet-based GitHub PR preview environments; previews are created from a `ResourceSetInputProvider` (`spec.type: GitHubPullRequest`) feeding a `ResourceSet`, not by commits to the GitOps repo
+
+### Versioning model
+
+- **Maven project version** (`pom.xml`, currently `0.0.1-SNAPSHOT`) is the development/build version for the app source.
+- **Deployment image version** is controlled by Git context in CI:
+  - PR previews: `pr-<PR_NUMBER>-<SHORT_SHA>`
+  - `main` promotions: `sha-<SHORT_SHA>`
+  - formal releases only: Git tag `vX.Y.Z` publishes image `X.Y.Z`
+- The built OCI image metadata is stamped from the CI-derived deployment version, so runtime/deployment identity does not silently depend on the Maven snapshot string.
+
 ## Project structure
 
 ```text

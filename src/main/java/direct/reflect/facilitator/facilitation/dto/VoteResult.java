@@ -10,4 +10,4 @@ public record VoteResult(
 
     @Schema(description = "Updated total vote count for this response")
     int voteCount
-) {}
+) { }

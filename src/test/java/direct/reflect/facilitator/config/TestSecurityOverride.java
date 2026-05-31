@@ -12,7 +12,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.SimpleUrlLogoutSuccessHandler;
 
-import direct.reflect.facilitator.common.config.SecurityConfig;
+import direct.reflect.facilitator.auth.infrastructure.security.SecurityConfig;
 
 @TestConfiguration
 @EnableWebSecurity
@@ -43,9 +43,8 @@ public class TestSecurityOverride {
                 .requestMatchers("/actuator/health/**").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/", "/home").authenticated()
-                .requestMatchers("/api/retro/*/join").authenticated()
-                .requestMatchers("/api/retro/*/participants").authenticated()
-                .requestMatchers("/api/retro/*/events").authenticated()
+                .requestMatchers("/api/retros/**").authenticated()
+                .requestMatchers("/api/me/retros/active").authenticated()
                 .requestMatchers("/retro/**").authenticated()
                 .requestMatchers("/api/user/**").authenticated()
                 .requestMatchers("/profile/**").authenticated()

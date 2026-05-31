@@ -10,4 +10,4 @@ public record SubmitResponseResult(
 
     @Schema(description = "ID of the step the response belongs to", example = "1")
     Long stepId
-) {}
+) { }

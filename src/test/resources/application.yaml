@@ -55,10 +55,10 @@ facilitator:
 
 logging:
   level:
-    "[direct.reflect.facilitator.integration]": INFO
-    "[direct.reflect.facilitator.integration.BaseIntegrationTest]": DEBUG
-    "[direct.reflect.facilitator.facilitation]": DEBUG
-    "[direct.reflect.facilitator.eventing]": DEBUG
+    "[direct.reflect.facilitator.e2e]": INFO
+    "[direct.reflect.facilitator.e2e.support.BaseEndToEndTest]": INFO
+    "[direct.reflect.facilitator.facilitation]": INFO
+    "[direct.reflect.facilitator.eventing]": INFO
     "[direct.reflect.facilitator.web]": WARN
     "[direct.reflect.facilitator.auth]": WARN
     "[direct.reflect.facilitator.common]": ERROR

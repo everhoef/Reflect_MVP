@@ -9,16 +9,20 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
+import direct.reflect.facilitator.facilitation.session.RetroSyncVersionQuery;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for EventService focusing on:
@@ -41,7 +45,7 @@ class EventServiceTest {
     private ObjectMapper objectMapper;
 
     @Mock
-    private RetroSyncVersionService retroSyncVersionService;
+    private RetroSyncVersionQuery retroSyncVersionQuery;
 
     private EventService eventService;
     private UUID testRetroId;
@@ -52,7 +56,7 @@ class EventServiceTest {
                 redisTemplate,
                 objectMapper,
                 applicationEventPublisher,
-                retroSyncVersionService);
+                retroSyncVersionQuery);
         testRetroId = UUID.randomUUID();
         ReflectionTestUtils.setField(eventService, "sseTimeoutMs", 3600000L);
     }
@@ -240,7 +244,7 @@ class EventServiceTest {
 
     @Test
     void shouldCreateSseEnvelopeWithAuthoritativeSyncVersion() {
-        when(retroSyncVersionService.getSyncVersion(testRetroId)).thenReturn(14L);
+        when(retroSyncVersionQuery.getSyncVersion(testRetroId)).thenReturn(14L);
 
         RetroEvent<String> event = RetroEvent.participantJoined(testRetroId, "Alice");
 
@@ -255,7 +259,7 @@ class EventServiceTest {
         UUID participantId = UUID.randomUUID();
         RetroEvent<String> event = RetroEvent.participantJoined(testRetroId, "Alice");
 
-        when(retroSyncVersionService.getSyncVersion(testRetroId)).thenReturn(22L);
+        when(retroSyncVersionQuery.getSyncVersion(testRetroId)).thenReturn(22L);
         when(objectMapper.writeValueAsString(any())).thenReturn("{\"syncVersion\":22,\"payload\":\"Alice\"}");
 
         eventService.createSseEmitter(testRetroId, participantId, "Test User");

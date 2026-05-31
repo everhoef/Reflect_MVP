@@ -1,11 +1,10 @@
 package direct.reflect.facilitator.facilitation.actions;
 
-import direct.reflect.facilitator.common.exception.ResourceNotFoundException;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
-import direct.reflect.facilitator.facilitation.Participant;
-import direct.reflect.facilitator.facilitation.ParticipantService;
-import direct.reflect.facilitator.facilitation.RetroSyncVersionService;
+import direct.reflect.facilitator.facilitation.participant.Participant;
+import direct.reflect.facilitator.facilitation.participant.ParticipantService;
+import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.List;
@@ -129,7 +128,7 @@ public class ActionItemService {
 
     private ActionItem getActionItemOrThrow(UUID retroId, UUID actionId) {
         return actionItemRepository.findByIdAndRetroSessionId(actionId, retroId)
-                .orElseThrow(() -> new ResourceNotFoundException("Action item not found: " + actionId));
+                .orElseThrow(() -> new ActionItemNotFoundException(actionId));
     }
 
     private void publishActionEvent(
