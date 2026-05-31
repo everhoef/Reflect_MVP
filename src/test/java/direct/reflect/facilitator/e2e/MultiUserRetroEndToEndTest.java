@@ -94,20 +94,20 @@ public class MultiUserRetroEndToEndTest extends BaseEndToEndTest {
             logTestProgress("PHASE_1", 3, 23, "Fast-forwarding past ESVP input step (ALL_RESPONDED)");
             fastForwardSession(sessionId, RetroPhase.SET_THE_STAGE, 1);
             facilitatorPage.reload();
-            waitForElement(facilitatorPage, "[data-testid='esvp-result-explorer']", SSE_PROPAGATION_TIMEOUT_MS);
+            waitForElement(facilitatorPage, "[data-column='Explorer']", SSE_PROPAGATION_TIMEOUT_MS);
 
-            // Verify all 4 ESVP categories are visible on the facilitator page (reveal mode)
-            logTestProgress("PHASE_1", 4, 23, "Verifying ESVP categories visible at reveal step");
-            log.info("  ├─ Verifying 4 ESVP categories...");
-            assertTrue(facilitatorPage.locator("[data-testid='esvp-result-explorer']").isVisible(),
-                "Explorer result bar should be visible at ESVP reveal step");
-            assertTrue(facilitatorPage.locator("[data-testid='esvp-result-shopper']").isVisible(),
-                "Shopper result bar should be visible at ESVP reveal step");
-            assertTrue(facilitatorPage.locator("[data-testid='esvp-result-vacationer']").isVisible(),
-                "Vacationer result bar should be visible at ESVP reveal step");
-            assertTrue(facilitatorPage.locator("[data-testid='esvp-result-prisoner']").isVisible(),
-                "Prisoner result bar should be visible at ESVP reveal step");
-            log.info("  ├─ ✅ All 4 ESVP categories visible");
+            // Verify all 4 ESVP columns are visible on the facilitator page
+            logTestProgress("PHASE_1", 4, 23, "Verifying ESVP columns visible at reveal step");
+            log.info("  ├─ Verifying 4 ESVP columns...");
+            assertTrue(facilitatorPage.locator("[data-column='Explorer']").isVisible(),
+                "Explorer column should be visible at ESVP reveal step");
+            assertTrue(facilitatorPage.locator("[data-column='Shopper']").isVisible(),
+                "Shopper column should be visible at ESVP reveal step");
+            assertTrue(facilitatorPage.locator("[data-column='Vacationer']").isVisible(),
+                "Vacationer column should be visible at ESVP reveal step");
+            assertTrue(facilitatorPage.locator("[data-column='Prisoner']").isVisible(),
+                "Prisoner column should be visible at ESVP reveal step");
+            log.info("  ├─ ✅ All 4 ESVP columns visible");
 
             // Advance from reveal step (FACILITATOR_CLICK) → GATHER_DATA
             clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS);
