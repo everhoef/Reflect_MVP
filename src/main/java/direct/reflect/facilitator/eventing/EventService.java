@@ -1,48 +1,49 @@
 package direct.reflect.facilitator.eventing;
 
+import direct.reflect.facilitator.eventing.infrastructure.redis.RedisPubSubConfig;
+import direct.reflect.facilitator.facilitation.session.RetroSyncVersionQuery;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
-
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.time.LocalDateTime;
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import java.io.IOException;
-import java.util.Map;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
+@RequiredArgsConstructor
 public class EventService {
+
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final RetroSyncVersionQuery retroSyncVersionQuery;
     private final AtomicInteger activeConnections = new AtomicInteger(0);
 
     @Value("${facilitator.sse.timeout-ms:3600000}")
     private long sseTimeoutMs;
 
     // Record to store SSE emitter with participant info
-    private record EmitterConnection(SseEmitter emitter, String participantName) {}
+    private record EmitterConnection(SseEmitter emitter, String participantName) { }
 
     // Local SSE connections for this pod instance
     private final ConcurrentHashMap<String, EmitterConnection> localEmitters = new ConcurrentHashMap<>();
@@ -62,7 +63,7 @@ public class EventService {
 
         log.info("EventService initialized - SSE keep-alive scheduled every 30s");
     }
-    
+
     @PreDestroy
     public void cleanup() {
         // Close all local SSE connections
@@ -75,7 +76,7 @@ public class EventService {
         });
         keepAliveExecutor.shutdown();
     }
-    
+
     /**
      * Publishes RetroEvent with transaction awareness.
      *
@@ -154,10 +155,10 @@ public class EventService {
 
         emitter.onError((error) -> {
             // Check if this is a normal client disconnection (user navigating away)
-            boolean isClientDisconnection = error instanceof org.springframework.web.context.request.async.AsyncRequestNotUsableException ||
-                error.getMessage().contains("Broken pipe") ||
-                error.getMessage().contains("Connection reset") ||
-                error.getMessage().contains("disconnected client");
+            boolean isClientDisconnection = error instanceof org.springframework.web.context.request.async.AsyncRequestNotUsableException
+                || error.getMessage().contains("Broken pipe")
+                || error.getMessage().contains("Connection reset")
+                || error.getMessage().contains("disconnected client");
 
             if (isClientDisconnection) {
                 log.trace("SSE connection closed by client for participant {} in retro {}", participantInfo, retroId);
@@ -181,30 +182,36 @@ public class EventService {
             log.error("[SSE] Failed to establish connection for {}: {}",
                 participantInfo, e.getMessage());
             cleanupConnection(connectionId, emitter, participantInfo, retroId);
-            throw new RuntimeException("Failed to establish SSE connection", e);
+            throw new IllegalStateException("Failed to establish SSE connection", e);
         }
 
         return emitter;
     }
-    
+
     /**
      * Thread-safe cleanup method to avoid double-decrements.
      */
     private void cleanupConnection(String connectionId, SseEmitter emitter, String participantInfo, UUID retroId) {
-        // Only cleanup if the emitter in the map matches the one we're cleaning up
-        // This prevents race conditions where multiple cleanup calls happen for the same connection
-        if (localEmitters.remove(connectionId, emitter)) {
-            activeConnections.decrementAndGet();
-            log.trace("Cleaned up SSE connection for participant {} in retro {} (active: {})", participantInfo, retroId, activeConnections.get());
+        EmitterConnection existingConnection = localEmitters.get(connectionId);
+
+        // Only cleanup if the stored connection still points at this emitter.
+        // localEmitters stores EmitterConnection wrappers, so remove using the wrapper value.
+        if (existingConnection != null
+                && existingConnection.emitter() == emitter
+                && localEmitters.remove(connectionId, existingConnection)) {
+            int remainingConnections = activeConnections.decrementAndGet();
+            log.trace("Cleaned up SSE connection for participant {} in retro {} (active: {})",
+                participantInfo, retroId, remainingConnections);
             try {
                 emitter.complete();
             } catch (Exception e) {
                 // Silently ignore completion errors during cleanup - these are expected when client disconnects
-                log.trace("Error completing emitter during cleanup for participant {} in retro {} (expected): {}", participantInfo, retroId, e.getMessage());
+                log.trace("Error completing emitter during cleanup for participant {} in retro {} (expected): {}",
+                    participantInfo, retroId, e.getMessage());
             }
         }
     }
-    
+
     /**
      * Send to local emitters.
      */
@@ -226,7 +233,7 @@ public class EventService {
 
         String eventData;
         try {
-            eventData = event.payload() != null ? objectMapper.writeValueAsString(event.payload()) : "null";
+            eventData = objectMapper.writeValueAsString(toSseEnvelope(event));
         } catch (JacksonException e) {
             log.error("[{}] Failed to serialize payload for event type {}: {}",
                 event.correlationId(), event.type(), e.getMessage());
@@ -241,7 +248,7 @@ public class EventService {
             try {
                 entry.getValue().emitter().send(SseEmitter.event()
                     .id(event.correlationId())
-                    .name(event.type().name().toLowerCase())
+                    .name(event.type().name().toLowerCase(Locale.ROOT))
                     .data(eventData));
 
                 log.trace("[{}] Delivered to {}", event.correlationId(), participantName);
@@ -259,7 +266,12 @@ public class EventService {
         log.debug("[{}] Broadcast completed: {} succeeded, {} failed",
             event.correlationId(), successCount, failureCount);
     }
-    
+
+    RetroSseEnvelope<?> toSseEnvelope(RetroEvent<?> event) {
+        long syncVersion = retroSyncVersionQuery.getSyncVersion(event.retroId());
+        return new RetroSseEnvelope<>(syncVersion, event.payload());
+    }
+
     /**
      * Send keep-alive messages to all active connections.
      */
@@ -348,7 +360,7 @@ public class EventService {
      * Most code should call publish() instead, which provides transaction awareness.
      */
     private void broadcastToRedis(RetroEvent<?> event) {
-        String channel = "retro:" + event.retroId();
+        String channel = RedisPubSubConfig.getChannelForRetro(event.retroId().toString());
 
         // Broadcast to Redis Pub/Sub (all pods will receive)
         // RedisTemplate handles JSON serialization automatically

@@ -2,49 +2,42 @@ package direct.reflect.facilitator.facilitation.response;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import direct.reflect.facilitator.facilitation.RetroSession;
-import direct.reflect.facilitator.facilitation.Participant;
-import direct.reflect.facilitator.facilitation.ParticipantService;
-import direct.reflect.facilitator.facilitation.RetroSessionService;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
+import direct.reflect.facilitator.facilitation.participant.Participant;
+import direct.reflect.facilitator.facilitation.participant.ParticipantService;
+import direct.reflect.facilitator.facilitation.session.RetroSessionService;
+import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
+import direct.reflect.facilitator.facilitation.session.InvalidSessionStateException;
+import direct.reflect.facilitator.facilitation.session.InvalidStepException;
 import direct.reflect.facilitator.facilitation.dto.ComponentResponseDto;
 import direct.reflect.facilitator.configurator.RetroStep;
 import direct.reflect.facilitator.configurator.RetroStage;
 import direct.reflect.facilitator.configurator.ComponentType;
-import direct.reflect.facilitator.configurator.RetroStepRepository;
+import direct.reflect.facilitator.configurator.RetroStepQueryService;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
-import direct.reflect.facilitator.common.exception.RetroSessionNotFoundException;
-import direct.reflect.facilitator.common.exception.InvalidSessionStateException;
-import direct.reflect.facilitator.common.exception.InvalidStepException;
-import direct.reflect.facilitator.common.exception.ParticipantNotFoundException;
-import direct.reflect.facilitator.common.exception.VoteLimitExceededException;
-import direct.reflect.facilitator.common.exception.InputLimitExceededException;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
 @Service
 @Transactional
-@RequiredArgsConstructor
 @Slf4j
+@RequiredArgsConstructor
 public class ResponseService {
-
     private final ParticipantResponseRepository responseRepository;
-    private final RetroStepRepository retroStepRepository;
+    private final RetroStepQueryService retroStepQueryService;
     private final EventService eventService;
     private final RetroSessionService retroSessionService;
     private final ParticipantService participantService;
+    private final RetroSyncVersionService retroSyncVersionService;
 
     /**
      * Polymorphic method accepting ComponentResponseDto.
@@ -142,6 +135,7 @@ public class ResponseService {
         }
 
         ParticipantResponse savedResponse = responseRepository.save(response);
+        retroSyncVersionService.bumpSyncVersion(session.getId());
         publishResponseSubmittedEvent(session.getId(), savedResponse);
 
         return savedResponse;
@@ -185,6 +179,7 @@ public class ResponseService {
         response.setEditedAt(LocalDateTime.now());
 
         ParticipantResponse saved = responseRepository.save(response);
+        retroSyncVersionService.bumpSyncVersion(response.getParticipant().getSession().getId());
         log.info("Updated response {} by participant {}", responseId, participant.getDisplayName());
 
         publishResponseSubmittedEvent(response.getParticipant().getSession().getId(), saved);
@@ -226,6 +221,7 @@ public class ResponseService {
         List<ParticipantResponse> responses = responseRepository.findBySessionAndRetroStep(session, step);
         responses.forEach(response -> response.setIsVisible(true));
         responseRepository.saveAll(responses);
+        retroSyncVersionService.bumpSyncVersion(session.getId());
 
         log.info("Revealed {} responses for step {} in session {}", responses.size(), stepId, session.getId());
 
@@ -305,6 +301,7 @@ public class ResponseService {
 
         response.setEditedAt(LocalDateTime.now());
         ParticipantResponse saved = responseRepository.save(response);
+        retroSyncVersionService.bumpSyncVersion(retroId);
 
         // Publish event to refresh UI for all participants
         publishResponseSubmittedEvent(retroId, saved);
@@ -325,8 +322,7 @@ public class ResponseService {
     }
 
     private RetroStep getRetroStepById(Long stepId) {
-        return retroStepRepository.findById(stepId)
-            .orElseThrow(() -> new IllegalArgumentException("RetroStep not found with ID: " + stepId));
+        return retroStepQueryService.getStepById(stepId);
     }
 
     private void publishResponseSubmittedEvent(UUID retroId, ParticipantResponse response) {

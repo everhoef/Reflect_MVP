@@ -9,7 +9,7 @@ import java.util.List;
 
 @Repository
 public interface RetroStepRepository extends JpaRepository<RetroStep, Long> {
-    
+
     List<RetroStep> findByRetroStageOrderByOrderIndexAsc(RetroStage retroStage);
 
     @Query("SELECT MAX(rs.orderIndex) FROM RetroStep rs WHERE rs.retroStage = :stage")

@@ -16,7 +16,6 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -25,17 +24,23 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @ActiveProfiles({"import"})
 @Testcontainers
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Slf4j
 class RetroTemplateContractTest {
 
     private static final Set<ComponentType> SUPPORTED_COMPONENT_TYPES =
-            EnumSet.of(ComponentType.MULTI_COLUMN_BOARD, ComponentType.RATING_SCALE, ComponentType.HISTOGRAM_CHART, ComponentType.ESVP_SELECTOR);
+            EnumSet.of(
+                    ComponentType.MULTI_COLUMN_BOARD,
+                    ComponentType.RATING_SCALE,
+                    ComponentType.HISTOGRAM_CHART,
+                    ComponentType.SMART_ACTION_BUILDER,
+                    ComponentType.ACTION_REVIEW);
 
     private static final Set<AdvancementTrigger> SUPPORTED_ADVANCEMENT_TRIGGERS =
             EnumSet.of(AdvancementTrigger.AUTO, AdvancementTrigger.FACILITATOR_CLICK,
@@ -93,7 +98,6 @@ class RetroTemplateContractTest {
                 }
             }
 
-            log.info("Loaded {} steps from Default template for contract validation", stepsHolder.size());
             return null;
         });
     }
@@ -158,19 +162,5 @@ class RetroTemplateContractTest {
             assertNotNull(config.get("min"), stepLabel + ": 'min' must not be null");
             assertNotNull(config.get("max"), stepLabel + ": 'max' must not be null");
         }
-
-        if (step.getComponentType() == ComponentType.ESVP_SELECTOR) {
-            assertTrue(config.containsKey("columns"),
-                    stepLabel + ": ESVP_SELECTOR must have 'columns' key");
-            Object columns = config.get("columns");
-            assertNotNull(columns, stepLabel + ": 'columns' must not be null");
-            assertTrue(columns instanceof List,
-                    stepLabel + ": 'columns' must be a List, was " + columns.getClass().getSimpleName());
-            assertEquals(4, ((List<?>) columns).size(),
-                    stepLabel + ": ESVP_SELECTOR must have exactly 4 columns (E/S/V/P)");
-        }
-
-        log.debug("✅ {} (type={}, trigger={}) passed contract",
-                stepLabel, step.getComponentType(), step.getAdvancementTrigger());
     }
 }

@@ -3,29 +3,21 @@ package direct.reflect.facilitator.configurator;
 import direct.reflect.facilitator.eventing.EventService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
-import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.FilterType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
-import direct.reflect.facilitator.common.config.SecurityConfig;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
-import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
@@ -74,7 +66,7 @@ class CsvImporterServiceTest {
                 .findFirst().orElse(null);
         assertNotNull(defaultTemplate);
         assertEquals("Default", defaultTemplate.getName());
-        assertEquals("A concise 5-phase retrospective: ESVP check-in → Mad Sad Glad → Perfection Game → Start Stop Continue → +/- Delta.", defaultTemplate.getDescription());
+        assertEquals("A concise 5-phase retrospective: ESVP check-in → Mad Sad Glad → Perfection Game → Start Stop Continue → Action Review.", defaultTemplate.getDescription());
         assertEquals(3, defaultTemplate.getMaturityLevel());
         assertEquals(true, defaultTemplate.isReleased());
 
@@ -91,14 +83,14 @@ class CsvImporterServiceTest {
         assertEquals("Start Stop Continue", defaultTemplate.getDecideActions().getName());
 
         assertNotNull(defaultTemplate.getCloseRetro());
-        assertEquals("+/- Delta", defaultTemplate.getCloseRetro().getName());
+        assertEquals("Action Review", defaultTemplate.getCloseRetro().getName());
     }
 
     @Test
     @Transactional
     void testImportRetroStages() {
         List<RetroStage> stages = retroStageRepository.findAll();
-        assertEquals(30, stages.size());
+        assertEquals(31, stages.size());
         
         // Verify some key stages are imported correctly
         RetroStage madSadGlad = stages.stream()
@@ -119,7 +111,7 @@ class CsvImporterServiceTest {
     @Transactional
     void testImportRetroStepsOrderedByStage() {
         List<RetroStage> stages = retroStageRepository.findAll();
-        assertEquals(30, stages.size());
+        assertEquals(31, stages.size());
 
         long totalSteps = retroStepRepository.count();
         log.info("Total steps found: {}", totalSteps);
@@ -131,19 +123,22 @@ class CsvImporterServiceTest {
                 .filter(step -> step.getComponentType() == ComponentType.RATING_SCALE).count();
         long histogramSteps = retroStepRepository.findAll().stream()
                 .filter(step -> step.getComponentType() == ComponentType.HISTOGRAM_CHART).count();
-        long esvpSteps = retroStepRepository.findAll().stream()
-                .filter(step -> step.getComponentType() == ComponentType.ESVP_SELECTOR).count();
+        long smartActionBuilderSteps = retroStepRepository.findAll().stream()
+                .filter(step -> step.getComponentType() == ComponentType.SMART_ACTION_BUILDER).count();
+        long actionReviewSteps = retroStepRepository.findAll().stream()
+                .filter(step -> step.getComponentType() == ComponentType.ACTION_REVIEW).count();
 
-        log.info("Component distribution - Board: {}, Rating: {}, Histogram: {}, ESVP: {}",
-                boardSteps, ratingSteps, histogramSteps, esvpSteps);
+        log.info("Component distribution - Board: {}, Rating: {}, Histogram: {}",
+                boardSteps, ratingSteps, histogramSteps);
 
         // For debugging, let's verify the expected total matches what we imported
         assertTrue(totalSteps > 0, "Should have imported some steps");
-        assertEquals(23, totalSteps, "Should have imported all 23 steps from CSV");
-        assertEquals(19, boardSteps, "Should have 19 MULTI_COLUMN_BOARD steps");
+        assertEquals(24, totalSteps, "Should have imported all 24 steps from CSV");
+        assertEquals(20, boardSteps, "Should have 20 MULTI_COLUMN_BOARD steps");
         assertEquals(1, ratingSteps, "Should have 1 RATING_SCALE step");
         assertEquals(1, histogramSteps, "Should have 1 HISTOGRAM_CHART step");
-        assertEquals(2, esvpSteps, "Should have 2 ESVP_SELECTOR steps");
+        assertEquals(1, smartActionBuilderSteps, "Should have 1 SMART_ACTION_BUILDER step");
+        assertEquals(1, actionReviewSteps, "Should have 1 ACTION_REVIEW step");
 
         // Test RetroSteps for each RetroStage, ensuring they are properly ordered
         for (RetroStage stage : stages) {

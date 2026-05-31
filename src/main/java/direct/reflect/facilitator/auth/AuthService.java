@@ -1,18 +1,26 @@
 package direct.reflect.facilitator.auth;
 
+import direct.reflect.facilitator.organization.ManagerTeamAccess;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.context.SecurityContextImpl;
+import org.springframework.stereotype.Component;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Authentication Service for OIDC + Guest hybrid model.
@@ -30,8 +38,12 @@ import java.util.UUID;
  */
 @Component("authService")
 @Slf4j
+@RequiredArgsConstructor
 public class AuthService {
-    
+    private static final UUID OIDC_USER_ID_NAMESPACE = UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
+
+    private final ManagerTeamAccess managerTeamAccess;
+
     /**
      * Get participant ID (subject identifier) for current user.
      * Works for both OIDC users (deterministic UUID from username) and guests (random UUID).
@@ -45,7 +57,7 @@ public class AuthService {
             if (username == null) {
                 throw new IllegalStateException("OIDC session missing authenticatedUser");
             }
-            UUID participantId = generateUserBasedId(username);
+            UUID participantId = toOidcUserId(username);
             log.debug("Retrieved OIDC participantId: {} for username: {}, httpSessionId: {}",
                 participantId, username, session.getId());
             return participantId;
@@ -56,7 +68,7 @@ public class AuthService {
             return participantId;
         }
     }
-    
+
     /**
      * Get username for current user (null for guests).
      * Corresponds to OIDC 'preferred_username' claim.
@@ -68,7 +80,7 @@ public class AuthService {
         }
         return null; // Guests don't have usernames
     }
-    
+
     /**
      * Get display name for current user.
      * Corresponds to OIDC 'name' claim or guest-provided display name.
@@ -78,7 +90,7 @@ public class AuthService {
         if (session == null) {
             throw new IllegalStateException("No session found - user must be authenticated or initialized as guest");
         }
-        
+
         String authType = (String) session.getAttribute("authType");
         if ("OIDC".equals(authType)) {
             String oidcDisplayName = (String) session.getAttribute("userDisplayName");
@@ -94,7 +106,7 @@ public class AuthService {
             return guestDisplayName;
         }
     }
-    
+
     /**
      * Check if current user is OIDC authenticated.
      */
@@ -102,7 +114,42 @@ public class AuthService {
         HttpSession session = request.getSession(false);
         return session != null && "OIDC".equals(session.getAttribute("authType"));
     }
-    
+
+    public Set<GrantedAuthority> resolveOidcAuthorities(Collection<? extends GrantedAuthority> existingAuthorities,
+                                                        String username) {
+        Set<GrantedAuthority> authorities = new HashSet<>(existingAuthorities);
+        authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+
+        if (hasManagerRole(username)) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_MANAGER"));
+        }
+
+        return authorities;
+    }
+
+    public boolean hasManagerRole(String username) {
+        UUID userId = toOidcUserId(username);
+        return managerTeamAccess.hasManagerRole(userId);
+    }
+
+    public Optional<UUID> findSingleManagedTeamId(HttpServletRequest request) {
+        String username = getUsername(request);
+        if (username == null || username.isBlank()) {
+            return Optional.empty();
+        }
+
+        UUID userId = toOidcUserId(username);
+        return managerTeamAccess.findSingleManagedTeamId(userId);
+    }
+
+    public UUID toOidcUserId(String username) {
+        if (username == null || username.isBlank()) {
+            throw new IllegalArgumentException("OIDC username cannot be blank");
+        }
+
+        return UUID.nameUUIDFromBytes((OIDC_USER_ID_NAMESPACE + username).getBytes(StandardCharsets.UTF_8));
+    }
+
     /**
      * Initialize guest session using unified session structure.
      * Allows duplicate display names (like Zoom/Teams) - backend uses unique UUIDs.
@@ -111,59 +158,49 @@ public class AuthService {
         if (displayName == null || displayName.trim().isEmpty()) {
             throw new IllegalArgumentException("Guest display name cannot be empty");
         }
-        
+
         HttpSession session = request.getSession(true);
         String trimmedDisplayName = displayName.trim();
-        
+
         // Generate unique guest ID (acts as the "username" for guests)
-        UUID guestId = UUID.randomUUID();
-        String guestUsername = guestId.toString();
-        
+        String guestUsername = UUID.randomUUID().toString();
+
         // Use SAME session structure as OIDC for consistency
         session.setAttribute("authenticatedUser", guestUsername);     // Unique UUID
         session.setAttribute("userDisplayName", trimmedDisplayName);  // Can be duplicate
         session.setAttribute("authType", "GUEST");
-        
+
         // Set up Spring Security authentication
         Authentication guestAuth = new UsernamePasswordAuthenticationToken(
             guestUsername, // Use unique guest ID as principal for Spring Security
             null, // No credentials for guests
             List.of(new SimpleGrantedAuthority("ROLE_GUEST"))
         );
-        
+
         // Set security context
         SecurityContext context = new SecurityContextImpl(guestAuth);
         SecurityContextHolder.setContext(context);
-        
+
         // Ensure context is properly saved to session - force explicit save
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
-        
+
         log.debug("Saved Spring Security context to session for guest: {}", guestUsername);
-        
+
         log.info("Guest '{}' authenticated with unique ID: {}", trimmedDisplayName, guestUsername);
     }
-    
+
     /**
      * Get guest participant ID from session.
      */
     private UUID getOrCreateGuestId(HttpSession session) {
         String guestUsername = (String) session.getAttribute("authenticatedUser");
-        
+
         if (guestUsername == null) {
             throw new IllegalStateException("No guest session found - call initializeGuestSession first");
         }
-        
+
         // The guest username is the UUID string, convert it back to UUID
         return UUID.fromString(guestUsername);
     }
-    
-    /**
-     * Generate consistent UUID for OIDC users based on username.
-     * Uses UUID v5 (namespace-based) for deterministic results.
-     */
-    private UUID generateUserBasedId(String username) {
-        // Use standard namespace UUID for consistent hashing
-        UUID namespace = UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
-        return UUID.nameUUIDFromBytes((namespace.toString() + username).getBytes());
-    }
+
 }

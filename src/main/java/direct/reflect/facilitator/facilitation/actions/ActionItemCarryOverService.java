@@ -1,0 +1,43 @@
+package direct.reflect.facilitator.facilitation.actions;
+
+import direct.reflect.facilitator.facilitation.session.RetroPhase;
+import direct.reflect.facilitator.facilitation.session.RetroSession;
+import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
+import direct.reflect.facilitator.facilitation.session.RetroSessionNotFoundException;
+import java.util.List;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class ActionItemCarryOverService {
+
+  private final RetroSessionRepository sessionRepository;
+  private final ActionItemRepository actionItemRepository;
+
+  public List<ActionItemDto> getPreviousOpenActions(UUID retroId) {
+    RetroSession currentSession = sessionRepository.findById(retroId)
+        .orElseThrow(() -> new RetroSessionNotFoundException(retroId));
+
+    UUID teamId = currentSession.getTeamId();
+    if (teamId == null || currentSession.getCreatedAt() == null) {
+      return List.of();
+    }
+
+    return sessionRepository
+        .findFirstByTeamIdAndPhaseAndIdNotAndCreatedAtBeforeOrderByFinishedAtDescCreatedAtDesc(
+            teamId,
+            RetroPhase.COMPLETED,
+            currentSession.getId(),
+            currentSession.getCreatedAt())
+        .map(previousSession -> actionItemRepository
+            .findByRetroSessionIdAndStatus(previousSession.getId(), ActionItemStatus.OPEN)
+            .stream()
+            .map(ActionItemDto::from)
+            .toList())
+        .orElseGet(List::of);
+  }
+}

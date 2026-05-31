@@ -1,6 +1,5 @@
 package direct.reflect.facilitator.facilitation.dto;
 
-import tools.jackson.databind.ObjectMapper;
 import direct.reflect.facilitator.facilitation.response.ParticipantResponse;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -42,7 +41,6 @@ public record ColumnResponseDto(
     String clusterName
 ) implements ComponentResponseDto {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /**
      * Convert a ParticipantResponse entity to a ColumnResponseDto.

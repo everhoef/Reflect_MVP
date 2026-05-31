@@ -1,14 +1,13 @@
 package direct.reflect.facilitator.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * Authentication Controller - handles guest authentication and logout.
@@ -48,8 +47,8 @@ public class AuthController {
     @PostMapping("/guest")
     public String authenticateGuest(HttpServletRequest request, String displayName) {
 
-        log.info("=== GUEST AUTHENTICATION ===");
-        log.info("Display name: {}", displayName);
+        log.debug("=== GUEST AUTHENTICATION ===");
+        log.debug("Display name: {}", displayName);
 
         if (displayName == null || displayName.trim().isEmpty()) {
             return "redirect:/login?error=missing_display_name";
@@ -59,7 +58,7 @@ public class AuthController {
             // Initialize guest session - same structure as OIDC users for consistency
             // This clears any existing OIDC session data to ensure clean isolation
             authenticationHelper.initializeGuestSession(request, displayName.trim());
-            log.info("Guest '{}' successfully authenticated", displayName.trim());
+            log.debug("Guest '{}' successfully authenticated", displayName.trim());
 
             return "redirect:/";
         } catch (Exception e) {
@@ -75,10 +74,10 @@ public class AuthController {
     public String logout(HttpServletRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null) {
-            log.info("Logging out user: {} (type: {})", 
+            log.debug("Logging out user: {} (type: {})",
                 auth.getName(), auth.getClass().getSimpleName());
         }
-        
+
         // Spring Security logout handles session clearing automatically
         return "redirect:/login";
     }

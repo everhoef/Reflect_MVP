@@ -162,12 +162,29 @@ The application follows **function-oriented modular architecture** organized aro
 - **Low Coupling**: Minimize dependencies between modules through interfaces and dependency injection
 - **High Cohesion**: Group related functionality within the same module
 
-### Module Organization (by business function)
-- **configurator**: Template/stage/step definitions, CSV import, participant responses
-- **facilitation**: Sessions, participants, retrospective flow control
-- **eventing**: Real-time SSE event streaming and notifications
-- **auth**: Authentication (OIDC + guest mode with CookieAuthenticationToken)
-- **common**: Shared utilities, exceptions, configurations
+### Module Organization, current implemented structure
+- **Business domains**
+  - **facilitation**: The most fully split backend module. Current capability packages are `session/`, `participant/`, `response/`, `actions/`, `clustering/`, and `escalation/`, plus shared `facilitation/dto/` for cross-capability response wrappers that have not been moved deeper yet.
+  - **configurator**: Still mostly flat today. Templates, stages, steps, CSV import, repositories, and component contract enums still live directly under `configurator/`.
+  - **organization**: Still mostly flat today. Organizations, teams, memberships, repositories, DTOs, and services still live directly under `organization/`.
+- **Support modules**
+  - **auth**: Partially layered today. `AuthController`, `AuthApiController`, and `AuthService` are still flat under `auth/`, while infrastructure moved under `auth/infrastructure/security/` and `auth/infrastructure/session/`.
+  - **eventing**: Partially layered today. `EventService`, `RetroEventController`, `RetroEvent`, and `RetroSseEnvelope` are still flat under `eventing/`, while Redis wiring lives under `eventing/infrastructure/redis/`.
+- **Shared kernel and app shell**
+  - **common**: Now reduced to `common/ids/` only. Keep it tiny and policy-free.
+  - **web**: Already split into `web/api/` and `web/infrastructure/` for shared HTTP glue such as `ApiExceptionHandler` and MVC config.
+
+The original refactor plan aimed for broader `api`, `application`, `domain`, and `infrastructure` layering across every backend module. That target is only partially realized. Treat the package tree above as the source of truth for current work.
+
+### Pragmatic Module and Layer Guardrails
+
+- Prefer `api`, `application`, `domain`, and `infrastructure` as the internal layer vocabulary when a module already uses that split, or when a task is explicitly extending an existing seam.
+- Do not create empty layer packages just for symmetry. Flat modules such as `configurator/` and `organization/` are still valid current structure.
+- Keep dependency direction clear where layered packages already exist: `api` calls owned application surfaces, application coordinates domain behavior, and infrastructure supports the owning module.
+- Business domains may call support modules only through narrow owned surfaces. Support modules carry transport, identity, and integration mechanics, not product rules.
+- Do not import another module's repositories or JPA entities directly. Prefer a small query or service surface owned by the source module.
+- `common` must stay tiny, generic, and dependency-light. In current code that means `common/ids/`, not a new dumping ground.
+- When adding backend code, extend the structure that already exists. New facilitation work should usually land in one of the capability packages. New auth, eventing, configurator, or organization work should follow the current package shape unless the task explicitly finishes a deeper package move.
 
 ### Domain Model
 
@@ -218,8 +235,22 @@ Custom cookie-based authentication supporting two modes:
 
 The frontend treats the React component tree similarly to how a DevOps engineer treats a cluster: state is managed centrally, and components are decoupled micro-units that discover each other dynamically.
 
+### Current frontend structure, implemented truth
+
+- The frontend is still mostly organized by type, not by full feature module.
+- Current source-of-truth directories are:
+  - `pages/` for route-level page shells and composition
+  - `components/retro/` for retro activity UI and facilitation-specific widgets
+  - `components/ui/` for generic UI primitives
+  - `hooks/api/` for API and TanStack Query hooks
+  - `store/` for the current Zustand stores
+  - `lib/` for shared helpers and the API client
+  - `types/` for shared and generated TypeScript types
+- The broader `App/`, `modules/`, and `shared/` tree from the original refactor proposal is not the current implemented structure. Do not write docs or new code as if `frontend/src/modules`, `frontend/src/shared`, or `frontend/src/app` already exist.
+- Current frontend boundary enforcement is intentionally narrow. It only guards the directories that really exist today, not the broader aspirational module split from the plan.
+
 ### State Management (Zustand)
-We use **Zustand** as our global state manager (e.g., `assistantStore.ts`). 
+We use **Zustand** as our global state manager (currently `frontend/src/store/assistantStore.ts` and `frontend/src/store/retroStore.ts`). 
 - **DevOps Analogy**: Think of Zustand as an in-memory Redis cache or `etcd` for the browser. Instead of passing data down through a deep tree of components (which is like passing configuration through 10 layers of bash scripts), components can simply subscribe directly to the "cache".
 - **Usage**: Use Zustand for state that needs to be accessed by wildly different parts of the application (like the Assistant/Guidance state, which affects the sidebar, coachmarks, and main content simultaneously).
 - **Rule**: Do not put *everything* in Zustand. Only global/cross-cutting concerns. Local UI state (like whether a dropdown is open) belongs in local component state (`useState`).
@@ -384,8 +415,9 @@ Facilitators can ALWAYS advance - the system shows warnings but never blocks. Th
 ## Code Conventions
 
 ### Java Coding Standards
-- Use Lombok annotations (`@Data`, `@RequiredArgsConstructor`, `@Slf4j`) to reduce boilerplate
-- Use `@Slf4j` for logging in all classes
+- Use Lombok by default for Java boilerplate elimination when possible. Prefer Lombok annotations such as `@Getter`, `@Setter`, `@Data`, `@RequiredArgsConstructor`, `@AllArgsConstructor`, `@NoArgsConstructor`, `@Builder`, and `@Slf4j` unless custom behavior is required.
+- Do not hand-write getters, setters, constructors, or logger fields when Lombok can express the intent clearly.
+- Use `@Slf4j` for logging in all classes unless a class genuinely requires a different logger setup.
 - **Logging Policy**: DO NOT add INFO/WARN logs for debugging. Use DEBUG/TRACE level and adjust logging configuration. Only use INFO/WARN for genuinely important production events.
 - Prefer constructor injection over field injection
 - Use `@Service` for all business function implementations
@@ -412,54 +444,63 @@ Facilitators can ALWAYS advance - the system shows warnings but never blocks. Th
 - **Flaky tests are bugs**: A flaky test indicates a real problem — race condition, missing synchronization, incorrect assumptions. Treat flaky tests as P1 bugs and fix immediately.
 - **Test reliability is non-negotiable**: All tests must pass reliably on every run. If a test passes "most of the time", it is broken and must be fixed.
 
+#### Test Ownership and Multi-User Verification
+
+- Lower layers own non-UI correctness where possible. Validation, authorization matrices, persistence invariants, and service guards should stay below the browser layer unless the browser is the only truthful place to prove them.
+- Module-aligned tests should live under the owning top-level package. Extend an existing owner when the workflow or contract matches. Create a new test file only when ownership, runtime, or layer genuinely differs.
+- Browser regressions stay narrow and high-value. Use them for collaboration, SSE propagation, and DOM behavior that lower layers cannot prove honestly.
+- Isolated browser contexts or profiles are the canonical multi-user verification strategy. Shared tabs in one browser context are not valid multi-user evidence.
+- The only approved fallback is one browser actor plus isolated API actors, and only when true browser isolation is unavailable in the current tool or runtime. This fallback does not replace real browser-to-browser collaboration coverage when isolated contexts are available.
+
 #### Test Package Architecture
 
-The test package structure mirrors `src/main/java` as closely as practical:
+The test package structure mirrors `src/main/java` for unit, component, and integration tests. Browser journeys live in their own end-to-end package:
 
-- **`integration/`** — Browser/E2E tests ONLY (enforced by `IntegrationPackageBrowserOnlyTest`). Any non-browser test in this package is a violation.
-- **`facilitation/`** — MockMvc/API and data tests for the facilitation module
-- **`configurator/`** — Import, template, and configurator tests
-- **`auth/`** — Authentication controller and service tests
-- **`eventing/`** — SSE event and contract tests
-- **`common/`** — Architecture enforcement tests (e.g., `IntegrationPackageBrowserOnlyTest`)
-- **`config/`** — Test configuration classes (`TestSecurityOverride`, `TestRedisConfig`)
+- **`e2e/`** — Playwright/browser end-to-end tests only. Shared browser helpers live under `e2e/support/`, and browser suites extend `BaseEndToEndTest`.
+- **`facilitation/`** — Module-owned unit, component, and integration tests for facilitation. Prefer the capability packages `session/`, `participant/`, `response/`, `actions/`, `clustering/`, and `escalation/`. Keep a flat facilitation test only when it intentionally spans multiple facilitation capabilities, such as `AuthorizationMatrixIntegrationTest`.
+- **`configurator/`** — Import, template, contract, and integration tests for configurator ownership.
+- **`organization/`** — Organization, team, membership, and related lower-level tests.
+- **`auth/`** — Authentication controller, service, and security-adjacent lower-level tests.
+- **`eventing/`** — SSE event, transport, and contract tests below the browser layer.
+- **`common/`** — Architecture guardrails and tiny shared-kernel contract tests.
+- **`web/`** — Server-rendered route/controller tests when present.
+- **`config/`** — Test configuration classes (`TestSecurityOverride`, `TestRedisConfig`).
 
 #### Test Layer Taxonomy
 
-Each test class belongs to exactly one layer. The layer determines the package and naming convention.
+Use the test pyramid terms literally: unit + component, integration, and end-to-end. The runtime and package should match the lowest truthful layer that proves the behavior.
 
-**Layer 1 — Browser regression** (`integration/`, extends `BaseIntegrationTest`, Playwright required):
-- `RetroFlowBrowserRegressionTest` — golden-path regression: column rendering, sticky notes, SSE propagation, clustering UI, voting UI, timer controls, stage progress bar
-- `MultiUserRetroBrowserRegressionTest` — multi-user flows, column isolation, privacy mode reveal
-- `SseBrowserTest` — SSE transport (connection, participant_joined, session_started) and UI chain (SSE event → DOM update)
+**Unit + component** (module-owned packages, no browser, focused runtime):
+- `ParticipantServiceTest` — service logic with Mockito and no Spring container.
+- `SessionApiControllerTest`, `ParticipantApiControllerTest`, `ResponseApiControllerTest` — focused controller/component tests in the owning facilitation capability.
+- `RetroTemplateContractTest` — narrow contract coverage without full browser or broad integration setup.
 
-**Layer 2 — Spring/API integration** (`facilitation/`, MockMvc, Testcontainers, no browser):
-- `StepAdvancementApiIntegrationTest` — step index increment, 403 for non-facilitator
-- `ParticipantStateDataIntegrationTest` — participant LEFT/ACTIVE state, FK-safe response preservation
-- `ClusteringApiIntegrationTest` — merge/unmerge/rename/list endpoints
-- `VotingIntegrationTest` — voting API and data contract
-- `AuthorizationMatrixIntegrationTest` — unauthenticated → 401 JSON for all /api/** endpoints
+**Integration** (module-owned packages, Spring/Testcontainers as needed, no browser):
+- `StepAdvancementApiIntegrationTest` — step index increment and 403 for non-facilitator.
+- `ParticipantStateDataIntegrationTest` — participant LEFT/ACTIVE state and FK-safe response preservation.
+- `ClusteringApiIntegrationTest`, `ActionItemApiIntegrationTest`, `EscalationApiIntegrationTest` — endpoint and workflow contracts in their owning capability package.
+- `ClusteringDataModelTest`, `EscalationDataModelTest` — repository and persistence invariants.
+- `TemplateImportIntegrationTest` — configurator import integrity and stage data contracts.
+- `AuthorizationMatrixIntegrationTest` — cross-capability facilitation transport gate for `/api/**`.
 
-**Layer 3 — Configurator/import** (`configurator/`, SpringBootTest, real DB, no browser):
-- `TemplateImportIntegrationTest` — template CSV import integrity and stage data contracts
-
-**Layer 4 — Data/repository** (`facilitation/`, no browser, no MockMvc):
-- `ClusteringDataModelTest` — repository query correctness and entity persistence
-
-**Layer 5 — Contract** (module-aligned package, no browser, no Spring context beyond what's needed):
-- `RetroTemplateContractTest` — template structure contracts
+**End-to-end** (`src/test/java/direct/reflect/facilitator/e2e/`, Playwright required):
+- `RetroFlowEndToEndTest` — golden-path retrospective journey, column rendering, clustering UI, voting UI, and stage progress.
+- `MultiUserRetroEndToEndTest` — multi-user flows, column isolation, and privacy-mode reveal.
+- `SseEndToEndTest` — SSE transport and UI update chain.
+- `SmartActionBuilderEndToEndTest`, `ActionReviewEndToEndTest`, `EscalationVotingEndToEndTest` — browser journeys for user-facing flows that lower layers cannot prove honestly.
 
 #### Test Class Naming Rules
 
-A test class name MUST communicate the layer it operates at and the behaviour it guards. Template names (`Ssc`, `MadSadGlad`, `StartStopContinue`, `HappinessHistogram`, `OriginalFour`) are **banned** in any generic browser regression or API/data test class name. They are only allowed where the class intentionally tests template-specific data integrity (e.g., `TemplateImportIntegrationTest`).
+A test class name MUST communicate the layer it operates at and the behaviour it guards. Template names (`Ssc`, `MadSadGlad`, `StartStopContinue`, `HappinessHistogram`, `OriginalFour`) are **banned** in any generic end-to-end or integration test class name. They are only allowed where the class intentionally tests template-specific data integrity, for example `TemplateImportIntegrationTest`.
 
 Suffix conventions:
-- `BrowserRegressionTest` — Playwright, broad regression scope
-- `BrowserSmokeTest` — Playwright, narrow proof-of-concept check
-- `BrowserTest` — Playwright, focused browser test (e.g., SSE browser tests)
-- `ApiIntegrationTest` — MockMvc, HTTP contract
-- `DataIntegrationTest` — SpringBootTest, real DB, no browser
-- `DataModelTest` — repository query contract
+- `Test` — unit or focused component test in the owning module package.
+- `ApiIntegrationTest` — MockMvc or HTTP integration contract.
+- `DataIntegrationTest` — SpringBootTest, real DB, no browser, service-level or multi-repository workflow contract.
+- `DataModelTest` — narrower persistence contract focused on intentional repository and mapping invariants.
+- `EndToEndTest` — Playwright browser journey under `e2e/`.
+
+Do not add new `BrowserRegressionTest`, `BrowserSmokeTest`, or `BrowserTest` classes. Those names describe the old browser taxonomy that lived under `integration/`.
 
 #### Security Testing Approach
 
@@ -467,6 +508,45 @@ Suffix conventions:
 - **`@WithMockUser`**: Acceptable in tests that mock `AuthService`/`ParticipantService` via `@MockitoBean`. The annotation satisfies the transport gate; the mock controls business authorization.
 - **Do NOT use `@WithMockUser`** in security-critical tests that test the authorization matrix itself — use `SecurityMockMvcRequestPostProcessors.authentication()` + `MockHttpSession` with `authType`/`authenticatedUser` attributes instead.
 - **`spring.security.enabled: false`** must NOT appear in test config — it silently disables all `@PreAuthorize` checks.
+
+#### Cucumber BDD Architecture
+
+The BDD stack uses Cucumber + Playwright to verify user-facing behavior through semantic interaction. It avoids raw Playwright waits and CSS coupling by observing the semantic shell.
+
+| Package | Role | Key Classes |
+|---|---|---|
+| `bdd/` | Runner + Entry Point | `CucumberTestRunner` |
+| `bdd/support/` | Scenario Lifecycle | `CucumberSpringConfiguration`, `PlaywrightWorld` |
+| `bdd/support/context/` | Scenario State | `RetroScenarioContext` |
+| `bdd/support/selectors/` | Semantic Selectors | `RetroSelectors` |
+| `bdd/support/drivers/` | Behavior Surfaces | `RetroSessionDriver`, `ProgressBarDriver`, `SyncDriver` |
+| `bdd/stepdefinitions/` | Gherkin Glue | `VisualClueStageSteps` |
+
+**Architecture Components:**
+- **`CucumberSpringConfiguration`**: Bootstraps the Spring context with Testcontainers (PostgreSQL, Redis) and test-specific security overrides.
+- **`PlaywrightWorld`**: Manages the Playwright browser lifecycle. It provides isolated `BrowserContext` and `Page` instances for each scenario, supporting multi-user flows via `createAdditionalContext()`.
+- **`RetroScenarioContext`**: A `@ScenarioScope` component that carries shared state (session IDs, phase numbers) across step definitions within a single scenario.
+- **`RetroSelectors`**: A central library of semantic selectors. Step definitions and drivers must use these constants instead of raw CSS or XPath strings.
+- **`SyncDriver`**: Observes the `[data-testid='retro-content']` semantic shell to ensure the UI is in sync with the backend. It polls for state changes based on attributes like `data-phase`, `data-step-index`, and the upcoming `data-sync-state`.
+- **`RetroSessionDriver`**: Handles high-level retrospective lifecycle operations such as guest authentication, session creation, and phase advancement.
+- **`ProgressBarDriver`**: Encapsulates interactions with the stage progress indicator, verifying station status, connectors, and spatial orientation.
+
+**Extension Philosophy:**
+- **New Behavior**: Add a dedicated Driver in `bdd/support/drivers/` for complex component interactions.
+- **New Step**: Add Gherkin steps to existing classes in `bdd/stepdefinitions/` or create a new class for a new feature area.
+- **New Selector**: Always add to `RetroSelectors` first. Never use raw selectors in step definitions.
+- **New State**: Use `RetroScenarioContext` for variables that need to persist across steps in one scenario.
+
+**Synchronization and SSE:**
+The BDD stack does not use a raw SSE event driver. Instead, it observes the rendered shell state. The frontend (`useSSE` -> `RetroPage` reconciliation -> `useAppliedVersionStore`) handles the complexity of `signaledVersion` vs `appliedVersion`. Tests observe the outcome via semantic attributes on the `retro-content` container.
+
+**Architecture Guardrails:**
+`ArchitectureGuardrailTest` enforces BDD hygiene:
+- No BDD class may extend `BaseEndToEndTest`.
+- `PendingException` is forbidden in committed code.
+- Raw Playwright waits (`waitForTimeout`, `Thread.sleep`) are forbidden in step definitions.
+- CSS/Layout coupling tokens (Tailwind classes, bounding boxes) are forbidden in drivers and steps.
+- Every `.feature` file must be tagged with `@facilitation` or `@visual-clue-pilot`.
 
 ### Security Considerations
 - Always validate user permissions before operations
@@ -486,10 +566,10 @@ Every feature delivery MUST follow this 5-step process:
 
 1. **PLAN**: User and AI discuss scope via Prometheus interview (~15 min). User defines what to build; AI creates the work plan.
 
-2. **BUILD**: AI agents execute the plan autonomously. No user involvement during this phase. Agent writes BOTH implementation code AND test code (integration tests + Playwright E2E tests).
+2. **BUILD**: AI agents execute the plan autonomously. No user involvement during this phase. Agent writes BOTH implementation code AND test code, integration tests and Playwright end-to-end tests.
 
 3. **VERIFY**: Automated gate — ALL of the following MUST pass:
-   - `./mvnw clean test` — zero failures. This single command runs ALL tests: unit tests, integration tests, AND Playwright E2E tests. There is NO separate Playwright step.
+   - `./mvnw clean verify` — zero failures. This single command runs ALL tests (unit, integration, Playwright) AND static analysis (Checkstyle, PMD, SpotBugs). There is no separate Playwright step.
    - BDD "Critical" scenarios from the Notion story guide test coverage (but NOT 1:1 mapping — see BDD Verification subsection below)
    - After all tests pass, AI agent MUST update the Notion story status to `Needs review` via MCP tool call: `mcp_notion-hosted_notion-update-page` with `command: update_properties`, property `Status: Needs review`
 
@@ -507,12 +587,13 @@ A feature is READY FOR REVIEW when ALL of the following conditions are true:
 
 - [ ] All BDD "Critical" scenarios from the Notion story are covered by tests (NOT necessarily 1:1 — a single test may cover multiple scenarios)
 - [ ] Every new API/View/Event endpoint has an integration test
-- [ ] All frontend functionality is verified via Playwright E2E tests (tests MUST live in `src/test/java/.../integration/`)
-- [ ] `./mvnw clean test` passes with zero failures (this runs everything: unit + integration + Playwright)
+- [ ] All frontend functionality is verified via Playwright end-to-end tests (tests MUST live in `src/test/java/direct/reflect/facilitator/e2e/`)
+- [ ] `./mvnw clean verify` passes with zero failures (this runs everything: unit + integration + Playwright + static analysis)
 - [ ] No `@Disabled`, `@Ignore`, or `@Tag("flaky")` annotations added
 - [ ] No suppressed errors (`@SuppressWarnings`, empty catch blocks, `as any`)
 - [ ] Notion story status updated to `Needs review`
-- [ ] Code follows existing patterns in this AGENTS.md (GRASP, controller separation, Lombok, etc.)
+- [ ] Code follows existing patterns in this AGENTS.md (GRASP, controller separation, Lombok-first boilerplate reduction, etc.)
+- [ ] New Java code uses Lombok for boilerplate by default where appropriate, instead of manual getters, setters, constructors, or logger fields unless custom behavior is required
 
 ### Test Requirements
 
@@ -521,12 +602,12 @@ A feature is READY FOR REVIEW when ALL of the following conditions are true:
 Additional REQUIRED rules for feature delivery:
 
 - **Integration tests**: REQUIRED for every new endpoint (API, View, or Event controller). Use `@SpringBootTest` + Testcontainers. Follow patterns in existing test classes.
-- **Playwright E2E tests**: REQUIRED for every user-facing feature. Tests MUST live in `src/test/java/.../integration/` alongside existing tests (e.g., `RetroFlowBrowserRegressionTest`). MUST capture screenshot evidence.
-- **Regression gate**: `./mvnw clean test` MUST show zero failures TOTAL — not just new tests passing, but ALL existing tests still passing.
+- **Playwright end-to-end tests**: REQUIRED for every user-facing feature. Tests MUST live in `src/test/java/direct/reflect/facilitator/e2e/` alongside the existing browser journeys, for example `RetroFlowEndToEndTest`. They MUST capture screenshot evidence.
+- **Regression gate**: `./mvnw clean verify` MUST show zero failures TOTAL — not just new tests passing, but ALL existing tests still passing.
 
 **Definitions**:
-- **User-facing feature**: Any change visible in the browser UI (new page, new component, changed behavior, new interaction). REQUIRES Playwright E2E tests.
-- **Backend endpoint**: API endpoint, service logic, or data model change with no direct UI impact. REQUIRES integration test only (no Playwright required).
+- **User-facing feature**: Any change visible in the browser UI, new page, new component, changed behavior, new interaction. REQUIRES Playwright end-to-end tests.
+- **Backend endpoint**: API endpoint, service logic, or data model change with no direct UI impact. REQUIRES integration test only, no Playwright required.
 - **Pure refactor**: No behavior change. Existing tests MUST still pass. New tests ONLY if coverage gaps are discovered.
 
 ### BDD Verification
@@ -549,10 +630,20 @@ Additional REQUIRED rules for feature delivery:
 - If Notion MCP is unavailable: delivery proceeds, agent MUST inform user to update Notion status manually
 - **Tool call pattern**: `mcp_notion-hosted_notion-update-page(page_id, command: update_properties, properties: {Status: 'Needs review'})`
 
+### Commit Message Policy
+
+- Use **Conventional Commits** for all commit messages: `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`, `ci:`, and `build:`.
+- Treat Conventional Commits as the basis for release/version semantics when CI/CD automation needs to infer change type.
+- Prefer **early local enforcement** through a repo-managed `commit-msg` git hook so contributors get feedback before pushing.
+- Also enforce the same policy in **CI and branch protection** as a backstop; local hooks alone are not sufficient because they can be bypassed or missing.
+- Tooling such as Commitizen, Husky, Lefthook, or a plain shell `commit-msg` hook is acceptable. Choose the lightest option that the repository can maintain consistently.
+- At minimum, require a CI check that validates either commit messages, PR titles, or both before merge, even if local hooks are present.
+- Do not merge work that bypasses the Conventional Commit policy unless the repo owner explicitly approves an exception.
+
 ### Edge Cases
 
 - **Story with no BDD scenarios**: MUST NOT build. Agent MUST flag this to user. BDD is the acceptance contract.
-- **Pure backend story (no UI)**: Integration tests only. No Playwright E2E required.
+- **Pure backend story (no UI)**: Integration tests only. No Playwright end-to-end coverage required.
 - **Story spanning multiple commits**: Set `Needs review` ONLY on final delivery, NOT on partial deliveries.
 - **Notion MCP unavailable**: Proceed with delivery. Agent MUST notify user to update status manually.
 - **BDD scenario technically infeasible**: Agent MUST document the conflict and ask user for resolution before proceeding.
@@ -623,7 +714,7 @@ docker compose up -d
 
 ### Testing with Testcontainers
 - Tests use Testcontainers for PostgreSQL and Redis — no manual setup needed
-- Playwright E2E tests run as part of the Maven test suite
+- Playwright end-to-end tests run as part of the Maven test suite
 - `./mvnw test` runs unit, integration, and Playwright tests
 
 ### Important Notes
@@ -637,12 +728,12 @@ docker compose up -d
 
 ### Application Management
 
-**User runs the application in a separate iTerm2 terminal tab.**
+**Agent may manage the application directly.**
 
 #### How It Works
-- User runs: `./mvnw spring-boot:run -Dspring-boot.run.profiles=import` in dedicated terminal
-- Spring Boot logs to **both** console (for user) **and** `/tmp/facilitator.log` (for Claude)
-- User sees live logs in their terminal, Claude reads from log file
+- Start the application with `./mvnw spring-boot:run -Dspring-boot.run.profiles=import`
+- Check whether it is already running before starting another instance
+- Use `/tmp/facilitator.log` for log inspection when startup or runtime output is being written there
 
 #### Starting the Application
 1. **Check if running**:
@@ -650,13 +741,12 @@ docker compose up -d
    curl -s http://localhost:8080/ > /dev/null && echo "✅ Running" || echo "❌ Not running"
    ```
 
-2. **If not running**, tell the user:
-   > "Please start the application in a separate iTerm2 tab:
-   > ```bash
-   > ./mvnw spring-boot:run -Dspring-boot.run.profiles=import
-   > ```"
+2. **If not running, start it yourself**:
+   ```bash
+   ./mvnw spring-boot:run -Dspring-boot.run.profiles=import
+   ```
 
-3. Wait for user confirmation before proceeding
+3. Wait until the HTTP check succeeds or the logs show startup completed before proceeding
 
 #### Monitoring Logs (Claude)
 ```bash
@@ -690,6 +780,10 @@ lsof -i :8080
 ps aux | grep -i "[m]vn spring-boot:run"
 ```
 
+#### Manual Multi-User Browser QA
+- Do not use multiple tabs in the same browser to simulate different users. This is fundamentally not possible due to the cookie that is set locally, so you can only have 1 user and 1 session in that browser context.
+- Canonical multi-user QA uses isolated browser contexts or profiles. For manual checks, use two different browsers, two separate browser profiles, or one normal window plus one incognito window only when they are truly isolated.
+
 ### Task Management
 - Use the TodoWrite tool to track multi-step tasks
 - Mark tasks as completed immediately after finishing
@@ -697,7 +791,8 @@ ps aux | grep -i "[m]vn spring-boot:run"
 
 ### Code Generation Patterns
 - Follow Spring MVC patterns (not WebFlux - we use standard Spring MVC)
-- Use Lombok annotations consistently
+- Use Lombok annotations consistently, and default to Lombok for Java boilerplate when it expresses the intent clearly
+- Avoid generating manual getters, setters, constructors, or logger declarations unless the class needs custom behavior that Lombok should not hide
 - Implement proper error handling with custom exceptions
 - Use UUID v7 with `@GeneratedUuidV7` annotation for primary keys
 
@@ -747,7 +842,7 @@ The diff must contain **only the files the partner intended to change**. Reject 
 | `frontend/node_modules/` | Package install output; should never be tracked |
 | `.opencode/oh-my-opencode.json` | Runtime tooling config; ambient drift from OpenCode sessions |
 
-If forbidden files are present, ask the partner to re-run the skill (or fix the branch yourself per the branch-rewrite pattern in `.sisyphus/notepads/pr-skill-and-pr-hygiene/learnings.md`).
+If forbidden files are present, ask the partner to re-run the skill, or fix the branch by removing the forbidden files manually and force-pushing.
 
 ### Step 2: Test Gate
 
@@ -755,12 +850,12 @@ Checkout the branch and run:
 
 ```bash
 git checkout <branch-name>
-./mvnw clean test
+./mvnw clean verify
 ```
 
 Expected: `Tests run: N, Failures: 0, Errors: 0, Skipped: 0` — BUILD SUCCESS.
 
-Zero tolerance. If any test fails, the PR is not ready.
+Zero tolerance. If any test fails or static analysis reports violations, the PR is not ready.
 
 After running tests, restore any drift the Maven build produces. Maven regenerates static assets (new hashed JS/CSS bundles as untracked files) and generated TypeScript types — `git restore` alone is insufficient because new untracked files won't be removed by it:
 
@@ -784,7 +879,7 @@ A clean diff is necessary but not sufficient. The change still needs to be corre
 
 **Merge when all of the following are true:**
 - Diff scope contains only the intended files (no forbidden classes above)
-- `./mvnw clean test` passes with zero failures
+- `./mvnw clean verify` passes with zero failures
 - The content of the change matches the partner's stated intent
 - `gh pr view <N> --json mergeStateStatus` returns `"CLEAN"`
 
@@ -809,8 +904,8 @@ git diff origin/main...<branch> --name-only
 gh pr view <N> --json number,title,state,headRefName,reviews,reviewDecision
 gh api repos/<owner>/<repo>/pulls/<N>/comments
 
-# Run full test suite
-./mvnw clean test
+# Run full regression gate
+./mvnw clean verify
 
 # Check merge eligibility
 gh pr view <N> --json mergeStateStatus

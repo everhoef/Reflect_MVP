@@ -10,4 +10,4 @@ public record UpdateResponseResult(
 
     @Schema(description = "Updated content of the response")
     String content
-) {}
+) { }

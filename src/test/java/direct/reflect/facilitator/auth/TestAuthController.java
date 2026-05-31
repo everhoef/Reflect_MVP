@@ -1,5 +1,12 @@
 package direct.reflect.facilitator.auth;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -15,20 +22,14 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-
 @RestController
 @RequestMapping("/test")
 @Profile("test")
 @Slf4j
+@RequiredArgsConstructor
 public class TestAuthController {
+
+    private final AuthService authService;
 
     @RequestMapping(value = "/login-oauth-user", method = {RequestMethod.POST, RequestMethod.GET})
     public ResponseEntity<String> loginOAuthUser(
@@ -69,7 +70,6 @@ public class TestAuthController {
             request.getSession().setAttribute("userDisplayName", displayName);
             request.getSession().setAttribute("authType", "OIDC");
             request.getSession().removeAttribute("guestDisplayName");
-            request.getSession().removeAttribute("guestId");
 
             return ResponseEntity.status(302)
                 .header("Location", "/")
@@ -78,38 +78,6 @@ public class TestAuthController {
         } catch (Exception e) {
             log.error("Failed to set up OAuth2 test authentication", e);
             return ResponseEntity.internalServerError().body("Authentication setup failed");
-        }
-    }
-
-    @PostMapping("/login-guest-user")
-    public ResponseEntity<String> loginGuestUser(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            @RequestParam(defaultValue = "Guest User") String displayName) {
-
-        try {
-            SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
-            securityContext.setAuthentication(
-                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
-                    displayName,
-                    null,
-                    Collections.singletonList(new SimpleGrantedAuthority("ROLE_GUEST"))
-                )
-            );
-            SecurityContextHolder.setContext(securityContext);
-
-            HttpSessionSecurityContextRepository repository = new HttpSessionSecurityContextRepository();
-            repository.saveContext(securityContext, request, response);
-
-            request.getSession().setAttribute("guestDisplayName", displayName);
-            request.getSession().setAttribute("authType", "GUEST");
-            request.getSession().removeAttribute("authenticatedUser");
-
-            return ResponseEntity.ok("Guest authentication set up for: " + displayName);
-
-        } catch (Exception e) {
-            log.error("Failed to set up guest test authentication", e);
-            return ResponseEntity.internalServerError().body("Guest authentication setup failed");
         }
     }
 

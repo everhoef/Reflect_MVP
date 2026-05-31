@@ -3,7 +3,7 @@ package direct.reflect.facilitator.auth;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,7 +17,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
-@Slf4j
 public class AuthApiController {
 
     private final AuthService authService;
@@ -35,20 +34,26 @@ public class AuthApiController {
         }
 
         HttpSession session = request.getSession(false);
-        String authType = session != null ? (String) session.getAttribute("authType") : null;
+        String authType = resolveAuthType(session, authentication);
         if (authType == null) {
-            return ResponseEntity.status(401)
-                    .body(Map.of(
-                            "error", "Authentication required",
-                            "loginUrl", "/login"
-                    ));
+            return unauthorized();
         }
 
         boolean isGuest = "GUEST".equals(authType);
         String role = isGuest ? "GUEST" : "USER";
 
-        String participantId = authService.getParticipantId(request).toString();
-        String displayName = authService.getDisplayName(request);
+        if (authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"))) {
+            role = "MANAGER";
+        }
+
+        String participantId;
+        String displayName;
+        try {
+            participantId = authService.getParticipantId(request).toString();
+            displayName = authService.getDisplayName(request);
+        } catch (IllegalStateException e) {
+            return unauthorized();
+        }
 
         Map<String, Object> user = new LinkedHashMap<>();
         user.put("id", participantId);
@@ -62,5 +67,36 @@ public class AuthApiController {
         body.put("user", user);
 
         return ResponseEntity.ok(body);
+    }
+
+    private String resolveAuthType(HttpSession session, Authentication authentication) {
+        if (session == null) {
+            return null;
+        }
+
+        String authType = (String) session.getAttribute("authType");
+        if (authType != null) {
+            return authType;
+        }
+
+        if (session.getAttribute("authenticatedUser") == null || session.getAttribute("userDisplayName") == null) {
+            return null;
+        }
+
+        boolean isGuest = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_GUEST"));
+
+        String derivedAuthType = isGuest ? "GUEST" : "OIDC";
+        session.setAttribute("authType", derivedAuthType);
+
+        return derivedAuthType;
+    }
+
+    private ResponseEntity<Map<String, String>> unauthorized() {
+        return ResponseEntity.status(401)
+                .body(Map.of(
+                        "error", "Authentication required",
+                        "loginUrl", "/login"
+                ));
     }
 }
