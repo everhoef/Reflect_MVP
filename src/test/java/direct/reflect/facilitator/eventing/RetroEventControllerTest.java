@@ -1,7 +1,5 @@
 package direct.reflect.facilitator.eventing;
 
-import direct.reflect.facilitator.eventing.EventService;
-import direct.reflect.facilitator.eventing.RetroEvent;
 import direct.reflect.facilitator.facilitation.participant.SseParticipantAccess;
 import direct.reflect.facilitator.facilitation.participant.ParticipantNotFoundException;
 
@@ -12,20 +10,19 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Tests for RetroEventController SSE endpoint functionality.
@@ -94,7 +91,6 @@ class RetroEventControllerTest {
         // when a new session is created, which helps establish SSE connections immediately
         
         UUID retroId = UUID.randomUUID();
-        String sessionName = "Test Session";
         
         RetroEvent<Void> retroCreatedEvent = RetroEvent.retroCreated(retroId, "system");
         
@@ -123,7 +119,7 @@ class RetroEventControllerTest {
         // Verify participant validation was attempted
         verify(sseParticipantAccess).authorizeSseConnection(any(HttpServletRequest.class), eq(retroId));
         // Verify no SSE emitter was created for unauthorized access
-        verify(eventService, org.mockito.Mockito.never()).createSseEmitter(any(UUID.class), any(UUID.class), any(String.class));
+        verify(eventService, never()).createSseEmitter(any(UUID.class), any(UUID.class), any(String.class));
     }
 
     @Test
@@ -163,7 +159,7 @@ class RetroEventControllerTest {
                 .andExpect(status().is3xxRedirection()); // WebMvcTest redirects to login for unauthenticated requests
                 
         // Verify no service methods were called due to authentication failure
-        verify(sseParticipantAccess, org.mockito.Mockito.never()).authorizeSseConnection(any(HttpServletRequest.class), any(UUID.class));
-        verify(eventService, org.mockito.Mockito.never()).createSseEmitter(any(UUID.class), any(UUID.class), any(String.class));
+        verify(sseParticipantAccess, never()).authorizeSseConnection(any(HttpServletRequest.class), any(UUID.class));
+        verify(eventService, never()).createSseEmitter(any(UUID.class), any(UUID.class), any(String.class));
     }
 }

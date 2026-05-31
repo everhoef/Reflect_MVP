@@ -5,8 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -21,11 +19,6 @@ import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
 import direct.reflect.facilitator.facilitation.actions.ActionItem;
 import direct.reflect.facilitator.facilitation.actions.ActionItemRepository;
-import direct.reflect.facilitator.facilitation.escalation.EscalatedItem;
-import direct.reflect.facilitator.facilitation.escalation.EscalatedItemRepository;
-import direct.reflect.facilitator.facilitation.escalation.EscalatedItemVote;
-import direct.reflect.facilitator.facilitation.escalation.EscalatedItemVoteId;
-import direct.reflect.facilitator.facilitation.escalation.EscalatedItemVoteRepository;
 import direct.reflect.facilitator.facilitation.participant.Participant;
 import direct.reflect.facilitator.facilitation.participant.ParticipantRepository;
 import direct.reflect.facilitator.facilitation.participant.ParticipantRole;
@@ -57,9 +50,9 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -175,8 +168,8 @@ class EscalationApiIntegrationTest {
         ActionItem actionItem = saveActionItem(retroSession, "Stabilize cross-team deployment handoff");
 
         mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/escalations", retroSession.getId(), actionItem.getId())
-                        .with(authentication(participantAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(participantAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{" +
                                 "\"problemDescription\":\"Cross-team API dependency blocking releases\"" +
@@ -207,8 +200,8 @@ class EscalationApiIntegrationTest {
         ActionItem actionItem = saveActionItem(retroSession, "Clarify cross-team release ownership");
 
         mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/escalations", retroSession.getId(), actionItem.getId())
-                        .with(authentication(participantAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(participantAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{" +
                                 "\"problemDescription\":\"\"" +
@@ -230,8 +223,8 @@ class EscalationApiIntegrationTest {
         ActionItem actionItem = saveActionItem(retroSession, "Stabilize release ownership");
 
         mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/escalations", retroSession.getId(), actionItem.getId())
-                        .with(authentication(participantAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(participantAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{" +
                                 "\"problemDescription\":\"Cross-team API dependency blocking releases\"" +
@@ -239,8 +232,8 @@ class EscalationApiIntegrationTest {
                 .andExpect(status().isCreated());
 
         mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/escalations", retroSession.getId(), actionItem.getId())
-                        .with(authentication(participantAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(participantAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{" +
                                 "\"problemDescription\":\"Another escalation attempt should be rejected\"" +
@@ -274,8 +267,8 @@ class EscalationApiIntegrationTest {
         when(authService.findSingleManagedTeamId(any(HttpServletRequest.class))).thenReturn(Optional.of(team.getId()));
 
         mockMvc.perform(post("/api/retros")
-                        .with(authentication(managerAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(managerAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{" +
                                 "\"sessionName\":\"Platform Retro\"" +
@@ -292,8 +285,8 @@ class EscalationApiIntegrationTest {
         setCurrentParticipant(facilitator);
 
         mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/escalations", retroSession.getId(), actionItem.getId())
-                        .with(authentication(managerAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(managerAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{" +
                                 "\"problemDescription\":\"Cross-team release ownership is unresolved\"" +
@@ -323,8 +316,8 @@ class EscalationApiIntegrationTest {
         ActionItem actionItem = saveActionItem(retroSession, "Clarify org-wide deployment process");
 
         mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/escalations", retroSession.getId(), actionItem.getId())
-                        .with(authentication(participantAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(participantAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{" +
                                 "\"problemDescription\":\"No owning team exists for this retrospective\"" +
@@ -352,8 +345,8 @@ class EscalationApiIntegrationTest {
                 LocalDateTime.of(2026, 4, 7, 10, 0));
 
         mockMvc.perform(post("/api/retros/{retroId}/escalations/{escalationId}/vote", retroSession.getId(), escalatedItem.getId())
-                        .with(authentication(participantAuth))
-                        .with(csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(participantAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.syncVersion").isNumber())
                 .andExpect(jsonPath("$.escalationId").value(escalatedItem.getId().toString()))
@@ -368,8 +361,8 @@ class EscalationApiIntegrationTest {
         assertThat(escalatedItemVoteRepository.countByEscalatedItemId(escalatedItem.getId())).isEqualTo(1);
 
         mockMvc.perform(post("/api/retros/{retroId}/escalations/{escalationId}/vote", retroSession.getId(), escalatedItem.getId())
-                        .with(authentication(participantAuth))
-                        .with(csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(participantAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.syncVersion").value(afterFirstVoteSyncVersion + 1))
                 .andExpect(jsonPath("$.voteCount").value(0))
@@ -431,7 +424,7 @@ class EscalationApiIntegrationTest {
         saveVote(stillBelowThreshold, participantTwo);
 
         mockMvc.perform(get("/api/retros/{retroId}/escalations", retroSession.getId())
-                        .with(authentication(participantAuth)))
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(participantAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.syncVersion").value(8))
                 .andExpect(jsonPath("$.data[0].syncVersion").value(8))
@@ -465,7 +458,7 @@ class EscalationApiIntegrationTest {
         saveVote(thresholdReached, participantTwo);
 
         mockMvc.perform(get("/api/retros/{retroId}/escalations", retroSession.getId())
-                        .with(authentication(participantAuth)))
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(participantAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.syncVersion").value(6))
                 .andExpect(jsonPath("$.data[0].problemDescription").value("Release handoff is blocked by another team"))
@@ -483,7 +476,7 @@ class EscalationApiIntegrationTest {
         sessionRepository.saveAndFlush(retroSession);
 
         mockMvc.perform(get("/api/retros/{retroId}/escalations", retroSession.getId())
-                        .with(authentication(participantAuth)))
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(participantAuth)))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.syncVersion").value(9))
@@ -495,12 +488,12 @@ class EscalationApiIntegrationTest {
     void managerEscalations_nonManagerIsForbiddenForListAndDetail() throws Exception {
         UUID escalationId = UUID.randomUUID();
 
-        mockMvc.perform(get("/api/manager/escalations").with(authentication(nonManagerAuth)))
+        mockMvc.perform(get("/api/manager/escalations").with(SecurityMockMvcRequestPostProcessors.authentication(nonManagerAuth)))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"error\":\"Access denied\"}"));
 
-        mockMvc.perform(get("/api/manager/escalations/{id}", escalationId).with(authentication(nonManagerAuth)))
+        mockMvc.perform(get("/api/manager/escalations/{id}", escalationId).with(SecurityMockMvcRequestPostProcessors.authentication(nonManagerAuth)))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"error\":\"Access denied\"}"));
@@ -516,7 +509,7 @@ class EscalationApiIntegrationTest {
 
         Participant facilitator = saveParticipant(managedRetro, "Facilitator", ParticipantRole.FACILITATOR);
         Participant participantOne = saveParticipant(managedRetro, "Alice", ParticipantRole.PARTICIPANT);
-        Participant participantTwo = saveParticipant(managedRetro, "Bob", ParticipantRole.PARTICIPANT);
+        saveParticipant(managedRetro, "Bob", ParticipantRole.PARTICIPANT);
         saveParticipant(managedRetro, "Carol", ParticipantRole.PARTICIPANT);
 
         EscalatedItem thresholdMet = saveEscalation(
@@ -544,7 +537,7 @@ class EscalationApiIntegrationTest {
         saveVote(foreignThresholdMet, otherFacilitator);
         saveVote(foreignThresholdMet, otherParticipant);
 
-        mockMvc.perform(get("/api/manager/escalations").with(authentication(managerAuth)))
+        mockMvc.perform(get("/api/manager/escalations").with(SecurityMockMvcRequestPostProcessors.authentication(managerAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(thresholdMet.getId().toString()))
@@ -553,7 +546,7 @@ class EscalationApiIntegrationTest {
                 .andExpect(jsonPath("$[0].threshold").value(3))
                 .andExpect(jsonPath("$[0].thresholdMet").value(true));
 
-        mockMvc.perform(get("/api/manager/escalations/{id}", thresholdMet.getId()).with(authentication(managerAuth)))
+        mockMvc.perform(get("/api/manager/escalations/{id}", thresholdMet.getId()).with(SecurityMockMvcRequestPostProcessors.authentication(managerAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(thresholdMet.getId().toString()))
                 .andExpect(jsonPath("$.problemDescription").value("Cross-team dependency blocks releases"))

@@ -410,6 +410,9 @@
 				</executions>
 				<configuration>
 					<includeTests>true</includeTests>
+					<rulesets>
+						<ruleset>${project.basedir}/pmd-ruleset.xml</ruleset>
+					</rulesets>
 					<failOnViolation>true</failOnViolation>
 					<failurePriority>5</failurePriority>
 					<maxAllowedViolations>${pmd.maxAllowedViolations}</maxAllowedViolations>
@@ -432,7 +435,9 @@
 				</executions>
 				<configuration>
 					<configLocation>checkstyle.xml</configLocation>
+					<includeTestSourceDirectory>true</includeTestSourceDirectory>
 					<failOnViolation>true</failOnViolation>
+					<violationSeverity>warning</violationSeverity>
 					<consoleOutput>true</consoleOutput>
 					<maxAllowedViolations>${checkstyle.maxAllowedViolations}</maxAllowedViolations>
 				</configuration>

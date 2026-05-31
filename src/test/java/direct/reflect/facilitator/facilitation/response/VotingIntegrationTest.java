@@ -1,5 +1,6 @@
 package direct.reflect.facilitator.facilitation.response;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.configurator.RetroStage;
@@ -12,8 +13,6 @@ import direct.reflect.facilitator.facilitation.participant.ParticipantRole;
 import direct.reflect.facilitator.facilitation.participant.ParticipantStatus;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
 import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
-import direct.reflect.facilitator.facilitation.response.ParticipantResponse;
-import direct.reflect.facilitator.facilitation.response.ParticipantResponseRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -24,6 +23,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -36,10 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -157,7 +155,7 @@ class VotingIntegrationTest {
 
         mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
-                        .with(csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
         ParticipantResponse loaded = responseRepository.findById(response.getId()).orElseThrow();
@@ -173,14 +171,14 @@ class VotingIntegrationTest {
 
         mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
-                        .with(csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
         assertThat(getVotes(responseRepository.findById(response.getId()).orElseThrow())).hasSize(1);
 
         mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
-                        .with(csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
         assertThat(getVotes(responseRepository.findById(response.getId()).orElseThrow())).isEmpty();
@@ -196,7 +194,7 @@ class VotingIntegrationTest {
         for (UUID responseId : List.of(r1.getId(), r2.getId(), r3.getId())) {
             mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                             testSession.getId(), responseId)
-                            .with(csrf()))
+                            .with(SecurityMockMvcRequestPostProcessors.csrf()))
                     .andExpect(status().isOk());
         }
 
@@ -216,13 +214,13 @@ class VotingIntegrationTest {
         for (int i = 0; i < 5; i++) {
             mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                             testSession.getId(), responses.get(i).getId())
-                            .with(csrf()))
+                            .with(SecurityMockMvcRequestPostProcessors.csrf()))
                     .andExpect(status().isOk());
         }
 
         mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), responses.get(5).getId())
-                        .with(csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -243,7 +241,7 @@ class VotingIntegrationTest {
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(participantAUuid);
         mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
-                        .with(csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
         assertThat(getVotes(responseRepository.findById(response.getId()).orElseThrow())).hasSize(1);
@@ -251,7 +249,7 @@ class VotingIntegrationTest {
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(participantBUuid);
         mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
-                        .with(csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
         assertThat(getVotes(responseRepository.findById(response.getId()).orElseThrow())).hasSize(2);
@@ -259,7 +257,7 @@ class VotingIntegrationTest {
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(participantAUuid);
         mockMvc.perform(post("/api/retros/{retroId}/responses/{responseId}/vote",
                         testSession.getId(), response.getId())
-                        .with(csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
         List<String> finalVotes = getVotes(responseRepository.findById(response.getId()).orElseThrow());

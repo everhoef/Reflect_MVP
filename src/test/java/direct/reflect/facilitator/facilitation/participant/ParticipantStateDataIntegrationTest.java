@@ -1,11 +1,9 @@
 package direct.reflect.facilitator.facilitation.participant;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.config.TestSecurityOverride;
-import direct.reflect.facilitator.facilitation.participant.Participant;
-import direct.reflect.facilitator.facilitation.participant.ParticipantRepository;
-import direct.reflect.facilitator.facilitation.participant.ParticipantStatus;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
 import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,6 +20,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -33,11 +32,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -76,7 +72,7 @@ class ParticipantStateDataIntegrationTest {
     @MockitoBean
     private AuthService authService;
 
-    /** Pre-built authentication token injected into each request via authentication() post-processor. */
+    /** Pre-built authentication token injected into each request via org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication() post-processor. */
     private UsernamePasswordAuthenticationToken testAuth;
 
     @BeforeEach
@@ -103,10 +99,10 @@ class ParticipantStateDataIntegrationTest {
 
         // ── Step 1: Create first session ──────────────────────────────────────────
         mockMvc.perform(post("/api/retros")
-                        .with(authentication(testAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sessionName\": \"First Session\"}")
-                        .with(csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
         List<Participant> afterFirstCreate = participantRepository.findByParticipantId(fixedParticipantId);
@@ -130,10 +126,10 @@ class ParticipantStateDataIntegrationTest {
 
         // ── Step 2: Create second session (same user) ──────────────────────────────
         mockMvc.perform(post("/api/retros")
-                        .with(authentication(testAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sessionName\": \"Second Session\"}")
-                        .with(csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
         // ── Step 3: Assert domain state ────────────────────────────────────────────

@@ -11,13 +11,19 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import direct.reflect.facilitator.e2e.support.BaseEndToEndTest;
 
-import static org.junit.jupiter.api.Assertions.*;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 import direct.reflect.facilitator.facilitation.session.RetroPhase;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
 import lombok.extern.slf4j.Slf4j;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Broad retrospective flow integration tests.
@@ -49,7 +55,7 @@ public class MultiUserRetroEndToEndTest extends BaseEndToEndTest {
     @Order(7)
     @Timeout(600) // 10 minutes max - flow test has many steps with multi-page sync
     @DisplayName("Should validate complete retro flow with columnId isolation")
-    void shouldValidateCompleteRetroFlowWithColumnIsolation() throws InterruptedException {
+    void shouldValidateCompleteRetroFlowWithColumnIsolation() {
         BrowserContext facilitatorContext = createMonitoredContext();
         Page facilitatorPage = facilitatorContext.newPage();
 
@@ -449,8 +455,8 @@ public class MultiUserRetroEndToEndTest extends BaseEndToEndTest {
             startRetroSession(facilitatorPage, sessionId);
 
             logTestProgress("ADVANCE", 3, 4, "Fast-forwarding to GATHER_DATA step 1 and loading retro URL");
-            String retroUrl = baseUrl + "/retro/" + sessionId;
             fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 1);
+            String retroUrl = baseUrl + "/retro/" + sessionId;
 
             facilitatorPage.navigate(retroUrl);
             waitForElement(facilitatorPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
@@ -498,7 +504,6 @@ public class MultiUserRetroEndToEndTest extends BaseEndToEndTest {
             sessionService.startSession(UUID.fromString(sessionId));
 
             logTestProgress("ADVANCE_1", 2, 6, "Fast-forwarding to GATHER_DATA step 1 (facilitator only)");
-            String retroUrl = baseUrl + "/retro/" + sessionId;
             fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 1);
             refreshRetroPageUntilLoaded(facilitatorPage, sessionId, RetroPhase.GATHER_DATA.name(), "[data-testid='guidance-sidebar']");
             waitForElement(facilitatorPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
@@ -796,8 +801,8 @@ public class MultiUserRetroEndToEndTest extends BaseEndToEndTest {
 
             logTestProgress("SETUP", 3, 5, "Fast-forwarding to GATHER_DATA step 0 (guaranteed board step)");
             fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 0);
-
             String retroUrl = baseUrl + "/retro/" + sessionId;
+
             facilitatorPage.navigate(retroUrl);
             participantPage.navigate(retroUrl);
             waitForAllPagesElement("[data-column]", facilitatorPage, participantPage);
@@ -853,19 +858,6 @@ public class MultiUserRetroEndToEndTest extends BaseEndToEndTest {
 
     // ==================== HELPERS ====================
 
-    private void waitForPageAtStepIndex(int expectedStepIndex, Page... pages) {
-        String js = String.format(
-            "() => { " +
-            "  const el = document.querySelector('[data-step-index]'); " +
-            "  return el && parseInt(el.getAttribute('data-step-index')) === %d; " +
-            "}",
-            expectedStepIndex
-        );
-        for (Page page : pages) {
-            page.waitForFunction(js, null,
-                new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
-        }
-    }
 
     /**
      * Fast-forwards the session DB state to the given phase and step index,
@@ -876,7 +868,7 @@ public class MultiUserRetroEndToEndTest extends BaseEndToEndTest {
                 .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
         session.setPhase(phase);
         session.setCurrentStepIndex(stepIndex);
-        session.setStepStartedAt(java.time.LocalDateTime.now());
+        session.setStepStartedAt(LocalDateTime.now());
         retroSessionRepository.save(session);
     }
 

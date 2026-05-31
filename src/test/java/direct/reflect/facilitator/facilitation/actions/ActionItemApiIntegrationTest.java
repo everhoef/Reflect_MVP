@@ -5,8 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -21,10 +19,6 @@ import direct.reflect.facilitator.config.TestRedisConfig;
 import direct.reflect.facilitator.config.TestSecurityOverride;
 import direct.reflect.facilitator.eventing.EventService;
 import direct.reflect.facilitator.eventing.RetroEvent;
-import direct.reflect.facilitator.facilitation.actions.ActionItem;
-import direct.reflect.facilitator.facilitation.actions.ActionItemDto;
-import direct.reflect.facilitator.facilitation.actions.ActionItemRepository;
-import direct.reflect.facilitator.facilitation.actions.ActionItemStatus;
 import direct.reflect.facilitator.facilitation.participant.Participant;
 import direct.reflect.facilitator.facilitation.participant.ParticipantRepository;
 import direct.reflect.facilitator.facilitation.participant.ParticipantRole;
@@ -47,6 +41,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -129,8 +124,8 @@ class ActionItemApiIntegrationTest {
     @Test
     void createActionItem_validRequest_returnsCreatedAndPublishesActionCreatedEvent() throws Exception {
         mockMvc.perform(post("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -179,8 +174,8 @@ class ActionItemApiIntegrationTest {
     @Test
     void createActionItem_missingRequiredFields_returnsBadRequest() throws Exception {
         mockMvc.perform(post("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -191,8 +186,8 @@ class ActionItemApiIntegrationTest {
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -203,8 +198,8 @@ class ActionItemApiIntegrationTest {
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -226,7 +221,7 @@ class ActionItemApiIntegrationTest {
         saveActionItem("Review incidents weekly", "Bob", LocalDate.of(2026, 5, 8), null);
 
         mockMvc.perform(get("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth)))
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth)))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.syncVersion").value(5))
@@ -246,7 +241,7 @@ class ActionItemApiIntegrationTest {
         sessionRepository.saveAndFlush(testSession);
 
         mockMvc.perform(get("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth)))
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth)))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.syncVersion").value(7))
@@ -261,8 +256,8 @@ class ActionItemApiIntegrationTest {
         ActionItem actionItem = saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), null);
 
         mockMvc.perform(patch("/api/retros/{retroId}/actions/{actionId}", testSession.getId(), actionItem.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -298,8 +293,8 @@ class ActionItemApiIntegrationTest {
         long initialSyncVersion = sessionRepository.findById(testSession.getId()).orElseThrow().getSyncVersion();
 
         mockMvc.perform(post("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -319,8 +314,8 @@ class ActionItemApiIntegrationTest {
         ActionItem actionItem = saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), null);
 
         mockMvc.perform(delete("/api/retros/{retroId}/actions/{actionId}", testSession.getId(), actionItem.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isNoContent());
 
         assertThat(actionItemRepository.findById(actionItem.getId())).isEmpty();
@@ -340,8 +335,8 @@ class ActionItemApiIntegrationTest {
         ActionItem actionItem = saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), null);
 
         mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/status", testSession.getId(), actionItem.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -366,7 +361,7 @@ class ActionItemApiIntegrationTest {
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(UUID.randomUUID());
 
         mockMvc.perform(get("/api/retros/{retroId}/actions", testSession.getId())
-                        .with(authentication(testAuth)))
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth)))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"error\":\"Access denied\"}"));

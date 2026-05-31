@@ -6,9 +6,6 @@ import static org.assertj.core.groups.Tuple.tuple;
 
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.config.TestRedisConfig;
-import direct.reflect.facilitator.facilitation.actions.ActionItem;
-import direct.reflect.facilitator.facilitation.actions.ActionItemRepository;
-import direct.reflect.facilitator.facilitation.actions.ActionItemStatus;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
 import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
 import jakarta.persistence.EntityManager;
@@ -119,15 +116,15 @@ class ActionItemDataModelTest {
         RetroSession sessionB = saveSession("Session B");
 
         ActionItem sessionAOpen = actionItemRepository.saveAndFlush(
-                buildActionItem(sessionA, "Daily sync", "Alice", LocalDate.of(2026, 5, 1), item -> {}));
-        ActionItem sessionADone = actionItemRepository.saveAndFlush(buildActionItem(
+                buildActionItem(sessionA, "Daily sync", "Alice", LocalDate.of(2026, 5, 1), item -> { }));
+        actionItemRepository.saveAndFlush(buildActionItem(
                 sessionA,
                 "Review incidents",
                 "Bob",
                 LocalDate.of(2026, 5, 8),
                 item -> item.setStatus(ActionItemStatus.DONE)));
         actionItemRepository.saveAndFlush(
-                buildActionItem(sessionB, "Trim backlog", "Carol", LocalDate.of(2026, 5, 15), item -> {}));
+                buildActionItem(sessionB, "Trim backlog", "Carol", LocalDate.of(2026, 5, 15), item -> { }));
 
         entityManager.clear();
 

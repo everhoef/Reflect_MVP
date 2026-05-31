@@ -24,14 +24,13 @@ import jakarta.persistence.EntityManagerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @DisplayName("Escalation Voting End-to-End Tests")
 class EscalationVotingEndToEndTest extends BaseEndToEndTest {
@@ -161,37 +160,6 @@ class EscalationVotingEndToEndTest extends BaseEndToEndTest {
             bobContext.close();
             carolContext.close();
         }
-    }
-
-    private void waitForServerReady() {
-        recordActivity("waitForServerReady");
-        long deadline = System.currentTimeMillis() + 30_000;
-        Exception lastFailure = null;
-        while (System.currentTimeMillis() < deadline) {
-            try {
-                HttpURLConnection connection = (HttpURLConnection) new URL(baseUrl + "/login").openConnection();
-                connection.setConnectTimeout(1_000);
-                connection.setReadTimeout(3_000);
-                int status = connection.getResponseCode();
-                connection.disconnect();
-                if (status < 500) {
-                    recordActivity("✓ Server ready");
-                    return;
-                }
-            } catch (Exception readinessFailure) {
-                lastFailure = readinessFailure;
-            }
-
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException interruptedException) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
-
-        throw new AssertionError("Server did not become ready within 30 seconds"
-                + (lastFailure == null ? "" : ": " + lastFailure.getMessage()));
     }
 
     private Team createManagedTeamForUsername(String teamName, String username) {

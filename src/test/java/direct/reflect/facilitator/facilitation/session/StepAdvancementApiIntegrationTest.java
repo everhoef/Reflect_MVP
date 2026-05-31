@@ -8,9 +8,6 @@ import direct.reflect.facilitator.facilitation.participant.Participant;
 import direct.reflect.facilitator.facilitation.participant.ParticipantRepository;
 import direct.reflect.facilitator.facilitation.participant.ParticipantRole;
 import direct.reflect.facilitator.facilitation.participant.ParticipantStatus;
-import direct.reflect.facilitator.facilitation.session.RetroPhase;
-import direct.reflect.facilitator.facilitation.session.RetroSession;
-import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -22,6 +19,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -33,7 +31,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -116,7 +113,7 @@ class StepAdvancementApiIntegrationTest {
         long initialSyncVersion = initial.getSyncVersion();
 
         mockMvc.perform(post("/api/retros/{retroId}/advance", testSession.getId())
-                        .with(csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isOk());
 
         RetroSession updated = sessionRepository.findById(testSession.getId()).orElseThrow();
@@ -129,7 +126,7 @@ class StepAdvancementApiIntegrationTest {
     void advanceNext_MultipleTimesSequentially_IncrementsStepIndex() throws Exception {
         for (int expectedStepIndex = 0; expectedStepIndex <= 4; expectedStepIndex++) {
             mockMvc.perform(post("/api/retros/{retroId}/advance", testSession.getId())
-                            .with(csrf()))
+                            .with(SecurityMockMvcRequestPostProcessors.csrf()))
                     .andExpect(status().isOk());
 
             RetroSession updated = sessionRepository.findById(testSession.getId()).orElseThrow();
@@ -146,7 +143,7 @@ class StepAdvancementApiIntegrationTest {
         when(authService.getParticipantId(any(HttpServletRequest.class))).thenReturn(unknownParticipantId);
 
         mockMvc.perform(post("/api/retros/{retroId}/advance", testSession.getId())
-                        .with(csrf()))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isForbidden());
     }
 }

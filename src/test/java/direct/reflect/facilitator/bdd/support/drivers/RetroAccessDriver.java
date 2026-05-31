@@ -6,31 +6,13 @@ import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.Cookie;
 import direct.reflect.facilitator.bdd.support.PlaywrightWorld;
 import direct.reflect.facilitator.bdd.support.context.RetroScenarioContext;
+import direct.reflect.facilitator.bdd.support.selectors.RetroSelectors;
 import io.cucumber.spring.ScenarioScope;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.DISPLAY_NAME_INPUT;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ERROR_PAGE_LOAD_FAILED_MESSAGE;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ERROR_PAGE_MESSAGE;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ERROR_PAGE_NOT_FOUND_MESSAGE;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ERROR_PAGE_SESSION_ENDED_MESSAGE;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ADDRESS_NAME_INPUT;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.ADDRESS_PLACEHOLDER_INPUT;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.CAPTCHA_INPUT;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.EMAIL_INPUT;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.PASSWORD_INPUT;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.PHONE_NAME_INPUT;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.PHONE_PLACEHOLDER_INPUT;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.TELEPHONE_INPUT;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.USERNAME_INPUT;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.JOIN_RETRO_ID_INPUT;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.JOIN_SESSION_BUTTON;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.LOGIN_SUBMIT_BUTTON;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.RETRO_CONTENT;
-import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.SESSION_NAME_INPUT;
 
 @ScenarioScope
 @Component
@@ -47,14 +29,14 @@ public class RetroAccessDriver {
         Page page = world.getPage();
         world.clearCookies();
         page.navigate(world.getBaseUrl() + "/login");
-        page.waitForSelector(DISPLAY_NAME_INPUT, new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-        page.fill(DISPLAY_NAME_INPUT, displayName);
-        page.click(LOGIN_SUBMIT_BUTTON);
+        page.waitForSelector(RetroSelectors.DISPLAY_NAME_INPUT, new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+        page.fill(RetroSelectors.DISPLAY_NAME_INPUT, displayName);
+        page.click(RetroSelectors.LOGIN_SUBMIT_BUTTON);
         page.waitForURL(
             url -> url.equals(world.getBaseUrl() + "/") || url.equals(world.getBaseUrl() + "/home") || url.endsWith("/"),
             new Page.WaitForURLOptions().setTimeout(DEFAULT_TIMEOUT_MS)
         );
-        page.waitForSelector(SESSION_NAME_INPUT, new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+        page.waitForSelector(RetroSelectors.SESSION_NAME_INPUT, new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
     }
 
     public void joinRetroAsGuest(String retroId, String displayName) {
@@ -62,9 +44,9 @@ public class RetroAccessDriver {
         world.clearCookies();
         page.navigate(world.getBaseUrl() + "/retro/" + retroId + "/lobby");
 
-        if (page.locator(DISPLAY_NAME_INPUT).count() > 0) {
-            page.fill(DISPLAY_NAME_INPUT, displayName);
-            page.click(LOGIN_SUBMIT_BUTTON);
+        if (page.locator(RetroSelectors.DISPLAY_NAME_INPUT).count() > 0) {
+            page.fill(RetroSelectors.DISPLAY_NAME_INPUT, displayName);
+            page.click(RetroSelectors.LOGIN_SUBMIT_BUTTON);
             page.waitForURL(
                 url -> url.equals(world.getBaseUrl() + "/") || url.equals(world.getBaseUrl() + "/home") || url.endsWith("/"),
                 new Page.WaitForURLOptions().setTimeout(DEFAULT_TIMEOUT_MS)
@@ -72,14 +54,14 @@ public class RetroAccessDriver {
         }
 
         page.navigate(world.getBaseUrl() + "/");
-        page.waitForSelector(JOIN_RETRO_ID_INPUT, new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-        page.fill(JOIN_RETRO_ID_INPUT, retroId);
-        page.click(JOIN_SESSION_BUTTON);
+        page.waitForSelector(RetroSelectors.JOIN_RETRO_ID_INPUT, new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+        page.fill(RetroSelectors.JOIN_RETRO_ID_INPUT, retroId);
+        page.click(RetroSelectors.JOIN_SESSION_BUTTON);
         page.waitForURL(
             url -> url.contains("/retro/" + retroId),
             new Page.WaitForURLOptions().setTimeout(LONG_TIMEOUT_MS)
         );
-        page.waitForSelector(RETRO_CONTENT, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
+        page.waitForSelector(RetroSelectors.RETRO_CONTENT, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
     }
 
     public void navigateToRetro(String retroId) {
@@ -90,7 +72,7 @@ public class RetroAccessDriver {
         Page page = world.getPage();
         try {
             navigateToRetro(retroId);
-            page.waitForSelector(RETRO_CONTENT, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
+            page.waitForSelector(RetroSelectors.RETRO_CONTENT, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
         } catch (RuntimeException e) {
             if (!isLoginBarrierVisible(page)) {
                 throw e;
@@ -144,20 +126,20 @@ public class RetroAccessDriver {
     }
 
     public void assertNoLoginPrompts() {
-        assertNoElement(PASSWORD_INPUT, "password field");
-        assertNoElement(EMAIL_INPUT, "email field");
-        assertNoElement(USERNAME_INPUT, "username field");
-        assertNoElement(CAPTCHA_INPUT, "CAPTCHA field");
+        assertNoElement(RetroSelectors.PASSWORD_INPUT, "password field");
+        assertNoElement(RetroSelectors.EMAIL_INPUT, "email field");
+        assertNoElement(RetroSelectors.USERNAME_INPUT, "username field");
+        assertNoElement(RetroSelectors.CAPTCHA_INPUT, "CAPTCHA field");
     }
 
     public void assertErrorPage() {
         Page page = world.getPage();
-        page.waitForSelector(ERROR_PAGE_MESSAGE, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
+        page.waitForSelector(RetroSelectors.ERROR_PAGE_MESSAGE, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
 
-        boolean notFoundMessageVisible = page.locator(ERROR_PAGE_NOT_FOUND_MESSAGE).count() > 0
-            && page.locator(ERROR_PAGE_SESSION_ENDED_MESSAGE).count() > 0;
+        boolean notFoundMessageVisible = page.locator(RetroSelectors.ERROR_PAGE_NOT_FOUND_MESSAGE).count() > 0
+            && page.locator(RetroSelectors.ERROR_PAGE_SESSION_ENDED_MESSAGE).count() > 0;
 
-        if (!notFoundMessageVisible && page.locator(ERROR_PAGE_LOAD_FAILED_MESSAGE).count() == 0) {
+        if (!notFoundMessageVisible && page.locator(RetroSelectors.ERROR_PAGE_LOAD_FAILED_MESSAGE).count() == 0) {
             String bodyText = page.locator("body").textContent();
             throw new AssertionError("Expected retrospective unavailable error page. Body text was: " + bodyText);
         }
@@ -165,14 +147,14 @@ public class RetroAccessDriver {
 
     public void assertRetroPageVisible() {
         Page page = world.getPage();
-        page.waitForSelector(RETRO_CONTENT, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
-        if (page.locator(RETRO_CONTENT).count() == 0) {
+        page.waitForSelector(RetroSelectors.RETRO_CONTENT, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
+        if (page.locator(RetroSelectors.RETRO_CONTENT).count() == 0) {
             throw new AssertionError("Expected retro content to be visible, but it was not found.");
         }
     }
 
     public void assertRetroContentNotVisible() {
-        if (world.getPage().locator(RETRO_CONTENT).count() > 0) {
+        if (world.getPage().locator(RetroSelectors.RETRO_CONTENT).count() > 0) {
             throw new AssertionError("Expected retro content to be inaccessible for invalid session link.");
         }
     }
@@ -187,11 +169,11 @@ public class RetroAccessDriver {
     public void assertNoPersonalInfoFields() {
         Page page = world.getPage();
         String[] selectors = {
-            PHONE_PLACEHOLDER_INPUT,
-            ADDRESS_PLACEHOLDER_INPUT,
-            PHONE_NAME_INPUT,
-            ADDRESS_NAME_INPUT,
-            TELEPHONE_INPUT
+            RetroSelectors.PHONE_PLACEHOLDER_INPUT,
+            RetroSelectors.ADDRESS_PLACEHOLDER_INPUT,
+            RetroSelectors.PHONE_NAME_INPUT,
+            RetroSelectors.ADDRESS_NAME_INPUT,
+            RetroSelectors.TELEPHONE_INPUT
         };
         for (String selector : selectors) {
             if (page.locator(selector).count() > 0) {
@@ -220,7 +202,7 @@ public class RetroAccessDriver {
     }
 
     private boolean isLoginBarrierVisible(Page page) {
-        return page.url().contains("/login") || page.locator(DISPLAY_NAME_INPUT).count() > 0;
+        return page.url().contains("/login") || page.locator(RetroSelectors.DISPLAY_NAME_INPUT).count() > 0;
     }
 
 }

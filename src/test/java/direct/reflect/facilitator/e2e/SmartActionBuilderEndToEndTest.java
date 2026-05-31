@@ -40,20 +40,7 @@ public class SmartActionBuilderEndToEndTest extends BaseEndToEndTest {
         String editedAction = createdAction + " (Edited)";
 
         try {
-            // Wait for server to be ready
-            long deadline = System.currentTimeMillis() + 30_000;
-            while (System.currentTimeMillis() < deadline) {
-                try {
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
-                        new java.net.URL(baseUrl + "/login").openConnection();
-                    conn.setConnectTimeout(1000);
-                    conn.setReadTimeout(3000);
-                    int status = conn.getResponseCode();
-                    conn.disconnect();
-                    if (status < 500) break;
-                } catch (Exception ignored) { }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
-            }
+            waitForServerReady();
 
             // 1. Authenticate
             logTestProgress("SETUP", 1, 9, "Authenticating users");

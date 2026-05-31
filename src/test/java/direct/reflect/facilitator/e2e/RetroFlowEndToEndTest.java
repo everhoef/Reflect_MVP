@@ -15,7 +15,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Golden-path retrospective regression test.
@@ -57,20 +60,7 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
         Page participantPage = participantContext.newPage();
 
         try {
-            // Wait for server to be ready (handles cold-start when run in isolation)
-            long deadline = System.currentTimeMillis() + 30_000;
-            while (System.currentTimeMillis() < deadline) {
-                try {
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
-                        new java.net.URL(baseUrl + "/login").openConnection();
-                    conn.setConnectTimeout(1000);
-                    conn.setReadTimeout(3000);
-                    int status = conn.getResponseCode();
-                    conn.disconnect();
-                    if (status < 500) break;
-                } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
-            }
+            waitForServerReady();
 
             // ── 1. Authenticate ────────────────────────────────────────────────────
             logTestProgress("SETUP", 1, 6, "Authenticating facilitator and participant");
@@ -161,20 +151,7 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
         Page facilitatorPage = facilitatorContext.newPage();
 
         try {
-            // Wait for server to be ready
-            long deadline = System.currentTimeMillis() + 30_000;
-            while (System.currentTimeMillis() < deadline) {
-                try {
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
-                        new java.net.URL(baseUrl + "/login").openConnection();
-                    conn.setConnectTimeout(1000);
-                    conn.setReadTimeout(3000);
-                    int status = conn.getResponseCode();
-                    conn.disconnect();
-                    if (status < 500) break;
-                } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
-            }
+            waitForServerReady();
 
             logTestProgress("SETUP", 1, 4, "Authenticating facilitator");
             authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
@@ -241,20 +218,7 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
         Page participantPage = participantContext.newPage();
 
         try {
-            // Wait for server to be ready
-            long deadline = System.currentTimeMillis() + 30_000;
-            while (System.currentTimeMillis() < deadline) {
-                try {
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
-                        new java.net.URL(baseUrl + "/login").openConnection();
-                    conn.setConnectTimeout(1000);
-                    conn.setReadTimeout(3000);
-                    int status = conn.getResponseCode();
-                    conn.disconnect();
-                    if (status < 500) break;
-                } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
-            }
+            waitForServerReady();
 
             logTestProgress("SETUP", 1, 5, "Authenticating facilitator and participant");
             authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
@@ -330,20 +294,7 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
         Page participantPage = participantContext.newPage();
 
         try {
-            // Wait for server ready
-            long deadline = System.currentTimeMillis() + 30_000;
-            while (System.currentTimeMillis() < deadline) {
-                try {
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
-                        new java.net.URL(baseUrl + "/login").openConnection();
-                    conn.setConnectTimeout(1000);
-                    conn.setReadTimeout(3000);
-                    int status = conn.getResponseCode();
-                    conn.disconnect();
-                    if (status < 500) break;
-                } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
-            }
+            waitForServerReady();
 
             logTestProgress("SETUP", 1, 4, "Authenticating facilitator and participant");
             authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
@@ -412,20 +363,7 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
         Page facilitatorPage = facilitatorContext.newPage();
 
         try {
-            // Wait for server ready
-            long deadline = System.currentTimeMillis() + 30_000;
-            while (System.currentTimeMillis() < deadline) {
-                try {
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
-                        new java.net.URL(baseUrl + "/login").openConnection();
-                    conn.setConnectTimeout(1000);
-                    conn.setReadTimeout(3000);
-                    int status = conn.getResponseCode();
-                    conn.disconnect();
-                    if (status < 500) break;
-                } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
-            }
+            waitForServerReady();
 
             logTestProgress("SETUP", 1, 3, "Authenticating facilitator");
             authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
@@ -460,20 +398,7 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
         Page facilitatorPage = facilitatorContext.newPage();
 
         try {
-            // Wait for server ready
-            long deadline = System.currentTimeMillis() + 30_000;
-            while (System.currentTimeMillis() < deadline) {
-                try {
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
-                        new java.net.URL(baseUrl + "/login").openConnection();
-                    conn.setConnectTimeout(1000);
-                    conn.setReadTimeout(3000);
-                    int status = conn.getResponseCode();
-                    conn.disconnect();
-                    if (status < 500) break;
-                } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
-            }
+            waitForServerReady();
 
             logTestProgress("SETUP", 1, 3, "Authenticating facilitator");
             authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
@@ -526,20 +451,7 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
         Page facilitatorPage = facilitatorContext.newPage();
 
         try {
-            // Wait for server to be ready (handles cold-start when run in isolation)
-            long deadline = System.currentTimeMillis() + 30_000;
-            while (System.currentTimeMillis() < deadline) {
-                try {
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
-                        new java.net.URL(baseUrl + "/login").openConnection();
-                    conn.setConnectTimeout(1000);
-                    conn.setReadTimeout(3000);
-                    int status = conn.getResponseCode();
-                    conn.disconnect();
-                    if (status < 500) break;
-                } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
-            }
+            waitForServerReady();
 
             logTestProgress("SETUP", 1, 6, "Authenticate facilitator and create session");
             authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
@@ -602,20 +514,7 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
         Page facilitatorPage = facilitatorContext.newPage();
 
         try {
-            // Wait for server to be ready (handles cold-start when run in isolation)
-            long deadline = System.currentTimeMillis() + 30_000;
-            while (System.currentTimeMillis() < deadline) {
-                try {
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
-                        new java.net.URL(baseUrl + "/login").openConnection();
-                    conn.setConnectTimeout(1000);
-                    conn.setReadTimeout(3000);
-                    int status = conn.getResponseCode();
-                    conn.disconnect();
-                    if (status < 500) break;
-                } catch (Exception ignored) { /* server not ready yet, retry */ }
-                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
-            }
+            waitForServerReady();
 
             logTestProgress("SETUP", 1, 3, "Authenticating facilitator");
             authenticateAsGuest(facilitatorPage, "Alice (Facilitator)");
@@ -713,7 +612,7 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
                 .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
         session.setPhase(RetroPhase.GATHER_DATA);
         session.setCurrentStepIndex(stepIndex);
-        session.setStepStartedAt(java.time.LocalDateTime.now());
+        session.setStepStartedAt(LocalDateTime.now());
         session.setTimerPausedAt(null);
         session.setAccumulatedPauseSeconds(0L);
         retroSessionRepository.save(session);

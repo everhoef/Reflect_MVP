@@ -5,20 +5,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.config.TestRedisConfig;
-import direct.reflect.facilitator.facilitation.escalation.EscalatedItem;
-import direct.reflect.facilitator.facilitation.escalation.EscalatedItemRepository;
-import direct.reflect.facilitator.facilitation.escalation.EscalatedItemVote;
-import direct.reflect.facilitator.facilitation.escalation.EscalatedItemVoteId;
-import direct.reflect.facilitator.facilitation.escalation.EscalatedItemVoteRepository;
 import direct.reflect.facilitator.facilitation.escalation.domain.EscalationThresholdPolicy;
 import direct.reflect.facilitator.facilitation.participant.ParticipantService;
 import direct.reflect.facilitator.facilitation.participant.SseParticipantAccess;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
 import direct.reflect.facilitator.facilitation.session.RetroSessionRepository;
 import direct.reflect.facilitator.facilitation.session.TeamBackedRetroFixture;
-import direct.reflect.facilitator.organization.Organization;
 import direct.reflect.facilitator.organization.OrganizationRepository;
-import direct.reflect.facilitator.organization.Team;
 import direct.reflect.facilitator.organization.TeamRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.ManyToOne;
@@ -100,7 +93,7 @@ class EscalationDataModelTest {
                 teamId,
                 "Cross-team API dependency is blocking releases",
                 EscalationThresholdPolicy.calculateVoteThreshold(5),
-                item -> {}));
+                item -> { }));
         entityManager.clear();
 
         EscalatedItem loadedEscalatedItem = escalatedItemRepository.findById(escalatedItem.getId()).orElseThrow();
@@ -119,9 +112,9 @@ class EscalationDataModelTest {
         RetroSession retroSession = teamBackedRetroFixture.createTeamBackedSession("Delivery");
         UUID teamId = retroSession.getTeamId();
 
-        assertInvalid(buildEscalatedItem(retroSession, teamId, null, 2, item -> {}));
-        assertInvalid(buildEscalatedItem(retroSession, teamId, "   ", 2, item -> {}));
-        assertInvalid(buildEscalatedItem(retroSession, teamId, "Manager support needed", 0, item -> {}));
+        assertInvalid(buildEscalatedItem(retroSession, teamId, null, 2, item -> { }));
+        assertInvalid(buildEscalatedItem(retroSession, teamId, "   ", 2, item -> { }));
+        assertInvalid(buildEscalatedItem(retroSession, teamId, "Manager support needed", 0, item -> { }));
         assertInvalid(buildEscalatedItem(retroSession, teamId, "Manager support needed", 2, item -> item.setTeamId(null)));
         assertInvalid(buildEscalatedItem(retroSession, teamId, "Manager support needed", 2, item -> item.setRetroSession(null)));
     }
@@ -151,13 +144,13 @@ class EscalationDataModelTest {
                 teamId,
                 "Shared deployment process needs manager support",
                 EscalationThresholdPolicy.calculateVoteThreshold(2),
-                item -> {}));
+                item -> { }));
         EscalatedItem secondEscalatedItem = escalatedItemRepository.saveAndFlush(buildEscalatedItem(
                 retroSession,
                 teamId,
                 "Cross-team release coordination needs escalation",
                 EscalationThresholdPolicy.calculateVoteThreshold(2),
-                item -> {}));
+                item -> { }));
 
         escalatedItemVoteRepository.saveAndFlush(buildVote(firstEscalatedItem, participantId));
         escalatedItemVoteRepository.saveAndFlush(buildVote(firstEscalatedItem, otherParticipantId));

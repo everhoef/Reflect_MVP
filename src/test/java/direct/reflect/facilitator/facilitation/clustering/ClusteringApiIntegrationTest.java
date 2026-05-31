@@ -1,5 +1,6 @@
 package direct.reflect.facilitator.facilitation.clustering;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.config.TestSecurityOverride;
 import direct.reflect.facilitator.configurator.RetroStep;
@@ -25,6 +26,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -37,11 +39,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -92,7 +91,7 @@ class ClusteringApiIntegrationTest {
     private Participant testParticipant;
     private RetroStep testStep;
 
-    /** Pre-built authentication token injected into each request via authentication() post-processor. */
+    /** Pre-built authentication token injected into each request via org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication() post-processor. */
     private UsernamePasswordAuthenticationToken testAuth;
 
     @BeforeEach
@@ -137,8 +136,8 @@ class ClusteringApiIntegrationTest {
         // When: POST merge
         String responseJson = mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/clusters/merge",
                         testSession.getId(), testStep.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mergeBody))
                 .andExpect(status().isOk())
@@ -170,8 +169,8 @@ class ClusteringApiIntegrationTest {
 
         mockMvc.perform(post("/api/retros/{retroId}/steps/{stepId}/clusters/unmerge",
                         testSession.getId(), testStep.getId())
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(unmergeBody))
                 .andExpect(status().isOk());
@@ -200,8 +199,8 @@ class ClusteringApiIntegrationTest {
 
         mockMvc.perform(put("/api/retros/{retroId}/steps/{stepId}/clusters/{clusterId}/name",
                         testSession.getId(), testStep.getId(), clusterId)
-                        .with(authentication(testAuth))
-                        .with(csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(renameBody))
                 .andExpect(status().isOk());
@@ -229,7 +228,7 @@ class ClusteringApiIntegrationTest {
         // When: GET clusters
         mockMvc.perform(get("/api/retros/{retroId}/steps/{stepId}/clusters",
                         testSession.getId(), testStep.getId())
-                        .with(authentication(testAuth)))
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.clustered").isMap())
                 .andExpect(jsonPath("$.unclustered").isArray())

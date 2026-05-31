@@ -90,8 +90,9 @@ public class AnonymousLoginSteps {
         if (participantCookies == null) {
             throw new AssertionError("Participant cookies not captured — cannot verify own contributions.");
         }
+        retroAccessDriver.clearCookies();
         retroAccessDriver.restoreCookies(participantCookies);
-        retroLifecycleDriver.reloadAndWait();
+        retroAccessDriver.rejoinRetroWithRecoveredGuestSession(context.getSessionId(), "Wise Owl");
         columnBoardDriver.waitForColumnBoardVisible();
         columnBoardDriver.assertOwnNoteVisible(context.getLastNoteContent());
     }

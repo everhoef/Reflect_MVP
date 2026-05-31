@@ -1,28 +1,18 @@
 package direct.reflect.facilitator.facilitation.participant;
 
-import direct.reflect.facilitator.facilitation.participant.Participant;
-import direct.reflect.facilitator.facilitation.participant.ParticipantId;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
-import direct.reflect.facilitator.configurator.RetroTemplate;
-import direct.reflect.facilitator.facilitation.participant.ParticipantRole;
-import direct.reflect.facilitator.facilitation.participant.ParticipantRepository;
-import direct.reflect.facilitator.facilitation.participant.ParticipantService;
-import direct.reflect.facilitator.facilitation.participant.ParticipantStatus;
 import direct.reflect.facilitator.facilitation.session.RetroPhase;
 import direct.reflect.facilitator.facilitation.session.RetroSyncVersionService;
 import direct.reflect.facilitator.auth.AuthService;
 import direct.reflect.facilitator.eventing.EventService;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 
 import java.util.Collections;
@@ -30,9 +20,15 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ParticipantServiceTest {

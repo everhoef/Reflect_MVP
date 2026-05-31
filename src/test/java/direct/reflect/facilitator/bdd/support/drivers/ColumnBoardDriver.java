@@ -64,9 +64,11 @@ public class ColumnBoardDriver {
     }
 
     public void assertNoteVisible(String noteContent) {
-        Locator note = world.getPage().locator(noteTextSelector(noteContent));
-        if (note.count() == 0) {
-            throw new AssertionError("Expected note to be visible: " + noteContent);
+        try {
+            world.getPage().waitForSelector(noteTextSelector(noteContent),
+                new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+        } catch (RuntimeException e) {
+            throw new AssertionError("Expected note to be visible: " + noteContent, e);
         }
     }
 
@@ -79,10 +81,16 @@ public class ColumnBoardDriver {
     }
 
     public void assertOwnNoteVisible(String noteContent) {
-        Locator ownNote = world.getPage().locator(OWN_NOTE_EDITABLE)
-            .filter(new Locator.FilterOptions().setHasText(noteContent));
-        if (ownNote.count() == 0) {
-            throw new AssertionError("Expected to find own contribution with edit affordance.");
+        try {
+            world.getPage().waitForSelector(OWN_NOTE_EDITABLE,
+                new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+            Locator ownNote = world.getPage().locator(OWN_NOTE_EDITABLE)
+                .filter(new Locator.FilterOptions().setHasText(noteContent));
+            if (ownNote.count() == 0) {
+                throw new AssertionError("Expected to find own contribution with edit affordance.");
+            }
+        } catch (RuntimeException e) {
+            throw new AssertionError("Expected to find own contribution with edit affordance: " + noteContent, e);
         }
     }
 }

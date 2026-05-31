@@ -2,19 +2,16 @@ package direct.reflect.facilitator.e2e;
 
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
-import com.microsoft.playwright.options.WaitForSelectorState;
-import com.microsoft.playwright.options.RequestOptions;
-import com.microsoft.playwright.APIResponse;
 import direct.reflect.facilitator.e2e.support.BaseEndToEndTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import lombok.extern.slf4j.Slf4j;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * SSE browser tests: transport layer and React UI update chain.
@@ -130,7 +127,7 @@ public class SseEndToEndTest extends BaseEndToEndTest {
                 waitForSseConnection(participantPage, UUID.fromString(sessionId));
                 log.info("Both SSE connections established");
 
-                Thread.sleep(500);
+                waitForParticipantList(facilitatorPage, "Facilitator", "Participant");
 
                 startRetroSession(facilitatorPage, sessionId);
                 log.info("Retro started");

@@ -2,7 +2,6 @@ package direct.reflect.facilitator.facilitation.actions;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -10,9 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.redis.testcontainers.RedisContainer;
 import direct.reflect.facilitator.config.TestRedisConfig;
 import direct.reflect.facilitator.config.TestSecurityOverride;
-import direct.reflect.facilitator.facilitation.actions.ActionItem;
-import direct.reflect.facilitator.facilitation.actions.ActionItemRepository;
-import direct.reflect.facilitator.facilitation.actions.ActionItemStatus;
 import direct.reflect.facilitator.facilitation.participant.ParticipantService;
 import direct.reflect.facilitator.facilitation.session.RetroPhase;
 import direct.reflect.facilitator.facilitation.session.RetroSession;
@@ -35,6 +31,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -142,7 +139,7 @@ class ActionCarryOverApiIntegrationTest {
         null);
 
     mockMvc.perform(get("/api/retros/{retroId}/actions/previous", currentSession.getId())
-            .with(authentication(testAuth)))
+            .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(1))
         .andExpect(jsonPath("$[0].what").value("Start design sync"))
@@ -164,7 +161,7 @@ class ActionCarryOverApiIntegrationTest {
         null);
 
     mockMvc.perform(get("/api/retros/{retroId}/actions/previous", currentSession.getId())
-            .with(authentication(testAuth)))
+            .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(0));
   }
@@ -195,7 +192,7 @@ class ActionCarryOverApiIntegrationTest {
         null);
 
     mockMvc.perform(get("/api/retros/{retroId}/actions/previous", currentSession.getId())
-            .with(authentication(testAuth)))
+            .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(0));
   }
@@ -233,7 +230,7 @@ class ActionCarryOverApiIntegrationTest {
         null);
 
     mockMvc.perform(get("/api/retros/{retroId}/actions/previous", currentSession.getId())
-            .with(authentication(testAuth)))
+            .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(1))
         .andExpect(jsonPath("$[0].what").value("Introduce incident review"))
@@ -267,7 +264,7 @@ class ActionCarryOverApiIntegrationTest {
         null);
 
     mockMvc.perform(get("/api/retros/{retroId}/actions/previous", betaCurrent.getId())
-            .with(authentication(testAuth)))
+            .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(0));
   }
@@ -298,7 +295,7 @@ class ActionCarryOverApiIntegrationTest {
         null);
 
     mockMvc.perform(get("/api/retros/{retroId}/actions/previous", currentSession.getId())
-            .with(authentication(testAuth)))
+            .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(0));
   }
