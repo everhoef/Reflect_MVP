@@ -985,9 +985,7 @@ public abstract class BaseEndToEndTest {
         log.debug("Start button clicked...");
 
         try {
-            facilitatorPage.waitForFunction(
-                "() => !document.body.textContent.includes('Session Lobby') && !document.body.textContent.includes('Loading retrospective')",
-                null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+            refreshRetroPageUntilLoaded(facilitatorPage, sessionId, null, "[data-testid='next-step-button']");
             log.debug("Lobby disappeared - retro content visible");
         } catch (Exception e) {
             log.warn("UI did not transition out of lobby (POST aborted, confirmed={}). Using service fallback.", startConfirmed[0]);
@@ -998,9 +996,7 @@ public abstract class BaseEndToEndTest {
                 sessionService.startSession(retroId);
             }
             facilitatorPage.navigate(currentUrl, new Page.NavigateOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
-            facilitatorPage.waitForFunction(
-                "() => !document.body.textContent.includes('Session Lobby') && !document.body.textContent.includes('Loading retrospective')",
-                null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+            refreshRetroPageUntilLoaded(facilitatorPage, sessionId, null, "[data-testid='next-step-button']");
             log.debug("Lobby disappeared after service-level start + page reload");
         }
 
@@ -1254,12 +1250,10 @@ public abstract class BaseEndToEndTest {
         clickElement(facilitatorPage, "[data-testid='start-retro-button']");
 
         // Wait for ALL pages (facilitator + participants) to transition from lobby → retro
-        // Check that "Session Lobby" disappears on all pages
         log.debug("Waiting for all pages to leave lobby...");
         for (UserPage userPage : participants) {
             try {
-                userPage.page().waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
-                    null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+                refreshRetroPageUntilLoaded(userPage.page(), sessionId, null, "[data-step-index]");
                 log.debug("✅ Participant {} left lobby", userPage.displayName());
             } catch (Exception e) {
                 log.warn("Participant {} lobby did not disappear - session may not have started", userPage.displayName());
@@ -1268,8 +1262,7 @@ public abstract class BaseEndToEndTest {
 
         boolean facilitatorLeftLobby = false;
         try {
-            facilitatorPage.waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
-                null, new Page.WaitForFunctionOptions().setTimeout(SHORT_TIMEOUT_MS));
+            refreshRetroPageUntilLoaded(facilitatorPage, sessionId, null, "[data-testid='next-step-button']");
             facilitatorLeftLobby = true;
             log.debug("✅ Facilitator left lobby");
         } catch (Exception ignored) {
@@ -1285,19 +1278,15 @@ public abstract class BaseEndToEndTest {
                 sessionService.startSession(retroId);
             }
             facilitatorPage.navigate(baseUrl + "/retro/" + sessionId, new Page.NavigateOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
-            facilitatorPage.waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
-                null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+            refreshRetroPageUntilLoaded(facilitatorPage, sessionId, null, "[data-testid='next-step-button']");
             log.debug("✅ Facilitator left lobby after service fallback");
             for (UserPage userPage : participants) {
                 try {
-                    userPage.page().waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
-                        null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+                    refreshRetroPageUntilLoaded(userPage.page(), sessionId, null, "[data-step-index]");
                     log.debug("✅ Participant {} left lobby after reload", userPage.displayName());
                 } catch (Exception e) {
                     log.warn("Participant {} still in lobby after service fallback - reloading page", userPage.displayName());
-                    userPage.page().reload(new Page.ReloadOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
-                    userPage.page().waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
-                        null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+                    refreshRetroPageUntilLoaded(userPage.page(), sessionId, null, "[data-step-index]");
                 }
             }
         }

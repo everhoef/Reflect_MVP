@@ -82,12 +82,11 @@ public class SseEndToEndTest extends BaseEndToEndTest {
             assertTrue(participantPage.url().contains("/retro/" + sessionId),
                 "Participant should be in retro lobby");
 
-            clickElement(facilitatorPage, "[data-testid='start-retro-button']");
+            startRetroSession(facilitatorPage, sessionId);
 
-            facilitatorPage.waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
-                null, new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
             participantPage.waitForFunction("() => !document.body.textContent.includes('Session Lobby')",
-                null, new Page.WaitForFunctionOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+                null, new Page.WaitForFunctionOptions().setTimeout(SSE_PROPAGATION_TIMEOUT_MS));
+            waitForElement(participantPage, "[data-step-index]", SSE_PROPAGATION_TIMEOUT_MS);
 
             assertFalse(facilitatorPage.textContent("body").contains("Session Lobby"),
                 "Facilitator should no longer see lobby after session started");
