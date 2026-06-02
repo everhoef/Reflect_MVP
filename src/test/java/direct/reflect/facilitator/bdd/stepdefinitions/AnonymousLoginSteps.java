@@ -77,6 +77,7 @@ public class AnonymousLoginSteps {
         String noteContent = "BDD test note from " + System.currentTimeMillis();
         context.setLastNoteContent(noteContent);
         columnBoardDriver.addNoteAndWait(columnId, noteContent);
+        context.setParticipantCookies(retroAccessDriver.captureCookies());
     }
 
     @Then("all my contributions should display as coming from {string}")
@@ -110,6 +111,7 @@ public class AnonymousLoginSteps {
         String noteContent = "Note before disconnect " + System.currentTimeMillis();
         context.setLastNoteContent(noteContent);
         columnBoardDriver.addNoteAndWait(columnId, noteContent);
+        context.setParticipantCookies(retroAccessDriver.captureCookies());
     }
 
     @Given("the session is still active")
