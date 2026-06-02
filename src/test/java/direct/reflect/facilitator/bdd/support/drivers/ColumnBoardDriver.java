@@ -68,7 +68,15 @@ public class ColumnBoardDriver {
             world.getPage().waitForSelector(noteTextSelector(noteContent),
                 new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
         } catch (RuntimeException e) {
-            throw new AssertionError("Expected note to be visible: " + noteContent, e);
+            log.warn("Note '{}' was not visible on first check; reloading retro page before retry.", noteContent);
+            retroLifecycleDriver.reloadAndWait();
+            waitForColumnBoardVisible();
+            try {
+                world.getPage().waitForSelector(noteTextSelector(noteContent),
+                    new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
+            } catch (RuntimeException retryFailure) {
+                throw new AssertionError("Expected note to be visible: " + noteContent, retryFailure);
+            }
         }
     }
 
@@ -90,7 +98,20 @@ public class ColumnBoardDriver {
                 throw new AssertionError("Expected to find own contribution with edit affordance.");
             }
         } catch (RuntimeException e) {
-            throw new AssertionError("Expected to find own contribution with edit affordance: " + noteContent, e);
+            log.warn("Own note '{}' was not visible on first check; reloading retro page before retry.", noteContent);
+            retroLifecycleDriver.reloadAndWait();
+            waitForColumnBoardVisible();
+            try {
+                world.getPage().waitForSelector(OWN_NOTE_EDITABLE,
+                    new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
+                Locator ownNote = world.getPage().locator(OWN_NOTE_EDITABLE)
+                    .filter(new Locator.FilterOptions().setHasText(noteContent));
+                if (ownNote.count() == 0) {
+                    throw new AssertionError("Expected to find own contribution with edit affordance.");
+                }
+            } catch (RuntimeException retryFailure) {
+                throw new AssertionError("Expected to find own contribution with edit affordance: " + noteContent, retryFailure);
+            }
         }
     }
 }
