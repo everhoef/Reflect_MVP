@@ -5,7 +5,6 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
-import com.microsoft.playwright.options.Cookie;
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
 import io.cucumber.java.Scenario;
@@ -87,15 +86,6 @@ public class PlaywrightWorld {
         additionalContext.setDefaultNavigationTimeout(DEFAULT_TIMEOUT_MS);
         blockExternalCdnResources(additionalContext);
         return additionalContext;
-    }
-
-    public List<Cookie> captureCookies() {
-        return page.context().cookies();
-    }
-
-    public void restoreCookies(List<Cookie> cookies) {
-        page.context().clearCookies();
-        page.context().addCookies(cookies);
     }
 
     public void clearCookies() {
