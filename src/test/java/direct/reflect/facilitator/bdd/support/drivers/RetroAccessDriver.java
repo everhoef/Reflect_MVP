@@ -71,15 +71,20 @@ public class RetroAccessDriver {
     public void rejoinRetroWithRecoveredGuestSession(String retroId, String displayName) {
         Page page = world.getPage();
         try {
+            page.navigate(world.getBaseUrl() + "/");
+            page.waitForSelector(RetroSelectors.SESSION_NAME_INPUT, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
+            assertGuestAuthenticated();
+            assertJoinedSession(retroId);
             navigateToRetro(retroId);
             page.waitForSelector(RetroSelectors.RETRO_CONTENT, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
         } catch (RuntimeException e) {
-            if (!isLoginBarrierVisible(page)) {
-                throw e;
+            if (isLoginBarrierVisible(page)) {
+                throw new AssertionError(
+                    "Recovered guest session did not survive re-entry for session '" + retroId + "' and display name '" + displayName + "'.",
+                    e
+                );
             }
-
-            log.warn("Retro re-entry hit login barrier for session {}. Falling back to a fresh guest rejoin for '{}'.", retroId, displayName);
-            joinRetroAsGuest(retroId, displayName);
+            throw e;
         }
     }
 
