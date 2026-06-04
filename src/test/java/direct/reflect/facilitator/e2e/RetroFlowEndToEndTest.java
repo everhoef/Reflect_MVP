@@ -114,8 +114,8 @@ public class RetroFlowEndToEndTest extends BaseEndToEndTest {
                     "Start column should be green (#10B981 / rgb(16,185,129)), got: " + startStyle);
             assertTrue(stopStyle.contains("#EF4444") || stopStyle.contains("rgb(239, 68, 68)"),
                     "Stop column should be red (#EF4444 / rgb(239,68,68)), got: " + stopStyle);
-            assertTrue(continueStyle.contains("#3B82F6") || continueStyle.contains("rgb(59, 130, 246)"),
-                    "Continue column should be blue (#3B82F6 / rgb(59,130,246)), got: " + continueStyle);
+            assertTrue(continueStyle.contains("#EAB308") || continueStyle.contains("rgb(234, 179, 8)"),
+                    "Continue column should be yellow (#EAB308 / rgb(234,179,8)), got: " + continueStyle);
 
             // ── 7. Submit sticky notes in all three columns ─────────────────────────
             logTestProgress("STICKY_NOTES", 6, 6, "Submitting sticky notes in all three columns");
