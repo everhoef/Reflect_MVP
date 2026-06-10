@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
-import { useSSESubscription } from "@/hooks/useSSEContext";
-import { EventType } from "@/types/events";
+import { useSSESubscription } from "@/shared/hooks/useSSEContext";
+import { EventType } from "@/shared/types/events";
 import type { StepComponentProps } from "@/modules/facilitation/components/ComponentRouter";
 import type { components } from "@/shared/types/api.d.ts";
 import { useClusters, submitColumnResponse, deleteResponse } from "@/modules/facilitation/hooks/api/useColumnBoard";
