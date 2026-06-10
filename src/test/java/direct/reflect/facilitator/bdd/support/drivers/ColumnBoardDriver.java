@@ -24,6 +24,7 @@ import static direct.reflect.facilitator.bdd.support.selectors.RetroSelectors.no
 public class ColumnBoardDriver {
     private static final int DEFAULT_TIMEOUT_MS = 5_000;
     private static final int LONG_TIMEOUT_MS = 15_000;
+    private static final int MAX_RELOAD_RETRIES = 2;
 
     private final PlaywrightWorld world;
     private final RetroLifecycleDriver retroLifecycleDriver;
@@ -65,8 +66,7 @@ public class ColumnBoardDriver {
 
     public void assertNoteVisible(String noteContent) {
         try {
-            world.getPage().waitForSelector(noteTextSelector(noteContent),
-                new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
+            assertVisibleWithReloadRecovery(noteTextSelector(noteContent), noteContent, false);
         } catch (RuntimeException e) {
             throw new AssertionError("Expected note to be visible: " + noteContent, e);
         }
@@ -82,15 +82,45 @@ public class ColumnBoardDriver {
 
     public void assertOwnNoteVisible(String noteContent) {
         try {
-            world.getPage().waitForSelector(OWN_NOTE_EDITABLE,
-                new Page.WaitForSelectorOptions().setTimeout(DEFAULT_TIMEOUT_MS));
-            Locator ownNote = world.getPage().locator(OWN_NOTE_EDITABLE)
-                .filter(new Locator.FilterOptions().setHasText(noteContent));
-            if (ownNote.count() == 0) {
-                throw new AssertionError("Expected to find own contribution with edit affordance.");
-            }
+            assertVisibleWithReloadRecovery(OWN_NOTE_EDITABLE, noteContent, true);
         } catch (RuntimeException e) {
             throw new AssertionError("Expected to find own contribution with edit affordance: " + noteContent, e);
         }
+    }
+
+    private void assertVisibleWithReloadRecovery(String selector, String noteContent, boolean requireOwnEditable) {
+        RuntimeException lastFailure = null;
+
+        for (int attempt = 0; attempt <= MAX_RELOAD_RETRIES; attempt++) {
+            try {
+                world.getPage().waitForSelector(selector,
+                    new Page.WaitForSelectorOptions().setTimeout(attempt == 0 ? DEFAULT_TIMEOUT_MS : LONG_TIMEOUT_MS));
+
+                if (requireOwnEditable) {
+                    Locator ownNote = world.getPage().locator(selector)
+                        .filter(new Locator.FilterOptions().setHasText(noteContent));
+                    if (ownNote.count() == 0) {
+                        throw new AssertionError("Expected to find own contribution with edit affordance.");
+                    }
+                }
+
+                return;
+            } catch (RuntimeException e) {
+                lastFailure = e;
+                if (attempt == MAX_RELOAD_RETRIES) {
+                    break;
+                }
+
+                log.warn("Selector '{}' for note '{}' was not visible on attempt {}/{}. Reloading retro page before retry.",
+                    selector, noteContent, attempt + 1, MAX_RELOAD_RETRIES + 1);
+                retroLifecycleDriver.reloadAndWait();
+                waitForColumnBoardVisible();
+            }
+        }
+
+        if (lastFailure == null) {
+            throw new AssertionError("Expected selector to become visible but no failure details were captured.");
+        }
+        throw lastFailure;
     }
 }

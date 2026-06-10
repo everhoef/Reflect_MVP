@@ -3,16 +3,12 @@ package direct.reflect.facilitator.bdd.support.drivers;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.playwright.Page;
-import com.microsoft.playwright.options.Cookie;
 import direct.reflect.facilitator.bdd.support.PlaywrightWorld;
-import direct.reflect.facilitator.bdd.support.context.RetroScenarioContext;
 import direct.reflect.facilitator.bdd.support.selectors.RetroSelectors;
 import io.cucumber.spring.ScenarioScope;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 @ScenarioScope
 @Component
@@ -23,7 +19,6 @@ public class RetroAccessDriver {
     private static final int LONG_TIMEOUT_MS = 15_000;
 
     private final PlaywrightWorld world;
-    private final RetroScenarioContext context;
 
     public void authenticateAsGuest(String displayName) {
         Page page = world.getPage();
@@ -66,21 +61,6 @@ public class RetroAccessDriver {
 
     public void navigateToRetro(String retroId) {
         world.getPage().navigate(world.getBaseUrl() + "/retro/" + retroId);
-    }
-
-    public void rejoinRetroWithRecoveredGuestSession(String retroId, String displayName) {
-        Page page = world.getPage();
-        try {
-            navigateToRetro(retroId);
-            page.waitForSelector(RetroSelectors.RETRO_CONTENT, new Page.WaitForSelectorOptions().setTimeout(LONG_TIMEOUT_MS));
-        } catch (RuntimeException e) {
-            if (!isLoginBarrierVisible(page)) {
-                throw e;
-            }
-
-            log.warn("Retro re-entry hit login barrier for session {}. Falling back to a fresh guest rejoin for '{}'.", retroId, displayName);
-            joinRetroAsGuest(retroId, displayName);
-        }
     }
 
     public void assertGuestAuthenticated() {
@@ -182,14 +162,6 @@ public class RetroAccessDriver {
         }
     }
 
-    public List<Cookie> captureCookies() {
-        return world.captureCookies();
-    }
-
-    public void restoreCookies(List<Cookie> cookies) {
-        world.restoreCookies(cookies);
-    }
-
     public void clearCookies() {
         world.clearCookies();
     }
@@ -199,10 +171,6 @@ public class RetroAccessDriver {
         if (count > 0) {
             throw new AssertionError("Found unexpected " + description + " on page");
         }
-    }
-
-    private boolean isLoginBarrierVisible(Page page) {
-        return page.url().contains("/login") || page.locator(RetroSelectors.DISPLAY_NAME_INPUT).count() > 0;
     }
 
 }

@@ -1,11 +1,8 @@
 package direct.reflect.facilitator.bdd.support.context;
 
-import com.microsoft.playwright.options.Cookie;
 import io.cucumber.spring.ScenarioScope;
 import lombok.Data;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 @ScenarioScope
 @Component
@@ -15,6 +12,4 @@ public class RetroScenarioContext {
     private String sessionId;
     private boolean lastAdvanceTriggered;
     private String lastNoteContent;
-    private List<Cookie> facilitatorCookies;
-    private List<Cookie> participantCookies;
 }

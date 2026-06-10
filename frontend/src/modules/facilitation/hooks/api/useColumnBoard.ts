@@ -74,3 +74,15 @@ export async function unmergeResponse(retroId: string, stepId: number, responseI
   });
   if (!response.ok) throw new ApiError(response.status, `Failed to unmerge response: ${response.status}`);
 }
+
+export async function deleteResponse(retroId: string, responseId: string): Promise<void> {
+  const base = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+  const response = await globalThis.fetch(
+    `${base}/api/retro/${retroId}/response/${responseId}`,
+    {
+      method: "DELETE",
+      headers: { ...csrfHeaders() },
+    },
+  );
+  if (!response.ok) throw new ApiError(response.status, `Failed to delete response: ${response.status}`);
+}

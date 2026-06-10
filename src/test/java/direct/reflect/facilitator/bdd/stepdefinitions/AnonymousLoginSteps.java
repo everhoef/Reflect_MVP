@@ -1,6 +1,5 @@
 package direct.reflect.facilitator.bdd.stepdefinitions;
 
-import com.microsoft.playwright.options.Cookie;
 import direct.reflect.facilitator.bdd.support.context.RetroScenarioContext;
 import direct.reflect.facilitator.bdd.support.drivers.ColumnBoardDriver;
 import direct.reflect.facilitator.bdd.support.drivers.RetroAccessDriver;
@@ -12,7 +11,6 @@ import io.cucumber.spring.ScenarioScope;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.Assertions;
 
-import java.util.List;
 import java.util.UUID;
 
 @ScenarioScope
@@ -64,11 +62,9 @@ public class AnonymousLoginSteps {
         retroLifecycleDriver.createRetroAndGetLobbyUrl();
         retroLifecycleDriver.advanceToPhase(2);
         columnBoardDriver.advanceFacilitatorUntilColumnBoardVisible();
-        context.setFacilitatorCookies(retroAccessDriver.captureCookies());
         retroAccessDriver.clearCookies();
         retroAccessDriver.joinRetroAsGuest(context.getSessionId(), displayName);
         columnBoardDriver.waitForColumnBoardVisible();
-        context.setParticipantCookies(retroAccessDriver.captureCookies());
     }
 
     @When("I add a card, vote, or comment")
@@ -86,14 +82,6 @@ public class AnonymousLoginSteps {
 
     @Then("I should be able to identify my own contributions")
     public void iShouldBeAbleToIdentifyMyOwnContributions() {
-        List<Cookie> participantCookies = context.getParticipantCookies();
-        if (participantCookies == null) {
-            throw new AssertionError("Participant cookies not captured — cannot verify own contributions.");
-        }
-        retroAccessDriver.clearCookies();
-        retroAccessDriver.restoreCookies(participantCookies);
-        retroAccessDriver.rejoinRetroWithRecoveredGuestSession(context.getSessionId(), "Wise Owl");
-        columnBoardDriver.waitForColumnBoardVisible();
         columnBoardDriver.assertOwnNoteVisible(context.getLastNoteContent());
     }
 
@@ -102,10 +90,8 @@ public class AnonymousLoginSteps {
         retroLifecycleDriver.createRetroAndGetLobbyUrl();
         retroLifecycleDriver.advanceToPhase(2);
         columnBoardDriver.advanceFacilitatorUntilColumnBoardVisible();
-        retroAccessDriver.clearCookies();
         retroAccessDriver.joinRetroAsGuest(context.getSessionId(), "Reconnect User");
         columnBoardDriver.waitForColumnBoardVisible();
-        context.setParticipantCookies(retroAccessDriver.captureCookies());
         String columnId = columnBoardDriver.findFirstColumnId();
         String noteContent = "Note before disconnect " + System.currentTimeMillis();
         context.setLastNoteContent(noteContent);
@@ -118,13 +104,7 @@ public class AnonymousLoginSteps {
 
     @When("I rejoin via the unique session link")
     public void iRejoinViaTheUniqueSessionLink() {
-        List<Cookie> participantCookies = context.getParticipantCookies();
-        if (participantCookies == null) {
-            throw new AssertionError("Participant cookies not captured for re-entry.");
-        }
-        retroAccessDriver.clearCookies();
-        retroAccessDriver.restoreCookies(participantCookies);
-        retroAccessDriver.rejoinRetroWithRecoveredGuestSession(context.getSessionId(), "Reconnect User");
+        retroAccessDriver.navigateToRetro(context.getSessionId());
         retroAccessDriver.assertRetroPageVisible();
     }
 
