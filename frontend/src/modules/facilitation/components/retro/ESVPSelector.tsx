@@ -2,9 +2,9 @@ import { useState, useCallback } from "react";
 import { useSSESubscription } from "@/hooks/useSSEContext";
 import { EventType } from "@/types/events";
 import type { StepComponentProps } from "@/modules/facilitation/components/ComponentRouter";
-import type { components } from "@/types/api.d.ts";
+import type { components } from "@/shared/types/api.d.ts";
 import { useClusters, submitColumnResponse, deleteResponse } from "@/modules/facilitation/hooks/api/useColumnBoard";
-import { useCurrentUser } from "@/hooks/api/useAuth";
+import { useCurrentUser } from "@/modules/auth/hooks/useAuth";
 
 type ColumnResponseDto = components["schemas"]["ColumnResponseDto"];
 type ClusterGroupsDto = components["schemas"]["ClusterGroupsDto"];
@@ -27,7 +27,7 @@ interface ESVPConfig {
 function allResponses(clusters: ClusterGroupsDto): ColumnResponseDto[] {
   const result: ColumnResponseDto[] = [];
   const clustered = clusters.clustered ?? {};
-  for (const notes of Object.values(clustered)) {
+  for (const notes of Object.values(clustered) as ColumnResponseDto[][]) {
     result.push(...notes);
   }
   result.push(...(clusters.unclustered ?? []));
