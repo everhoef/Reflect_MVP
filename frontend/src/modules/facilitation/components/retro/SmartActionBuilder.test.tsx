@@ -174,8 +174,8 @@ describe("SmartActionBuilder", () => {
 
     await waitFor(() => {
       expect(screen.getByText("What is required")).toBeInTheDocument();
-      expect(screen.getByText("Who is required")).toBeInTheDocument();
-      expect(screen.getByText("Due Date is required")).toBeInTheDocument();
+      expect(screen.getByText("When is required")).toBeInTheDocument();
+      expect(screen.getByText("Criteria is required")).toBeInTheDocument();
     });
 
     expect(mockCreateActionItem).not.toHaveBeenCalled();
@@ -187,7 +187,8 @@ describe("SmartActionBuilder", () => {
     fireEvent.change(screen.getByTestId("what-input"), { target: { value: "Fix the thing" } });
     fireEvent.change(screen.getByTestId("who-input"), { target: { value: "Alice" } });
     fireEvent.change(screen.getByTestId("due-date-input"), { target: { value: "2026-12-31" } });
-    
+    fireEvent.change(screen.getByTestId("success-criteria-input"), { target: { value: "It works" } });
+
     fireEvent.click(screen.getByTestId("create-action-btn"));
 
     await waitFor(() => {
@@ -195,6 +196,7 @@ describe("SmartActionBuilder", () => {
         what: "Fix the thing",
         who: "Alice",
         dueDate: "2026-12-31",
+        successCriteria: "It works",
       });
     });
   });
