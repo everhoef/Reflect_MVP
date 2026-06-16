@@ -42,7 +42,6 @@ public class ActionItem {
     @Column(name = "what", nullable = false, length = 500)
     private String what;
 
-    @NotBlank(message = "Action item 'who' is required")
     @Size(max = 200, message = "Action item 'who' must not exceed 200 characters")
     @Column(name = "who", nullable = false, length = 200)
     private String who;
@@ -51,8 +50,9 @@ public class ActionItem {
     @Column(name = "due_date", nullable = false)
     private LocalDate dueDate;
 
+    @NotBlank(message = "Success criteria is required")
     @Size(max = 500, message = "Success criteria must not exceed 500 characters")
-    @Column(name = "success_criteria", length = 500)
+    @Column(name = "success_criteria", nullable = false, length = 500)
     private String successCriteria;
 
     @Column(name = "escalated", nullable = false)

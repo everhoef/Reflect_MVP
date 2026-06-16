@@ -16,9 +16,9 @@ import { EscalationVote } from '@/modules/facilitation/components/retro/Escalati
 // Form Schema
 const baseActionItemSchema = z.object({
   what: z.string().min(1, "What is required"),
-  who: z.string().min(1, "Who is required"),
-  dueDate: z.string().min(1, "Due Date is required"),
-  successCriteria: z.string().optional(),
+  who: z.string().optional(),
+  dueDate: z.string().min(1, "When is required"),
+  successCriteria: z.string().min(1, "Criteria is required"),
   escalated: z.boolean().optional(),
   wasEscalated: z.boolean().optional(),
   problemDescription: z.string().optional(),
@@ -96,12 +96,10 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
     try {
       const payload: CreateActionItemRequest = {
         what: values.what,
-        who: values.who,
+        who: values.who ?? "",
         dueDate: values.dueDate,
+        successCriteria: values.successCriteria,
       };
-      if (values.successCriteria) {
-        payload.successCriteria = values.successCriteria;
-      }
       
       const createdItem = await createActionItem(payload);
       
@@ -130,9 +128,9 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
     try {
       const payload: UpdateActionItemRequest = {
         what: values.what,
-        who: values.who,
+        who: values.who ?? "",
         dueDate: values.dueDate,
-        successCriteria: values.successCriteria ?? "",
+        successCriteria: values.successCriteria,
       };
       await updateActionItem({
         actionId: editingId,
@@ -209,35 +207,36 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">Who <span className="text-red-500">*</span></label>
-              <input 
-                {...form.register("who")} 
-                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
-                placeholder="Who owns this?" 
+              <label className="text-sm font-medium text-gray-700">Who</label>
+              <input
+                {...form.register("who")}
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Who owns this?"
                 data-testid="who-input"
               />
               {form.formState.errors.who && <p className="text-xs text-red-500">{form.formState.errors.who.message}</p>}
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">Due Date <span className="text-red-500">*</span></label>
-              <input 
-                type="date" 
-                {...form.register("dueDate")} 
-                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              <label className="text-sm font-medium text-gray-700">When <span className="text-red-500">*</span></label>
+              <input
+                type="date"
+                {...form.register("dueDate")}
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 data-testid="due-date-input"
               />
               {form.formState.errors.dueDate && <p className="text-xs text-red-500">{form.formState.errors.dueDate.message}</p>}
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">Success Criteria</label>
-              <input 
-                {...form.register("successCriteria")} 
-                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
-                placeholder="How will we know it's done?" 
+              <label className="text-sm font-medium text-gray-700">Criteria <span className="text-red-500">*</span></label>
+              <input
+                {...form.register("successCriteria")}
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="How will we know it's done?"
                 data-testid="success-criteria-input"
               />
+              {form.formState.errors.successCriteria && <p className="text-xs text-red-500">{form.formState.errors.successCriteria.message}</p>}
             </div>
             
             {allowEscalation && (
@@ -308,12 +307,12 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
                     {editForm.formState.errors.who && <p className="text-xs text-red-500">{editForm.formState.errors.who.message}</p>}
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium text-gray-700">Due Date</label>
+                    <label className="text-sm font-medium text-gray-700">When</label>
                     <input type="date" {...editForm.register("dueDate")} className="flex h-10 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" data-testid="edit-due-date-input" />
                     {editForm.formState.errors.dueDate && <p className="text-xs text-red-500">{editForm.formState.errors.dueDate.message}</p>}
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium text-gray-700">Success Criteria</label>
+                    <label className="text-sm font-medium text-gray-700">Criteria</label>
                     <input {...editForm.register("successCriteria")} className="flex h-10 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" data-testid="edit-success-criteria-input" />
                   </div>
                   
@@ -375,7 +374,7 @@ export function SmartActionBuilder({ retroId, componentConfig }: StepComponentPr
                     </div>
                     {item.successCriteria && (
                       <div className="flex items-center gap-1 w-full">
-                        <span className="font-semibold text-gray-700">Success:</span>
+                        <span className="font-semibold text-gray-700">Criteria:</span>
                         <span data-testid={`action-success-${item.id}`}>{item.successCriteria}</span>
                       </div>
                     )}
