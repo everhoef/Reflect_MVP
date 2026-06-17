@@ -4,7 +4,6 @@ import { EventType } from "@/shared/types/events";
 import type { StepComponentProps } from "@/modules/facilitation/components/ComponentRouter";
 import type { components } from "@/shared/types/api.d.ts";
 import { useClusters, submitColumnResponse, deleteResponse } from "@/modules/facilitation/hooks/api/useColumnBoard";
-import { useCurrentUser } from "@/modules/auth/hooks/useAuth";
 
 type ColumnResponseDto = components["schemas"]["ColumnResponseDto"];
 type ClusterGroupsDto = components["schemas"]["ClusterGroupsDto"];
@@ -39,21 +38,17 @@ function InputMode({
   stepId,
   columns,
   responses,
-  currentParticipantId,
   onRefresh,
 }: {
   retroId: string;
   stepId: number;
   columns: ColumnConfig[];
   responses: ColumnResponseDto[];
-  currentParticipantId: string | undefined;
   onRefresh: () => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
 
-  const myResponse = responses.find(
-    (r) => r.participantId === currentParticipantId,
-  );
+  const myResponse = responses[0] ?? null;
   const selectedColumnId = myResponse?.columnId ?? null;
 
   const handleSelect = async (columnId: string) => {
@@ -183,9 +178,6 @@ export function ESVPSelector({ retroId, stepId, componentConfig }: StepComponent
   const showContent = caps.showContent === true;
 
   const { data: clusters, isLoading, invalidate } = useClusters(retroId, stepId);
-  const { data: me } = useCurrentUser();
-
-  const currentParticipantId = me?.user?.id;
 
   const invalidateLocal = useCallback(() => {
     invalidate();
@@ -212,7 +204,6 @@ export function ESVPSelector({ retroId, stepId, componentConfig }: StepComponent
         stepId={stepId}
         columns={columns}
         responses={responses}
-        currentParticipantId={currentParticipantId}
         onRefresh={invalidate}
       />
     );

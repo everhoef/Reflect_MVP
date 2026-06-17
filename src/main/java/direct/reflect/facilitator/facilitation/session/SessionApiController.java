@@ -36,7 +36,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -301,18 +300,9 @@ public class SessionApiController {
     }
 
     private String deriveTitleFromStep(RetroStep step) {
-        Map<String, Object> config = step.getComponentConfig();
-        if (config != null) {
-            Object columns = config.get("columns");
-            if (columns instanceof List<?> colList && !colList.isEmpty()) {
-                Object first = colList.get(0);
-                if (first instanceof Map<?, ?> colMap) {
-                    Object title = colMap.get("title");
-                    if (title instanceof String s && !s.isBlank()) {
-                        return s;
-                    }
-                }
-            }
+        if (step.getRetroStage() != null && step.getRetroStage().getName() != null
+                && !step.getRetroStage().getName().isBlank()) {
+            return step.getRetroStage().getName();
         }
         return step.getComponentType().name().replace("_", " ");
     }
