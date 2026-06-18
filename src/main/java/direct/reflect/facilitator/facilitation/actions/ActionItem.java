@@ -43,7 +43,7 @@ public class ActionItem {
     private String what;
 
     @Size(max = 200, message = "Action item 'who' must not exceed 200 characters")
-    @Column(name = "who", nullable = false, length = 200)
+    @Column(name = "who", nullable = true, length = 200)
     private String who;
 
     @NotNull(message = "Action item due date is required")
