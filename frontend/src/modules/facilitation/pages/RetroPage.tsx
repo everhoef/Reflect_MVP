@@ -136,10 +136,30 @@ function RetroPageInner() {
 
   const handleCopyRetroId = () => {
     if (!retroId) return;
-    void navigator.clipboard.writeText(retroId).then(() => {
+    const succeed = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    };
+    if (navigator.clipboard) {
+      void navigator.clipboard.writeText(retroId).then(succeed).catch(() => {
+        // fallback for non-HTTPS (e.g. local NAS over HTTP)
+        const el = document.createElement("textarea");
+        el.value = retroId;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+        succeed();
+      });
+    } else {
+      const el = document.createElement("textarea");
+      el.value = retroId;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      succeed();
+    }
   };
 
   const { data: rawState, isLoading, error } = useRetroState(retroId) as {
