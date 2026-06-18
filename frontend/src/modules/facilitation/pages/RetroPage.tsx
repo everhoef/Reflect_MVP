@@ -272,8 +272,7 @@ function RetroPageInner() {
 
   const { signaledVersion, connectionState, openCount } = useSSE(retroId, {
     [EventType.STEP_ADVANCED]: (data) => {
-      refreshState();
-      void queryClient.invalidateQueries({ queryKey: ["timer", retroId] });
+      void reconcileBundle();
       sseDispatch(EventType.STEP_ADVANCED, data);
     },
     [EventType.SESSION_STARTED]: (data) => { refreshState(); sseDispatch(EventType.SESSION_STARTED, data); },

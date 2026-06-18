@@ -170,6 +170,12 @@ public record RetroEvent<T>(
             retroId, EventType.TIMER_STARTED, "system", Instant.now(), null);
     }
 
+    public static RetroEvent<Void> timerFinished(UUID retroId) {
+        return new RetroEvent<>(
+            "evt-" + UUID.randomUUID().toString().substring(0, 8),
+            retroId, EventType.TIMER_FINISHED, "system", Instant.now(), null);
+    }
+
     public static RetroEvent<EscalationVoteData> escalationVoteUpdated(
             UUID retroId,
             String participantId,

@@ -249,6 +249,7 @@ public class RetroSessionService {
         String state;
         if (remaining <= 0) {
             state = "expired";
+            eventService.publishDirect(RetroEvent.timerFinished(sessionId));
         } else if (remaining <= 30) {
             state = "red";
         } else if (remaining <= 120) {

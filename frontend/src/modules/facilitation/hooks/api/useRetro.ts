@@ -138,6 +138,7 @@ export function useTimer(retroId: string | undefined) {
     queryFn: () => fetchTimerState(retroId!),
     enabled: !!retroId,
     staleTime: 0,
+    refetchInterval: 30_000,
   });
 }
 
