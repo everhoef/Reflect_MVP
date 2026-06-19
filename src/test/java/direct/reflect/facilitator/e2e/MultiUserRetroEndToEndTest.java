@@ -153,11 +153,9 @@ public class MultiUserRetroEndToEndTest extends BaseEndToEndTest {
                 "Carol should see Bob's note at the reveal step (showContent=true)");
             log.info("  ├─ ✅ Cross-user visibility verified at reveal step");
 
-            // Advance through remaining MSG steps: vote, summary, AUTO, then into GENERATE_INSIGHTS
+            // Advance through remaining MSG steps: vote → GENERATE_INSIGHTS
             clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // reveal+cluster → vote
-            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // vote → summary
-            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // summary → AUTO (index=4)
-            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // AUTO → GENERATE_INSIGHTS
+            clickNextAndWait(facilitatorPage, DEFAULT_TIMEOUT_MS); // vote → GENERATE_INSIGHTS
             log.info("  └─ ✓ Completed GATHER_DATA phase (Mad Sad Glad)");
 
             // ===== PHASE 3: GENERATE_INSIGHTS — Perfection Game (6 steps) =====
@@ -642,13 +640,13 @@ public class MultiUserRetroEndToEndTest extends BaseEndToEndTest {
             String sessionId = createRetroSession(facilitatorPage, "Late Join Consistency Test");
             sessionService.startSession(UUID.fromString(sessionId));
 
-            logTestProgress("ADVANCE", 2, 8, "Fast-forwarding to GATHER_DATA step 2 to build history");
-            fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 2);
+            logTestProgress("ADVANCE", 2, 8, "Fast-forwarding to GATHER_DATA step 1 to build history");
+            fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 1);
             facilitatorPage.reload();
 
             waitForElement(facilitatorPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
             waitForElement(facilitatorPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
-            waitForHistoryItemCount(facilitatorPage, 2);
+            waitForHistoryItemCount(facilitatorPage, 1);
 
             logTestProgress("CAPTURE", 3, 8, "Capturing facilitator guidance and history");
             String facilitatorGuidance = facilitatorPage.locator("[data-testid='guidance-content']").textContent();
@@ -678,19 +676,19 @@ public class MultiUserRetroEndToEndTest extends BaseEndToEndTest {
             assertEquals(facilitatorHistoryTexts, lateJoinerHistoryTexts,
                 "Late joiner history texts must match facilitator's at bootstrap");
 
-            logTestProgress("ADVANCE_2", 6, 8, "Fast-forwarding to step 3 to verify post-bootstrap alignment");
-            fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 3);
+            logTestProgress("ADVANCE_2", 6, 8, "Fast-forwarding to step 2 to verify post-bootstrap alignment");
+            fastForwardSession(sessionId, RetroPhase.GATHER_DATA, 2);
             facilitatorPage.reload();
 
             waitForElement(facilitatorPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
             waitForElement(facilitatorPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
-            waitForHistoryItemCount(facilitatorPage, 3);
+            waitForHistoryItemCount(facilitatorPage, 2);
 
             String retroUrl = facilitatorPage.url();
             lateJoinerPage.navigate(retroUrl);
             waitForElement(lateJoinerPage, "[data-testid='guidance-sidebar']", SSE_PROPAGATION_TIMEOUT_MS);
             waitForElement(lateJoinerPage, "[data-testid='guidance-content']", SSE_PROPAGATION_TIMEOUT_MS);
-            waitForHistoryItemCount(lateJoinerPage, 3);
+            waitForHistoryItemCount(lateJoinerPage, 2);
 
             logTestProgress("ASSERT_ADVANCE", 7, 8, "Asserting both pages aligned after step advance");
             String facilitatorGuidanceAfter = facilitatorPage.locator("[data-testid='guidance-content']").textContent();
