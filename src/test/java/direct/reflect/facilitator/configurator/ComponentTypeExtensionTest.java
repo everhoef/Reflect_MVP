@@ -14,6 +14,7 @@ class ComponentTypeExtensionTest {
                         "MULTI_COLUMN_BOARD",
                         "RATING_SCALE",
                         "HISTOGRAM_CHART",
+                        "ESVP_SELECTOR",
                         "GUIDANCE_MESSAGE",
                         "SMART_ACTION_BUILDER",
                         "ACTION_REVIEW");
