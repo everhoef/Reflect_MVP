@@ -26,6 +26,6 @@ export function useCurrentUser() {
   return useQuery<MeResponse | null>({
     queryKey: ["me"],
     queryFn: fetchCurrentUser,
-    staleTime: Infinity,
+    staleTime: 60 * 1000,
   });
 }

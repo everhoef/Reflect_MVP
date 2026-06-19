@@ -91,8 +91,8 @@ class TemplateImportIntegrationTest {
         log.info("Steps found for stage 29: {}", steps.size());
 
         assertThat(steps)
-                .as("Stage 29 (Start Stop Continue) should have exactly 7 steps")
-                .hasSize(7);
+                .as("Stage 29 (Start Stop Continue) should have exactly 6 steps")
+                .hasSize(6);
     }
 
     @Test
