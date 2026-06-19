@@ -300,7 +300,8 @@ class ActionItemApiIntegrationTest {
                                 {
                                   "what": "Introduce release checklist",
                                   "who": "Alice",
-                                  "dueDate": "2026-05-02"
+                                  "dueDate": "2026-05-02",
+                                  "successCriteria": "Checklist used in next release"
                                 }
                                 """))
                 .andExpect(status().isCreated());
