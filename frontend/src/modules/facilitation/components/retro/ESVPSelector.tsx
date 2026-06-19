@@ -51,9 +51,7 @@ function InputMode({
 }) {
   const [submitting, setSubmitting] = useState(false);
 
-  const myResponse = responses.find(
-    (r) => r.participantId === currentParticipantId,
-  );
+  const myResponse = responses.find((r) => r.participantId === currentParticipantId) ?? null;
   const selectedColumnId = myResponse?.columnId ?? null;
 
   const handleSelect = async (columnId: string) => {
@@ -182,10 +180,10 @@ export function ESVPSelector({ retroId, stepId, componentConfig }: StepComponent
   const allowInput = caps.allowInput !== false;
   const showContent = caps.showContent === true;
 
-  const { data: clusters, isLoading, invalidate } = useClusters(retroId, stepId);
   const { data: me } = useCurrentUser();
-
   const currentParticipantId = me?.user?.id;
+
+  const { data: clusters, isLoading, invalidate } = useClusters(retroId, stepId);
 
   const invalidateLocal = useCallback(() => {
     invalidate();

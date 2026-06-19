@@ -95,6 +95,12 @@ public class EventService {
         applicationEventPublisher.publishEvent(event);
     }
 
+    public void publishDirect(RetroEvent<?> event) {
+        log.debug("[{}] Publishing {} event directly (no transaction required)",
+            event.correlationId(), event.type(), event.retroId());
+        broadcastToRedis(event);
+    }
+
     /**
      * Handles events received from Redis Pub/Sub.
      * Called by MessageListenerAdapter for ALL events published by ANY pod (broadcast).

@@ -35,7 +35,7 @@ public class ActionItemService {
         actionItem.setRetroSession(participant.getSession());
         actionItem.setCreatedByParticipantId(participant.getParticipantId());
         actionItem.setWhat(normalizeRequiredText(request.what(), "what"));
-        actionItem.setWho(normalizeRequiredText(request.who(), "who"));
+        actionItem.setWho(normalizeOptionalText(request.who()));
         actionItem.setDueDate(request.dueDate());
         actionItem.setSuccessCriteria(normalizeOptionalText(request.successCriteria()));
 
@@ -76,7 +76,7 @@ public class ActionItemService {
             actionItem.setWhat(normalizeRequiredText(request.what(), "what"));
         }
         if (request.who() != null) {
-            actionItem.setWho(normalizeRequiredText(request.who(), "who"));
+            actionItem.setWho(normalizeOptionalText(request.who()));
         }
         if (request.dueDate() != null) {
             actionItem.setDueDate(request.dueDate());

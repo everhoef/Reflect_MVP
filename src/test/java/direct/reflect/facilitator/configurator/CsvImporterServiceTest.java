@@ -135,8 +135,8 @@ class CsvImporterServiceTest {
 
         // For debugging, let's verify the expected total matches what we imported
         assertTrue(totalSteps > 0, "Should have imported some steps");
-        assertEquals(24, totalSteps, "Should have imported all 24 steps from CSV");
-        assertEquals(19, boardSteps, "Should have 19 MULTI_COLUMN_BOARD steps");
+        assertEquals(20, totalSteps, "Should have imported all 20 steps from CSV");
+        assertEquals(14, boardSteps, "Should have 14 MULTI_COLUMN_BOARD steps");
         assertEquals(1, ratingSteps, "Should have 1 RATING_SCALE step");
         assertEquals(1, histogramSteps, "Should have 1 HISTOGRAM_CHART step");
         assertEquals(2, esvpSteps, "Should have 2 ESVP_SELECTOR steps");

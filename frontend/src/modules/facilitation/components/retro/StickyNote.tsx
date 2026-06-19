@@ -155,7 +155,7 @@ export function StickyNote({
             )}
           </div>
 
-          {allowVoting && (
+          {allowVoting ? (
             <button
               onClick={() => onVote?.(note.id)}
               className={[
@@ -168,7 +168,11 @@ export function StickyNote({
               👍
               {showVotes && <span>{note.voteCount}</span>}
             </button>
-          )}
+          ) : showVotes && note.voteCount > 0 ? (
+            <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium border border-gray-200 text-gray-500">
+              👍 <span>{note.voteCount}</span>
+            </span>
+          ) : null}
         </div>
       </Card>
     </div>

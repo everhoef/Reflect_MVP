@@ -105,7 +105,7 @@ class ActionItemDataModelTest {
         RetroSession retroSession = saveSession("Validation Retro");
 
         assertInvalid(buildActionItem(retroSession, "Daily sync", "Alice", LocalDate.of(2026, 5, 1), item -> item.setWhat(null)));
-        assertInvalid(buildActionItem(retroSession, "Daily sync", "Alice", LocalDate.of(2026, 5, 1), item -> item.setWho(null)));
+        assertInvalid(buildActionItem(retroSession, "Daily sync", "Alice", LocalDate.of(2026, 5, 1), item -> item.setSuccessCriteria(null)));
         assertInvalid(buildActionItem(retroSession, "Daily sync", "Alice", LocalDate.of(2026, 5, 1), item -> item.setDueDate(null)));
         assertInvalid(buildActionItem(retroSession, "Daily sync", "Alice", LocalDate.of(2026, 5, 1), item -> item.setRetroSession(null)));
     }
@@ -164,6 +164,7 @@ class ActionItemDataModelTest {
         actionItem.setWhat(what);
         actionItem.setWho(who);
         actionItem.setDueDate(dueDate);
+        actionItem.setSuccessCriteria("Default test criteria");
         customizer.accept(actionItem);
         return actionItem;
     }

@@ -218,7 +218,7 @@ class ActionItemApiIntegrationTest {
         testSession.setSyncVersion(5L);
         sessionRepository.saveAndFlush(testSession);
         saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), "Attendance logged");
-        saveActionItem("Review incidents weekly", "Bob", LocalDate.of(2026, 5, 8), null);
+        saveActionItem("Review incidents weekly", "Bob", LocalDate.of(2026, 5, 8), "Weekly review completed");
 
         mockMvc.perform(get("/api/retros/{retroId}/actions", testSession.getId())
                         .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth)))
@@ -253,7 +253,7 @@ class ActionItemApiIntegrationTest {
 
     @Test
     void updateActionItem_validRequest_returnsUpdatedItemAndPublishesActionUpdatedEvent() throws Exception {
-        ActionItem actionItem = saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), null);
+        ActionItem actionItem = saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), "Attendance logged");
 
         mockMvc.perform(patch("/api/retros/{retroId}/actions/{actionId}", testSession.getId(), actionItem.getId())
                         .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
@@ -300,7 +300,8 @@ class ActionItemApiIntegrationTest {
                                 {
                                   "what": "Introduce release checklist",
                                   "who": "Alice",
-                                  "dueDate": "2026-05-02"
+                                  "dueDate": "2026-05-02",
+                                  "successCriteria": "Checklist used in next release"
                                 }
                                 """))
                 .andExpect(status().isCreated());
@@ -311,7 +312,7 @@ class ActionItemApiIntegrationTest {
 
     @Test
     void deleteActionItem_existingItem_returnsNoContentAndPublishesActionDeletedEvent() throws Exception {
-        ActionItem actionItem = saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), null);
+        ActionItem actionItem = saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), "Attendance logged");
 
         mockMvc.perform(delete("/api/retros/{retroId}/actions/{actionId}", testSession.getId(), actionItem.getId())
                         .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
@@ -332,7 +333,7 @@ class ActionItemApiIntegrationTest {
 
     @Test
     void updateActionItemStatus_validRequest_returnsUpdatedStatus() throws Exception {
-        ActionItem actionItem = saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), null);
+        ActionItem actionItem = saveActionItem("Daily sync with design team", "Alice", LocalDate.of(2026, 5, 1), "Attendance logged");
 
         mockMvc.perform(post("/api/retros/{retroId}/actions/{actionId}/status", testSession.getId(), actionItem.getId())
                         .with(SecurityMockMvcRequestPostProcessors.authentication(testAuth))
